@@ -152,3 +152,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 论文平台选择及长期文献记忆（2026-11-18）
 
 论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。
+
+## 多代构思裂变补充协议（2026-11-19）
+
+一条技术任务需经过全球专利与论文检索、至少三条独立物理机理路径、反证与工程边界验证，再进入工程技术方案。若存在不同技术轴的已评价候选，优先调用 `patent_idea_crossovers`，构建可实施的多亲本组合创新；必须描述构件接口、控制时序和协同效果假说。对无法自洽、被在先技术挑战或试验否定的方案调用 `patent_idea_reject`，保留失败条件给下一代使用。任何评分、文本近似、构思交叉均不代替来源逐项核验或法律创造性判断。工作流见 `docs/IDEA_FISSION.md` 和 `skills/patent-idea-fission/SKILL.md`。
