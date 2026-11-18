@@ -23,3 +23,7 @@ patent_library/
 *.sqlite3-shm
 *.sqlite3-wal
 *.db
+
+# MCP 私有研究空间与临时证据
+private_patent_workspace/
+.patent_mcp/

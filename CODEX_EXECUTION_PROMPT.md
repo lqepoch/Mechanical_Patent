@@ -121,3 +121,27 @@ J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出�
 - external/google-patents-examples (Apache-2.0，2026-04-18 归档)：专利地图、Claim Text Extraction 与 Claim Breadth SQL 方法。对过时的 BigQuery 表结构不得照搬部署。
 
 实现与升级按实际授权、固定 SHA、NOTICE、真实检索来源和 CI 回归执行。增量补检索应记录到同一个案卷及 DOI 引证图谱，人工审批保持必须。
+
+
+## 追加执行目标：想法裂变与标准 MCP 接口（2026-11-18）
+
+新增加的实际代码包括：src/mechanical_patent/ideation_fission.py、src/mechanical_patent/mcp_server.py，技能 skills/patent-idea-fission 和 .agents 镜像、tests/test_fission_mcp.py。完整协议参阅 docs/MCP_INTERFACE.md，质量—多样性裂变规则参阅 docs/IDEA_FISSION.md。全部 Agent 自有提示词和 Skill 描述使用简体中文。
+
+操作指令：
+
+1. 检查现有源码及业务测试，先执行 python -m unittest discover -s tests -v，针对每个 MCP 工具验证输入 Schema、鉴权边界、操作幂等、跨案卷路径保护和异常处理。
+2. 与上游 patent-disclosure-skill 的交底、申请文件、claim-chart 和 Word 工具建立数据适配，统一中文五册结构；避免删除原有能力。
+3. 将 AutoPatent 阶段状态/断点恢复、IdeaForge TRIZ/SCAMPER 交叉协作、Trinno 可证伪实验和 Co-Scientist 竞争进化方式，依许可审查后吸收为 05a 构思谱系。IDEAgent/许可证不明项目只吸收公开思想，不复制源码。
+4. 将 patent_idea_plan 从计划任务扩展为宿主 AI 侧的多角色并行工作流：每代查新、多个技术轴独立构思、反证、工程分析、质量—多样性保留，最多四代或到预设预算为止。
+5. 实现可验证的候选融合：父方案与子方案有清晰区别技术特征和相互作用，简单拼接的方案必须有明确功能关系与技术效果论证。
+6. 优先接入真实专利数据库，包括 EPO OPS、授权行业专利 MCP、USPTO 开放接口、CNIPA 合法渠道、Google Patents BigQuery 和商业 Patsnap 许可数据源；缺失供应商或支付授权时报告实际覆盖。
+7. 对真实公开号、DOI、来源 PDF、权利要求、审查日期逐项标注；专利权利要求引用必须能匹配原文，论文摘要不可冒充专利权利要求。
+8. 对接中国专利五册输出、STEP 附图、DXF/DWG、SolidWorks 与后续 CAE 验证接口；实际未运行的工程计算或实验不得标为已完成。
+9. 服务采用官方 MCP SDK v2，stdio + Streamable HTTP；API Schema 能被外部 MCP Host 直接发现，至少覆盖案卷、检索、裂变、反证、工程和申请写作。自有知识图谱与证据库只管理真实已验证的来源状态。
+10. 将纯本地例程与生产系统能力分开：生产需 PostgreSQL + RLS、Keycloak/OIDC、限速与授权、队列和 Outbox、原始证据不可改写存储、审计和跨云部署。
+11. 每次提交先跑 Python 3.12 完整离线 CI + MCP v2 Client 协议握手与工具调用测试；任何红灯明确记录并修复。分组 Issue 对应后续未闭环项目。
+12. 创建 PR 并与 main 比较，检查功能回归及许可证。全部必需检查通过后合并 main，并保留回滚 SHA。
+
+输出应包含真实的用户使用示例：一句任务触发保密审批后的专利/论文检索→多代构思→逐特征反证→理论验证→权要/说明书撰写→审查待办。明确 AI 仅负责生成受验证的研究草稿，最终是否申请交由专利专业人员和企业授权人员决定。
+
+追加数据接入验收：核验 patent_run_create、patent_source_import 可导入第三方授权 MCP 真实结果，同时输入 verified=true 也必须入库标记未核验，重复导入去重、记录检索式与原始来源；无法通过源文件核对时不得出具创造性审核通过结论。

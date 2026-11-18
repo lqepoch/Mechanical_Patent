@@ -28,6 +28,7 @@ jobs:
           - test_mcp_bridge.py
           - test_skill_mirrors.py
           - test_citations.py
+          - test_fission_mcp.py
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,3 +44,16 @@ jobs:
         run: python scripts/sync_skill_mirrors.py --check
       - name: Unit tests
         run: python -m unittest discover -s tests -p '${{ matrix.suite }}' -v
+
+  mcp-contract:
+    name: MCP-v2协议发现与工具调用
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCP SDK v2
+        run: python -m pip install -e '.[mcp]'
+      - name: Protocol discovery and invocation
+        run: python -m unittest discover -s tests -p 'test_fission_mcp.py' -v

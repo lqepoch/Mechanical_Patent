@@ -210,3 +210,29 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 结果保留 04c_paper_citations.json、每一批 citation_batches/<hash>.json、更新后的 04b_technology_graph.json 及事件哈希链。通过新的专利论文交叉验证 Skill 对新 DOI 进一步核实论文元数据、真实全文和技术可迁移性。
 
 源码及许可证已固定为 git submodule：external/opencitations-api（ISC）、external/paper-qa（Apache-2.0）、external/google-patents-examples（Apache-2.0，原仓库已归档）。详细说明见 docs/CITATION_DISCOVERY.md；新增的 skills/patent-citation-discovery/SKILL.md 与 Codex 的 .agents/skills 镜像保持一致。
+
+
+## 🧠 新增：全球专利研发 MCP + 多代发明想法裂变
+
+- 统一专利 MCP 服务器：stdio（Codex、AI 桌面客户端）或回环地址上的 Streamable HTTP（由安全网关提供远程接入）。
+- MCP 工具支持案卷管理、授权专利/论文检索、证据读取、AI 构思裂变、质量—多样性路线优选、逐权要反证、工程理论审核及中文专利申请底稿。
+- 发明谱系独立文件 05a_idea_fission.json，保存父子节点、创新方法、理论假设、证据编号、反证与评分；默认至多四代、120个候选，可继续导入现有 05_inventions.json 工作流。
+- 所有 AI 推理和文字撰写由当前 ChatGPT / Codex 等 MCP Host 进行；不需要另外安装 Ollama 或配置模型 API Key。EPO OPS 等专利数据接口有独立凭证和许可要求。
+
+安装（Python 3.11+）：
+
+    python -m pip install -e '.[mcp]'
+
+启动本地 MCP：
+
+    python -m mechanical_patent.mcp_server --transport stdio --workspace ./private_patent_workspace
+
+启动由反向代理保护的 HTTP 后端：
+
+    python -m mechanical_patent.mcp_server --transport streamable-http --host 127.0.0.1 --port 8765 --workspace ./private_patent_workspace
+
+详细接口、示例配置、安全边界见 docs/MCP_INTERFACE.md，创新裂变方法见 docs/IDEA_FISSION.md，Codex 自发现入口为 .agents/skills/patent-idea-fission/SKILL.md。HTTP 默认只接受本机连接，正式远程使用仍必须配备 OAuth2/OIDC、项目访问控制和网络隔离，不可直接对公网暴露。
+
+备注：GitHub 上包含服务端与离线测试，但并不意味着全球数据检索渠道已经全部开通、生产认证已经部署或机械仿真已经执行。专业专利申请前须复核权利要求、公开充分性、工程实现和权属。
+
+跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
