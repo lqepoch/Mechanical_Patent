@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 
 from .core import PatentWorkflowError
 
-_ROOT = Path(__file__).resolve().parents[2] / "catalog"
+_ROOT = Path(__file__).resolve().parent / "data"
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{2,79}\Z")
 _HTML = re.compile(r"<[^>]+>")
 _KEYWORDS = ("消防", "救援", "应急", "灭火", "泡沫", "水泵", "fluid", "pump",
@@ -465,6 +465,36 @@ class ProblemSourceRegistry:
                 "experimental_validation_done":False,
                 "outbound_search_requires_project_approval":True}
 
+
+    def derive_topic(self, observation_id: str, problem: str, hypothesis: str,
+                     falsification: str, domain: str = "mechanical") -> dict:
+        """AI may register a research hypothesis; it cannot attest patent novelty."""
+        for field, value in (("problem",problem),("hypothesis",hypothesis),
+                             ("falsification",falsification),("domain",domain)):
+            if not isinstance(value,str) or not 5 <= len(value.strip()) <= 1600:
+                raise PatentWorkflowError(f"{field} 需要明确且有界的技术描述。")
+        with self.connect(write=True) as db:
+            observation=db.execute("SELECT * FROM observations WHERE id=?",
+                                   (observation_id,)).fetchone()
+            if not observation:
+                raise PatentWorkflowError("新的课题须关联真实且已入库的来源观察记录。")
+            topic_id="IDEA-"+sha256((observation_id+"|"+hypothesis.strip().casefold())
+                                   .encode()).hexdigest()[:20].upper()
+            result=db.execute("""INSERT OR IGNORE INTO topics
+                (id,title,domain,problem,hypothesis,falsification,origin,status,novelty_checked,created_at)
+                VALUES(?,?,?,?,?,?,?,'research_pending',0,?)""",
+                (topic_id,observation["title"],domain.strip(),problem.strip(),
+                 hypothesis.strip(),falsification.strip(),
+                 "public_observation:"+observation_id,_now()))
+            if result.rowcount:
+                db.execute("UPDATE observations SET status='research_pending' WHERE id=?",
+                           (observation_id,))
+                self._event(db,"topic_derived",topic_id,{"observation_id":observation_id,
+                           "status":"research_pending"})
+        return {"topic_id":topic_id,"created":bool(result.rowcount),
+                "status":"research_pending","novelty_checked":False,
+                "engineering_validated":False}
+
     def record_research(self, topic_id: str, agent: str, findings: str,
                         evidence_urls: list[str], *, public_only: bool = False) -> dict:
         if not public_only:
@@ -518,8 +548,19 @@ class ProblemSourceRegistry:
                     body=payload["data"]
                     if not isinstance(body,bytes):
                         raise PatentWorkflowError("RSS 供应商返回类型无效。")
+                    suggested=0
                     for entry in _feed_entries(body):
                         try:
+                            target=_url(entry["url"])
+                            origin_host=_host(source["url"])
+                            if not (_host(target)==origin_host or
+                                    _host(target).endswith("." + origin_host)):
+                                if suggested<3:
+                                    self.propose("RSS关联的外部平台："+_host(target),target,
+                                        "已批准公开RSS中的外部引用，需人工核对发布者与长期监测价值。",
+                                        discovered_from=source["id"])
+                                    suggested+=1
+                                continue
                             result=self.observe(source["id"],**entry)
                             if result["status"]=="created":
                                 added+=1
