@@ -54,20 +54,13 @@ user-invocable: true
 
 接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
 
+## 论文原始全文与页码证据（2026-11-19）
 
-## PDF 授权取证与长文档解析（2026-11-19）
-
-1. 为每篇论文核对 DOI 和来源所标注的 OA/许可；pdf_url 仅是候选，不允许凭一个链接直接认定可合法归档。
-2. 在项目私有环境执行 `literature pdf-fetch`，提供 case_id、workflow DB、已批准域名、合法版权依据和明确授权；下载使用 DNS 钉扎 HTTPS、SHA256 和 PDF 格式/大小校验，失败保存故障而不触碰既有分析。
-3. 配置经许可的本地 Docling artifacts，执行 `literature pdf-parse`；获得 JSON 页码/段落并自动更新单篇 Markdown 的机器区。全部输出保持 parsed_unverified。
-4. 通过 `patent_paper_pdf_status`、`patent_paper_pdf_page` 或 CLI pdf-pages 定位原文，再按页写入机理、工况、公式、证伪实验及与专利权利要求的差异；每段结论携带实际页码和文件 SHA256。
-5. 对于重新获取或换版本的 PDF，校验 SHA256；技术人员复核后再进入证据/发明审核阶段。文件不明、许可证无效、模型缺失、来源重定向或文件损坏时明确阻断。
-
-具体接口见 docs/PAPER_FULLTEXT.md。网页链接或自动结构化转换均不能代替人工核验原始公开 PDF。
+不同来源统一 DOI 后，只在纸面许可已确认、OA PDF 来源真实、企业外发审批通过时安排 `patent-fulltext-processing` 任务。Unpaywall 和 OpenAlex 的 PDF URL 先视为候选，未知许可/NC/ND 等不进入自动下载。通过受控 CLI 调用 `fulltext-plan`、`fulltext-process`，失败留存任务与 PDF SHA，利用 `patent_literature_fulltext_search` 获取页码证据。技术综述、创造性反证须以原始文献核验结果为据，切勿将 Docling 解析等同于论文结论核实。
 
 
-## 论文分页检索与中断恢复（2026-11-19）
+## 批量多平台检索、恢复与 DOI 授权发现（2026-11-19）
 
-对于数百至上千篇论文的需求，使用已有 literature harvest 而非仅调用单页 research。支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed。按各提供方原生 cursor / offset 查询，并逐页保存 checkpoint、项目私有 SQLite 与单篇 MD；失败允许在时限内从游标恢复。需明确留存每个来源的条数、API 异常和实际检索日期。OpenAlex 深分页第二页需要 API Key，Semantic Scholar 相关性搜索最多 1,000 条，其他平台的全文获取与版权仍单独核对。详细操作见 docs/PAPER_SOURCES.md。
+当项目目标涉及数百上千篇论文，优先使用 literature harvest 选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC 或 PubMed 的官方分页通道，按实际源配额、费用、公开日期和许可分流，逐页保留当前案卷 SQLite 游标与单篇 MD。Semantic Scholar 普通检索 offset 上限每词1000篇，Bulk 使用 token，每页1000篇、max_documents 必须为1000整数倍；OpenAlex 第二页需要 API Key。出现网络失败时保留 partial/failed checkpoint，后续经审批恢复。
 
-**Semantic Scholar Bulk 采集**：当相关性检索超过 1000 条时，进入 literature harvest --provider semantic-scholar-bulk，使用 page_size=1000、max_documents=1000的整数倍，并按 token 游标续检。Bulk 返回基本著录数据，需通过 DOI/开放原文补充实验工况与方程；不得把批量结果视为全文核验。见 docs/PAPER_SOURCES.md。
+用单独的 oa-enrich 在核准的同项目目录按 DOI 查询 Unpaywall 公开候选 PDF；不得自动下载。跨平台同 DOI 元数据应合并 authors/source_ids/sources，许可证或 OA 权属冲突按失效优先；保留原有分析笔记。PDF 获取、离线 Docling、页码块及版权审计采用已有 FulltextPipeline 的 fulltext-plan/fulltext-process，机器全文结果始终待核验。详细示例见 docs/PAPER_SOURCES.md。
