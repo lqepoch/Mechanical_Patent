@@ -1,34 +1,44 @@
 ---
 name: patent-autonomous
-description: "输入机械技术问题，自动开展中外专利查新、TRIZ/SCAMPER创新构思、反证检索、工程可行性论证，形成中国发明专利交底及申请草稿，保存证据与审核门禁。"
+description: "一条指令自动检索中国和全球专利、学术论文与跨领域技术文献，产生可解释机械发明方案，完成反证检索、工程可行性分析、中国发明专利交底与申请草稿。由当前 ChatGPT/Codex 模型直接执行，不要求配置外部模型 API。"
 user-invocable: true
 ---
 
-# Autonomous Mechanical Patent R&D
+# Patent Autonomous — AI native
 
-Use when the user asks to discover technical inventions, improve a machine/design, evaluate mechanical novelty or draft an invention patent from one technical direction.
+## Mandatory operating model
 
-## Required inputs
+The CURRENT ChatGPT/Codex/compatible AI client is the inventor, reviewer and patent drafter. This Skill supplies instructions and tool contracts; it never asks to install Qwen/Ollama or configure an OpenAI-compatible LLM API.
 
-- User's technical problem and application constraints. Assume reasonable parameters where unknown but mark all assumptions.
-- Whether unpublished technical details can be sent to external model/search providers.
-- Optional CAD/STEP/BOM and existing disclosure references. Never upload private materials without authorization.
+Read repo AGENTS.md and docs/AI_CLIENTS.md first. When there is no local terminal (ChatGPT website), use the current conversation's authorized web, repository connector and document tools and write the reports in the chat or connected repo. Do not claim a downloaded local repository is automatically visible in ChatGPT web.
 
-## Procedure
+## Single instruction, full workflow
 
-1. Read the root AGENTS.md, README.md, docs/ARCHITECTURE.md and docs/UPSTREAM_AUDIT.md.
-2. Execute the Mechanical Patent CLI using an authenticated live provider and local OpenAI-compatible model. The CLI returns a research dossier and stage-level JSON.
-3. If the provider is unavailable, disclose failure. Imported records are UNVERIFIED. Do not claim global search or novelty.
-4. Interpret the five independent generated directions, contrarian evidence, mechanical feasibility equations and uncertainty register.
-5. For a Chinese application, if the pinned handsomestWei/patent-disclosure-skill is installed, explicitly dispatch to its patent-disclosure and patent-application subskills. Provide it with the selected candidate, evidence and full engineering source. Its local CNIPA quick scan is only supplemental.
-6. If a STEP assembly exists and the PisenAILab china-patent-figure-skill has passed a local environment acceptance check, use that isolated tool for reproducible patent figure generation. Require human part-number and disclosure mapping review.
-7. Run independent QA: novelty/inventiveness risk, claim-to-specification traceability, theoretical feasibility, drawing labels, official CNIPA formatting, data confidentiality, provenance and inventor confirmation.
-8. Output an evidence-linked prior-art report, full candidate matrix, engineering verification plan, draft disclosure, claims, abstract, description, figure plan and issues list. Filing authorization is always a human action.
+1. Identify real-world engineering problem, physical environment, constraints, confidentiality class and intended invention patent jurisdiction.
+2. Run prior-art patent search AND scholarly paper search before any invention writing. Read sibling skills/patent-global-search/SKILL.md and skills/patent-paper-search/SKILL.md. Expand Mandarin/English synonyms, mechanical principles, IPC/CPC and cross-field analogs. Record both result sets with publication dates and exact identifiers.
+3. Compare patents by claims/description/figures, and scholarly papers by principles, method, assumptions and experimental scope. Extract technical defects and residual contradictions. Record inadequate search coverage.
+4. Generate multiple independent designs using TRIZ, SCAMPER, FMEA, Design Thinking, biomimicry/cross-domain physical principles and ambitious but physically coherent hypotheses. Each candidate needs components, assembly/control interactions, stepwise mechanisms, falsifiable equations, design constraints and alternatives.
+5. For EACH candidate perform new patent and paper countersearch: feature-by-feature D1/D2 comparison, motivation-to-combine analysis and citation-backed objection table. Novelty/inventiveness, feasibility and FTO are distinct evaluations.
+6. Verify theory via engineering checks: force, flow/NPSH, energy, heat, tolerance, materials, kinematics, boundaries, reliability and safety as applicable. Do not pretend to run SolidWorks/ANSYS or physical experiments unless actual tools and files are available. State equations, units, parameter assumptions, failure mechanisms and verification plan.
+7. Use pinned Chinese subskills external/patent-disclosure-skill/skills/patent-disclosure/SKILL.md and .../patent-application/SKILL.md for thorough legal drafting and Chinese terminology. Include technical disclosure, abstract, independent and dependent claims, complete enabling specification, drawing legend and claim-support matrix. If STEP CAD is available, use isolated china-patent-figure-skill for line art and cross-check marks.
+8. Independently audit: every citation real and dated, every distinction grounded, each claim supported, sufficient disclosure of reproducible mechanism and boundaries, numbering, official statutory formatting vs template preferences, confidentiality, actual human inventors. Mark a draft as pending engineering/patent-professional review. Never automatically submit the application.
 
-## Safety
+## Tool contract (optional CLI)
 
-- WIPO PATENTSCOPE public search is not an authorized scraper source.
-- Absent literature results never prove novelty or patentability; abstract-only retrieval is insufficient for full claim mapping.
-- Do not invent experiments, calculations, source references or inventors.
-- A theoretically implementable idea still needs sufficient technical disclosure and examination for Chinese patent registration.
-- No automatic infringement/FTO clearance or legal filing.
+The native AI produces the queries and authored material. Python tools only fetch and structure data, never request an LLM.
+
+    python -m mechanical_patent research \
+      --direction "消防泵高海拔吸水创新" \
+      --patent-query "high altitude pump inlet air separation" \
+      --paper-query "cavitation high altitude centrifugal pump" \
+      --allow-search-exposure --case-dir cases/new-case-001
+
+Academic APIs use OpenAlex + Crossref by default after search approval, with optional no-key public access. Patent APIs may require EPO/other authorized provider accounts. If data access is missing, report this and continue using permitted native web search. Read AGENT_NEXT_STEPS.md and fill 05_inventions.json, 06_countersearch.json, 07_engineering.json, 08_application.json with evidence IDs. Then run the static gate:
+
+    python -m mechanical_patent validate --case-dir cases/new-case-001
+
+## Output
+
+Patent and paper search logs, source coverage, parallel invention matrix, patent/paper counterevidence, physics and implementation report, Chinese invention application draft, figure plan and uncertainty/approval checklist.
+
+Missing literature or experiments must remain identified as missing. Any invented public patent number, fake paper, fabricated measurement or claim of authorization is a hard failure.
