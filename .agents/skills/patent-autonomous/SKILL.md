@@ -41,3 +41,8 @@ user-invocable: true
 ## 合法开放全文的增量证据处理（2026-11-19）
 
 在获得论文标题/摘要、候选 PDF 地址之后，按专用 `patent-fulltext-processing` Skill 审查许可/项目保密状态，调用受控 CLI 构建 PDF 任务、固定 IP/TLS 下载、离线 Docling 解析，再用 MCP `patent_literature_fulltext_search` 查询页码证据。机器解析输出只表明已取得文本，仍需工程师核对原始 PDF 后才可用于创造性反证及工程参数判断。维护知识库每篇 Markdown、来源 SHA256、下载恢复点。详见 docs/FULLTEXT_PIPELINE.md。
+
+## 自动研究的可核查短引（2026-11-19）
+
+先使用 patent_literature_fulltext_search 查询与机械问题对应的真实页码，再用 patent_literature_fulltext_quote 检查原文短引是否逐字匹配。仅当引用属于当前案卷、当前 PDF SHA256 且来源已解析，才通过 patent_literature_note(basis=full_text) 持久化工程事实。模型推断与专业复核分层保存，文本匹配不等同法律和工程结论已核验。未解析、缺页码及已变更 PDF 的证据要写入待补清单。
+
