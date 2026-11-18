@@ -209,6 +209,19 @@ class FulltextPipeline:
             ).fetchone()
             if job is None:
                 raise PatentWorkflowError("请先登记论文 PDF 许可及任务。")
+            # 实际执行前重新检查最新来源/许可，阻断许可撤回和 PDF URL 替换。
+            source = db.execute(
+                "SELECT kind,pdf_url,metadata_json FROM documents WHERE doc_id=?",
+                (doc_id,),
+            ).fetchone()
+            if source is None or source["kind"] != "paper":
+                raise PatentWorkflowError("论文记录已变更，全文任务必须重新审批。")
+            source_meta = json.loads(source["metadata_json"] or "{}")
+            if (source_meta.get("is_open_access") is not True
+                    or not _licensed(str(source_meta.get("license") or ""))
+                    or source["pdf_url"] != job["pdf_url"]
+                    or str(source_meta.get("license") or "") != job["source_license"]):
+                raise PatentWorkflowError("OA 来源、地址或许可证已改变，禁止使用旧授权下载。")
             if job["status"] == "parsed":
                 return dict(job), ""
             if job["status"] in {"downloading", "parsing"} and (
