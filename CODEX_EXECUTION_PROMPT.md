@@ -95,3 +95,31 @@ F. claim-element support table and draft CN application, including figure plan;
 G. open issues, failed steps, legal qualifications, human signoff and file hashes.
 
 No fabricated publication, citation, measurement or patent status. Never automatically submit an application.
+
+
+## Mandatory Crawl4AI and upstream source reuse contract (2026-11-18)
+
+The user specifically requires Crawl4AI as the web extraction engine. Build all browser/webpage parsing through the pinned local Crawl4AI Python library (0.9.5 initially), not ad-hoc browser/HTTP page scrapers. Structured official patent APIs and authorized bulk downloads remain API connectors; this exception is not browser crawling. Use search services (where licensed) to discover URL seeds, then Crawl4AI for permitted articles, patents’ public detail pages where allowed, scientific HTML and technical manuals. Ensure robots.txt checks, per-domain terms registry, explicit host permissions, source snapshots, per-redirect firewall/DNS protection, retries, crawl budget and provenance. Never automate prohibited WIPO PATENTSCOPE public search or bypass website anti-bot controls.
+
+The user explicitly authorizes copying third-party source into Mechanical_Patent for derivative modifications. This is permitted only when the exact source and all dependencies grant the necessary rights. The project includes pinned git submodules for the full MIT/Apache source of:
+- handsomestWei/patent-disclosure-skill
+- PisenAILab/china-patent-figure-skill
+- lianghugjil/patent-template
+- joyboseroy/ideaforge
+- open1s/trinno
+
+To edit the original source inside this repository use scripts/vendor_upstreams.py to create vendor/<name> and commit that resulting folder to the feature branch with original LICENSE, attribution, upstream SHA, modification notice and reproducible tests. Prefer internally maintained adapters over patching upstream modules ad-hoc. Existing submodules are fixed-version source references and do not imply the runtime automatically executes all upstream methods. A Git submodule checkout is performed using git submodule update --init --recursive.
+
+Do not copy wangziying1004/AutoPatent source until the repository owner grants an explicit, suitable license; freely analyze and independently reimplement methods such as 7-stage persistence, citation expansion, reverse claim charts and idea revision. Do not directly import PatZilla AGPL code into this proprietary target without legal compatibility assessment. Crawl4AI Apache-2.0 has its own required attribution statement; preserve NOTICE.
+
+For the single user instruction, produce:
+1. Authenticated China+world patent and NPL retrieval with recorded exact coverage.
+2. Multiple technically distinct inventive candidates from TRIZ, SCAMPER, design thinking, physical cross-domain transfer and FMEA.
+3. Independent evidence-backed closest-prior-art and countersearch claim chart (not a patent grant score).
+4. Reproducible mechanism design with physical equations, units, engineering assumptions, failure modes and actual verification plan.
+5. Revised candidate/portfolio selection with claim-feature support, avoid unsupported predictions and routine substitutions.
+6. Chinese invention patent disclosure and application draft, followed by full independent claim/spec/figure consistency QA.
+7. Auditable JSON, Markdown, editable DOCX and patent line drawings as available, with explicit blockers whenever tools/data are missing.
+8. Engineering + patent expert signoff and manual filing only.
+
+Start from PR #1 and Epic #2 with Issues #3-#10. Keep all running code passing tests. For each source addition, document the exact pinned commit, license compatibility, typed interfaces, upstream tests and security review. If current EPO credentials or cloud model account are not configured, write and test authentic adapters but never label fake fixtures as live worldwide retrieval. Every missing acceptance gate remains open in the issue tracker.
