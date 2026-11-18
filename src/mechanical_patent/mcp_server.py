@@ -17,6 +17,8 @@ from uuid import uuid4
 from .core import Evidence, PatentWorkflowError, evidence_id, save_json, validate_draft
 from .ideation_fission import FissionBoard, AXES, METHODS, SCORE_FIELDS
 from .technical_brief import render_brief
+from .figure_pipeline import prepare_figures, read_figure_plan
+from .figure_worker import sync_figures
 from .technical_review import inspect_brief
 from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
@@ -32,6 +34,8 @@ _READABLE = frozenset({
     "04_evidence.json", "04b_technology_graph.json", "05_inventions.json",
     "05a_idea_fission.json", "06_countersearch.json", "07_engineering.json",
     "08_application.json", "08a_technical_brief.json", "08a_technical_brief.tex",
+    "08d_figure_plan.json", "08e_figure_render.json", "08f_figure_sync.json",
+    "08g_pdf_build.json",
     "09_quality_gate.json", "10_enterprise_quality.json",
     "manifest.json", "AGENT_NEXT_STEPS.md",
 })
@@ -384,6 +388,52 @@ class PatentMCPService:
             "conversion_authorized": False, "filing_authorized": False,
         }
 
+    def figure_prepare(self, case_id: str, run_id: str, candidate_id: str,
+                       wanted: list[str] | None = None) -> dict[str, Any]:
+        """仅生成本案卷可编辑图源与哈希计划，绝不执行系统渲染命令。"""
+        folder = self._folder(case_id, run_id)
+        result = prepare_figures(folder, candidate_id=candidate_id, wanted=wanted)
+        from .audit import append_audit_event
+        append_audit_event(folder, stage="工程技术方案", action="生成可编辑图源与渲染计划",
+                           actor="MCP 工具", role="系统",
+                           payload={"candidate_id": candidate_id, "source_ids": [x["id"] for x in result["entries"]]})
+        return result
+
+    def figure_source(self, case_id: str, run_id: str, figure_id: str) -> dict[str, Any]:
+        """按图源编号读取固定白名单内的可编辑工程原理图内容。"""
+        folder = self._folder(case_id, run_id)
+        plan, _ = read_figure_plan(folder)
+        match = next((x for x in plan["entries"] if x["id"] == figure_id), None)
+        if match is None:
+            raise PatentWorkflowError("该研究运行没有此图源编号。")
+        source = (folder / match["source"]).read_text(encoding="utf-8")
+        return {"id": figure_id, "source": match["source"], "format": match["renderer"],
+                "source_sha256": match["source_sha256"], "content": source,
+                "geometry_proven": False}
+
+    def figure_status(self, case_id: str, run_id: str) -> dict[str, Any]:
+        folder = self._folder(case_id, run_id)
+        try:
+            plan, _ = read_figure_plan(folder)
+        except PatentWorkflowError:
+            return {"status": "not_prepared", "files": [], "filing_authorized": False}
+        status = {"status": plan["status"], "files": [
+            {"id": x["id"], "kind": x["kind"], "source": x["source"], "asset": x["asset"],
+             "source_sha256": x["source_sha256"]}
+            for x in plan["entries"]],
+            "render_executed_by_mcp": False, "filing_authorized": False}
+        record = folder / "08e_figure_render.json"
+        if record.is_file() and not record.is_symlink():
+            result = json.loads(record.read_text(encoding="utf-8"))
+            status["worker_status"] = result.get("status", "unknown")
+            status["rendered_count"] = len(result.get("rendered", []))
+            status["failure_count"] = len(result.get("failures", []))
+        return status
+
+    def figure_sync(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """只验证渲染产物并更新图文，不启动浏览器、CAD 或 LaTeX。"""
+        return sync_figures(self._folder(case_id, run_id), candidate_id=candidate_id)
+
     def brief_audit(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """独立审查工程技术方案，可双人签核归档，无须生成权利要求书。"""
         return inspect_brief(self._folder(case_id, run_id), case_id=case_id,
@@ -629,6 +679,27 @@ def create_server(service: PatentMCPService):
         return service.brief_save(case_id, run_id, candidate_id, brief)
 
     @server.tool()
+    def patent_figure_prepare(case_id: str, run_id: str, candidate_id: str,
+                              wanted: list[str] | None = None) -> dict[str, Any]:
+        """从已保存的研发事实中生成可编辑 draw.io/Mermaid 图源和安全渲染计划。"""
+        return service.figure_prepare(case_id, run_id, candidate_id, wanted)
+
+    @server.tool()
+    def patent_figure_source(case_id: str, run_id: str, figure_id: str) -> dict[str, Any]:
+        """按图示ID读取可编辑图源及SHA，不提供任意文件路径读取。"""
+        return service.figure_source(case_id, run_id, figure_id)
+
+    @server.tool()
+    def patent_figure_status(case_id: str, run_id: str) -> dict[str, Any]:
+        """检查图示源和隔离渲染器结果，不执行外部程序。"""
+        return service.figure_status(case_id, run_id)
+
+    @server.tool()
+    def patent_figure_sync(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """核实所有PDF输出的哈希后将配图写入新的工程说明书版本。"""
+        return service.figure_sync(case_id, run_id, candidate_id)
+
+    @server.tool()
     def patent_brief_audit(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """阶段A工程技术方案独立质检、双人评审验签和结案状态。"""
         return service.brief_audit(case_id, run_id, candidate_id)
@@ -660,7 +731,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "默认用 patent_brief_save 输出工程技术方案；只有用户申请决定及企业验签通过才可写专利申请文本；"
+            + "默认用 patent_brief_save 输出工程技术方案，允许 patent_figure_prepare 生成可编辑图源，隔离worker导出后用 patent_figure_sync 校验；只有用户申请决定及企业验签通过才可写专利申请文本；"
             + "执行 patent_brief_audit 审阅工程方案，双人签核可直接结案；独立批准后才可运行 patent_draft_save 与 patent_quality_audit。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
