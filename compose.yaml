@@ -1,0 +1,39 @@
+# Linux-only: host network preserves the MCP server's localhost-only security guard.
+# No ports or reverse proxy are published by this stack.
+name: mechanical-patent
+services:
+  patent-mcp:
+    image: ${PATENT_IMAGE:?Set PATENT_IMAGE in .env (e.g. ghcr.io/lqepoch/mechanical_patent:main)}
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2g
+    stop_grace_period: 45s
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    volumes:
+      - type: bind
+        source: ${PATENT_DATA_DIR:?Set PATENT_DATA_DIR to an absolute mounted disk path in .env}
+        target: /data
+        bind:
+          create_host_path: false
+    environment:
+      PATENT_MCP_WORKSPACE: /data
+      PATENT_MCP_PROJECT_ID: ${PATENT_MCP_PROJECT_ID:?Set PATENT_MCP_PROJECT_ID to one project}
+      EPO_OPS_CLIENT_ID: ${EPO_OPS_CLIENT_ID:-}
+      EPO_OPS_CLIENT_SECRET: ${EPO_OPS_CLIENT_SECRET:-}
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+      PATENT_CONTACT_EMAIL: ${PATENT_CONTACT_EMAIL:-}
+    command: ["--transport", "streamable-http", "--host", "127.0.0.1", "--port", "8765", "--workspace", "/data"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

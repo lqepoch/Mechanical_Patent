@@ -288,3 +288,19 @@ CLI 示例：
 MCP 支持 patent_literature_search/read/note/stats/pending/resume/resume_save/harvest。必须先获工作流外发许可；OpenAlex 深分页超过第一页需要免费 API Key，Crossref/EPO OPS 均受官方配额限制。所有 MD 初次仅含真实源著录数据、摘要/权要摘录，技术深入理解由宿主 AI 按照 patent-literature-memory Skill 逐篇写入并明确原文依据。研究资料不能提交 GitHub。
 
 详细实现、来源权限与企业升级路径参见 docs/ARCHITECTURE.md、docs/DUAL_LITERATURE.md 和 docs/MCP_INTERFACE.md。
+
+
+## Ubuntu 26.04 Docker / GHCR 部署
+
+提供 `ghcr.io/lqepoch/mechanical_patent:main` 多架构镜像与 Linux Docker Compose。`PATENT_DATA_DIR` 将宿主机独立磁盘挂载到容器 `/data`；`PATENT_MCP_PROJECT_ID` 绑定单独专利项目。独立 SQLite 位于 `/data/projects/<project-id>/patents.sqlite3`；服务只监听宿主机回环 `127.0.0.1:8765`。
+
+~~~bash
+cp .env.example .env
+chmod 600 .env
+# 配置 PATENT_MCP_PROJECT_ID、PATENT_DATA_DIR、PATENT_IMAGE
+bash scripts/deploy_ubuntu26.sh init
+bash scripts/deploy_ubuntu26.sh up
+bash scripts/deploy_ubuntu26.sh status
+~~~
+
+完整安装、GHCR 包公开配置、备份/回滚与权限边界见 docs/DEPLOYMENT_UBUNTU26.md。

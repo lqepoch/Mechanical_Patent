@@ -107,3 +107,10 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 - 来源元数据、摘要、权利要求与完整原文的核查程度严格分离；不能把供应商著录 verified 认定为真正读过全文。
 
 生产演进：地域/语种/同族/IPC/CPC/论文引证与相似专利覆盖；Docling/TEI/GROBID 有许可全文解析与页码；向量 ANN + 词法融合重排；真正可量化的 Recall@k/MRR；重试限流、统一租户 RBAC/ABAC、备份/恢复、审计追踪、KMS 和数据保留。当前 MCP HTTP 服务仍要求安全网关，不能直接作为多租户公网服务。
+
+
+## GHCR + Ubuntu 26.04 Docker 架构（2026-11-18）
+
+GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 使用 Linux host network 保留 127.0.0.1 回环限制，通过 bind mount 将指定数据磁盘映射到容器 /data。每个进程绑定 PATENT_MCP_PROJECT_ID，存储目录 /data/projects/<project-id>/ 包含独立 SQLite、案卷、科研资料、论文及事件链；容器更新不改变这些持久化内容。支持一致性备份、SHA256 和镜像 digest 回滚。详见 docs/DEPLOYMENT_UBUNTU26.md。
+
+目前缺少公网身份鉴权 OIDC、真实用户/项目 ABAC；需要另行完成认证网关、限流、审计及异地恢复，才能开放远程项目访问。
