@@ -12,6 +12,7 @@ from .core import PatentWorkflowError
 from .papers import CrossrefProvider, OpenAlexProvider
 from .providers import EPOOPSProvider, ImportedPatentProvider
 from .workflow import PatentResearch, validate_case
+from .workspace_cli import add_workspace_parser, handle_workspace
 
 
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
@@ -39,9 +40,12 @@ def main(argv: list[str] | None = None) -> int:
     _add_research_arguments(sub.add_parser("run", help="Alias of 'research'; no LLM API required"))
     validate = sub.add_parser("validate", help="Check AI-written evidence-linked application draft")
     validate.add_argument("--case-dir", required=True, type=Path)
+    add_workspace_parser(sub)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "workspace":
+            return handle_workspace(args)
         if args.command == "validate":
             result = validate_case(args.case_dir)
             print("Quality gate:", result["status"])
