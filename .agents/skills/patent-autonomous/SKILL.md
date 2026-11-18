@@ -53,7 +53,6 @@ user-invocable: true
 ## 前沿专利与 LaTeX 主源（2026-11-18）
 接到一条全新研发指令后，读取 patent-project-storage、patent-frontier-innovation、patent-latex-research 三项技能；锁定当前 project_id 的 SQLite；按实际供应商检索时间刷新专利索引及公开论文前沿。已有专利名称必须先核对真实公开号再裂变。研究论文保存分节 LaTeX 和 BibTeX 后再输出申请底稿；各个变种均按原权要逐技术特征反证，不能跳过工程实用性验证。
 
-
 ## 论文数据源选择与研究记忆（2026-11-18）
 
 多轮研究时调用 `paper-sources` 或 MCP capabilities，按任务配置 OpenAlex/Crossref/Semantic Scholar/arXiv/Europe PMC/PubMed/CORE/Lens；通过 Unpaywall 补 DOI 合法 OA PDF。所有检索仍受审批、许可和预算约束；输出跨平台 DOI 归并记录和逐篇 `03_paper_memory/EV-*.md`。每一轮需要加载上轮 Markdown 与来源索引，防止上下文裁剪造成重复检索。存档本地并经哈希检查，全文核验与专利实质对照单独推进。详见 docs/PAPER_SOURCES.md。
