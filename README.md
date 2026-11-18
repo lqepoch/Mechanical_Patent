@@ -257,6 +257,22 @@ Codex MCP 客户端配置时应当为每个项目设置独立的 server 项与 -
 
 详细查看 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md；对应三个中文 Skills 已同步到 .agents/skills。单纯安装完成不代表已经获得 EPO 官方数据授权、企业身份认证、完整全球检索覆盖或真实机械仿真能力。
 
+
+## ✅ 默认工程技术方案书（2026-11-18）
+
+用户给出技术创新问题时，默认研发产物为自然语言工程技术方案，不强行撰写权利要求/说明书。结合结构、操作步骤和现有公开来源选择 CAD/STEP 结构线稿、draw.io 原理图、Mermaid 流程/时序图、技术比较表及验证计划；CTeX/XeLaTeX 排版，源文件可修改。
+
+- 规范：docs/TECHNICAL_BRIEF_STANDARD.md
+- 新 Skill：skills/patent-technical-brief/SKILL.md（Codex 自动发现镜像同步）
+- 模板：src/mechanical_patent/templates/engineering_brief.tex
+- 输入样例：examples/technical_brief_demo.json（示意输入，并非真实成果）
+- MCP：patent_brief_save、patent_conversion_status（原 patent_draft_save 现在强制验证独立审批签名）
+
+工程方案审核通过后可以归档结束。仅用户明确申请并通过企业可信签名审批，才允许使用申请转换工具。生产级身份与权限治理仍在 Issue #25 追踪。
+
+
+工程阶段审阅接口：`patent_brief_audit`，通过双人独立签名返回 `technical_complete`，项目 SQLite 仍用 `--project-id` 单独绑定。
+
 ## 学术检索平台组合与统一元数据（2026-11-18）
 
 先运行 `python -m mechanical_patent paper-sources` 查看可用渠道，再在已有工作流保密审批后使用：
