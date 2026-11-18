@@ -37,11 +37,34 @@ def _within_case(path: Path, root: Path, *, extension: str) -> Path:
     return real
 
 
-def _copy_immutable(src: Path, dst: Path) -> None:
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _normalized_sha(data: dict[str, Any]) -> str:
+    # processed_at changes every parse run but is not source content.
+    # Make revision IDs stable across otherwise byte-identical extractions.
+    try:
+        raw = json.dumps(
+            {key: value for key, value in data.items() if key != "processed_at"},
+            ensure_ascii=False, sort_keys=True, allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise PatentWorkflowError("解析结果包含不允许的非JSON数据或非有限数值。") from exc
+    return sha256(raw).hexdigest()
+
+
+def _copy_immutable(src: Path, dst: Path, expected_sha256: str) -> None:
     if dst.is_symlink() or dst.parent.is_symlink():
         raise PatentWorkflowError("证据归档路径禁止符号链接。")
     dst.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if dst.exists():
+        if not dst.is_file() or _file_sha256(dst) != expected_sha256:
+            raise PatentWorkflowError("现有 PDF 归档损坏或遭到替换，拒绝复用。")
         return
     with tempfile.NamedTemporaryFile(dir=dst.parent, prefix=".pdf-copy-", delete=False) as tmp:
         temp = Path(tmp.name)
@@ -55,6 +78,8 @@ def _copy_immutable(src: Path, dst: Path) -> None:
             temp.unlink(missing_ok=True)
             raise
     try:
+        if _file_sha256(temp) != expected_sha256:
+            raise PatentWorkflowError("PDF 在读取与归档期间发生变化，拒绝绑定。")
         temp.replace(dst)
     finally:
         temp.unlink(missing_ok=True)
@@ -207,9 +232,7 @@ class FullTextEvidence:
                 json.dumps(bbox, ensure_ascii=False, sort_keys=True),
             ))
         blocks.sort(key=lambda item: item[0])
-        normalized_sha = sha256(
-            json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        normalized_sha = _normalized_sha(data)
         folder = self._directory(doc_id)
         with self.memory.connect() as db:
             meta = db.execute(
@@ -222,6 +245,15 @@ class FullTextEvidence:
         if meta is None:
             raise PatentWorkflowError("请先将该文献元数据登记到当前案卷，禁止悬空全文。")
         if old and old["parsed_sha256"] == normalized_sha:
+            archive_pdf = folder / ("source-" + pdf_sha + ".pdf")
+            archive_json = folder / ("docling-" + normalized_sha + ".json")
+            if archive_pdf.is_symlink() or archive_json.is_symlink():
+                raise PatentWorkflowError("历史归档不可由符号链接替换。")
+            if (not archive_pdf.is_file() or _file_sha256(archive_pdf) != pdf_sha
+                    or not archive_json.is_file()
+                    or _normalized_sha(json.loads(archive_json.read_text(encoding="utf-8")))
+                       != normalized_sha):
+                raise PatentWorkflowError("已有 PDF/解析归档校验失败，请人工修复。")
             return {
                 "doc_id": doc_id, "status": "unchanged",
                 "pdf_sha256": pdf_sha, "parsed_sha256": normalized_sha,
@@ -230,9 +262,15 @@ class FullTextEvidence:
         folder.mkdir(mode=0o700, parents=True, exist_ok=True)
         pdf_dest = folder / ("source-" + pdf_sha + ".pdf")
         json_dest = folder / ("docling-" + normalized_sha + ".json")
-        _copy_immutable(pdf, pdf_dest)
+        _copy_immutable(pdf, pdf_dest, pdf_sha)
+        if json_dest.is_symlink():
+            raise PatentWorkflowError("JSON 证据归档禁止符号链接。")
         if not json_dest.exists():
             save_json(json_dest, data)
+        elif (not json_dest.is_file()
+              or _normalized_sha(json.loads(json_dest.read_text(encoding="utf-8")))
+                 != normalized_sha):
+            raise PatentWorkflowError("历史 JSON 归档损坏或被替换。")
         if not SHA_PATTERN.fullmatch(pdf_sha):
             raise PatentWorkflowError("无法验证原始资料哈希。")
         with self.memory.connect(write=True) as db:
