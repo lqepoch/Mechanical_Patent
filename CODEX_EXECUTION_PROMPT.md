@@ -1,125 +1,71 @@
-# Codex implementation mandate — Mechanical_Patent
+# Codex 企业级执行提示词：Mechanical_Patent
 
-Repository: https://github.com/lqepoch/Mechanical_Patent
-Goal: a single natural-language instruction results in a source-auditable global patent research process, multiple original mechanical ideas, independent prior-art challenges, physically plausible implementation paths, and a professionally reviewable Chinese invention patent application draft.
+仓库：https://github.com/lqepoch/Mechanical_Patent
 
-Read all of README.md, AGENTS.md, docs/*, skills/patent-autonomous/SKILL.md and source tests. Start with a repository-wide architecture and license audit. Preserve existing working functionality and Git history. Propose changes as parent/child GitHub Issues, implement on feature branches, run tests, submit PR, and merge only after actual checks and permissions pass.
+你当前就是负责研究与编写发明专利的 AI。不得让用户配置 PATENT_LLM_BASE_URL、PATENT_LLM_MODEL、Ollama、Qwen 模型服务器或任何外部 LLM API。用户在 ChatGPT、Codex 或兼容 AI 客户端的当前会话中完成创新推理和写作。本仓库中的 Python 工具仅负责官方/授权数据检索、Crawl4AI 网页采集、案卷结构化、来源记录、几何/工程工具与 QA。
 
-### Mandatory upstream assessment and adapters
+## 总目标
 
-- handsomestWei/patent-disclosure-skill: make its complete CN patent disclosure, claims, specification, drawing description and office action workflow available as independently pinned skill. Its CNIPA quick-scan is additive, not the main global search. Replace parent routing so searching, ideation and drafting run automatically on a one-command request. Keep its guardrails.
-- wangziying1004/AutoPatent: learn its checkpoints, stage reports and adversarial Claim Chart feedback, but do not copy source without clear permission.
-- joyboseroy/ideaforge: integrate TRIZ, SCAMPER, design thinking and cross-domain synthesis using traceable concept lineage; FalkorDB optional behind a graph interface.
-- open1s/trinno: add hypothesis, falsification experiment, evidence classification, stage rollback and reproducible run log.
-- PisenAILab/china-patent-figure-skill: local isolated STEP to patent figure adapter with CAD/geometry acceptance test; protect confidential CAD, map BOM/part numbers to claims.
-- lianghugjil/patent-template: merge only verified format and document QA checks, with separate configurable nonstatutory preferences.
-- patent-client-agents / Patsnap / EPO OPS / CNIPA authorized data / USPTO ODP / BigQuery / licensed WIPO products / OpenAlex: adapters with explicit coverage, terms, quotas, rights, metadata and provenance.
+用户只发送一个技术指令，你自动:
+A. 中国和全球专利（包括权利要求、同族、引证、日期和 IPC/CPC）检索；
+B. 科研论文（OpenAlex、Crossref、arXiv、论文参考文献）与非专利文献检索；
+C. 结合论文机理和专利现有方案挖掘技术缺陷/技术矛盾；
+D. 通过独立 TRIZ、SCAMPER、Design Thinking、FMEA、跨行业迁移、激进但物理自洽的方法生成 5-10 条不同创新路线；
+E. 每条路线开展二轮专利+论文反证检索；
+F. 给出有真实理论依据、公式/变量/单位/工况、装配或控制步骤、失效模式、可制造性、验证实验计划的可实施方案；
+G. 优选具备明确区别特征、可清楚充分公开的发明候选；
+H. 使用 pinned handsomestWei 中文专利 Skill 写交底、权要、说明书、摘要和附图计划；
+I. 利用允许的本地 SolidWorks/STEP/ANSYS 工具生成真实附图或仿真（需要实际执行，不得编造），开展独立技术/专利专业复审；
+J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出待复核申请底稿。
 
-### Proposed parent issue: Autonomous Patent Research Platform
+## 已有实际代码与复用范围
 
-Child 1: Source-provider contracts and live CNIPA+EPO+US+PCT+NPL integration.
-- licensed authenticated APIs or bulk feeds; no forbidden public scraping;
-- DOI/publication/family dedup, full claims, publication date, patents/nonpatents;
-- rate limits, cursors, caching, delta refresh, source outages and API usage accounting;
-- bilingual queries, IPC/CPC expansion, citation forward/backward graph;
-- evidence IDs include verifiable publication/URL/excerpts; no missing-results novelty claims.
+读取：
+- AGENTS.md、README.md、docs/AI_CLIENTS.md、docs/DUAL_LITERATURE.md
+- skills/patent-autonomous/SKILL.md
+- skills/patent-global-search/SKILL.md
+- skills/patent-paper-search/SKILL.md
+- docs/UPSTREAM_AUDIT.md、docs/ARCHITECTURE.md、docs/SECURITY.md
 
-Child 2: Hybrid prior-art retrieval and objective evaluation.
-- BM25 + multilingual embeddings + cross-encoder rerank;
-- 100+ gold mechanical cases, recall@K, claim-chart precision, bilingual coverage;
-- D1/D2 closest prior art, feature-element citations with paragraph/claim anchors.
+已经存在：
+- Python CLI：research、run（alias）、validate
+- EPO OPS 专利适配器；OpenAlex/Crossref 学术元数据检索；
+- Crawl4AI 可选网页采集；Evidence、DOI/专利号统一记录、来源哈希和私有案卷；
+- 上游完整 git submodule（中文专利 Skill、机械专利图、文档 QA、IdeaForge、Trinno），带许可证；
+- 原生 Agent Skills 和离线 mock/CI 测试。
 
-Child 3: Creativity agents and technical constraints.
-- TRIZ, SCAMPER, Design Thinking, FMEA, cross-domain analogy, impossible-idea falsifier;
-- concept graph traceability, physical mechanism, boundaries, alternatives;
-- explicit novel contribution vs routine substitution vs obvious combination.
+上游源码二次开发遵循固定 commit、MIT/Apache 许可、NOTICE 和修改记录。AutoPatent 仓库未确认适用的再分发许可证，其思路可以独立实现，现阶段不复制代码。
 
-Child 4: Engineering verification and CAD.
-- analytical loads, stress, energy, pump curves, hydraulics, thermal and tolerance checks;
-- units and dimensional consistency; compare calculations/FEA/physical tests;
-- SolidWorks Windows-local APIs and STEP/assembly BOM source tracking;
-- simulation integration must require real solver execution with reproducible inputs.
+## 必须新建或完善的子系统
 
-Child 5: Contrarian claim-chart / patentability / FTO separation.
-- separate inventions from prior art; show motivation to combine; independent reviewer;
-- CN three-step inventive-step workflow; FTO scope is territory/time/current claims specific;
-- never fabricate an attorney's clearance or a grant prediction.
+1. 多源专利适配器：CNIPA 官方合法数据渠道、EPO OPS、USPTO ODP、PCT/WIPO 授权数据、Google Patents BigQuery、Patsnap 商业授权等。保留每一结果的公开时间、完整权利要求、同族、引证、法律状态真实性与版本。
+2. 双源检索：中英同义词扩展、IPC/CPC/DOI 引用网络、OpenAlex/Crossref/arXiv 文献覆盖、相关性+语义+全文检索、专业 Gold benchmark；论文方法迁移证据不能等同于专利授权结论。
+3. Crawl4AI：唯一 HTML 提取引擎，允许网站且通过规则检查才执行。使用域名白名单、robots/服务条款账本、网络出站策略、DNS/IP 重绑定/重定向阻断、队列、限速、重试、快照、来源哈希。结构化官方 API 直接通过自身 SDK 调用，无需网页采集。
+4. 专利创新：IdeaForge / Trinno 方法论、TRIZ 技术矛盾、SCAMPER 结构变换、跨行业可行机理、FMEA、可证伪实验与迭代版本；创新评分仅作候选排序。
+5. 工程验证：材料、力学、刚度、流体、热学、控制和安全约束；真 SolidWorks/ANSYS 运行才允许把状态记为仿真已完成或实测已完成。
+6. 反证：创新前/创新后两轮专利和论文双检索；以证据逐特征比较权利要求、论文方法、技术效果、组合动机；创造性、充分公开和 FTO 单独审核。
+7. 写作：直接复用 handsomestWei patent-disclosure / patent-application 子 Skills，保留全部功能，取消用户在每步重复触发的需要；统一 case JSON 和权利支持；专利附图接入 PisenAILab STEP 工具、DWG/DXF/Word 模板质量检查。
+8. 数据与权限：企业/项目/个人隔离、SSO、RBAC+ABAC、机密材料出站授权、RLS、对象存储、版本审计、专业审签、保密和专利权属审查。
+9. 工程部署：Python 业务逻辑跨 AWS Lambda/阿里云 FC；独立调度/任务队列；低耦合数据连接器；CI/CD、SBOM、SAST、限速、缓存、日志、指标、回滚和灾备。
+10. 测试：假 DOI/假公开号、未验证文献、来源短缺、模型假实验、提示词注入、数据库429、外网超时、多人访问越权、权利要求缺支持和高风险技术方案；所有测试在 CI 可离线执行。
 
-Child 6: CN disclosure and patent application generation.
-- pinned Chinese patent-disclosure-skill and patent-application integration;
-- independent/dependent claims, support matrix, enabling embodiments, reference numerals;
-- DOCX/PDF/SVG/DXF figure formats, auditable redlines and issue list.
+## 具体执行
 
-Child 7: Security, tenancy, governance.
-- project-level identity, SSO, roles, row-level security, immutable evidence and review trail;
-- outbound secrecy gates, no silent cloud upload, provider legal terms, retention and backups;
-- names/inventors reflect documented real contribution; CN foreign-filing secrecy checks.
+- 读取仓库和所有相关文件，列出实际已实现与待实施能力；勿覆盖现有成功模块。
+- 以 GitHub Epic #2 与 Issues #3-#10 为基础，继续补充父子关系、验收标准与里程碑；每项记录负责人（未知则空）和依赖。
+- 优先修复实际双源检索及 Agent 原生调用体验；包括 CLI/README 中不得出现必备的 LLM 模型 API 配置。
+- 正常任务先检索再创新，创新后针对每个方案再检索，论证可行性后写申请。
+- 每个模块提交有界、可回滚 PR，编译/测试/CI 和许可安全检查通过再合并到 main。
+- 若外部数据需要单独 EPO/Patsnap/OpenAlex 授权，只提示其是数据服务凭证；不强制提供。
+- 在 ChatGPT 网页等不能直接访问本地的环境，通过现有连接器/web 工具完成当前能力范围内的全部步骤并如实记录实际执行情况。
 
-Child 8: Production operations, cross-cloud and observability.
-- PostgreSQL/pgvector, object storage abstraction, queue, checkpointed execution;
-- AWS Lambda/Alibaba FC thin adapters and common vendor-neutral Python business code;
-- replay, retry, rate limit, rollback, idempotency, watchdog, cost/token quotas, tracing;
-- production alerts, SLOs, runbooks, disaster recovery, CI/CD, penetration tests.
+## 交付与验收
 
-Child 9: Evaluations and quality engineering.
-- offline mocked tests + provider contract tests (no real API credential in CI);
-- golden cases, hallucination traps, prompt injection from retrieved patent data,
-  falsely verified imported data, unsupported claim wording, model/data outage tests;
-- specialist patent attorney and mechanical engineer signoff.
+- 完整双源检索计划和搜索记录：中英关键词、数据库、检索日期、DOI、公开号、分类、完整性、空白和来源；
+- 论文与专利技术对比矩阵：问题/原理/手段/差异/可迁移性/显而易见性风险；
+- 每项可实施创新：零件、接口、运动/控制顺序、计算、参数、约束、替代实施例、风险与证伪实验；
+- 中国专利交底、权利要求书、说明书、摘要、附图及引用/支持矩阵；
+- 静态 QA、真实仿真/实验（若执行）、人工审签、权属/保密/FTO 检查清单；
+- 代码、测试、运行说明、架构更新、Issue/PR、失败记录与回滚计划。
 
-Child 10: Governance for external dependencies and releases.
-- record upstream commit SHA, license, security notices and accepted code;
-- no automatic import of unlicensed AutoPatent code;
-- create PRs with evidence of tests and verify status before merging into main;
-- use semantic releases and migration scripts, never silently overwrite case data.
-
-### Release gates
-
-G0: documented source/architecture/licenses and working deterministic tests.
-G1: authentic live multi-country evidence retrieval with measured coverage and claims.
-G2: independent inventive concepts, physical support and adversarial traceability.
-G3: full CN claim/specification/figure dossier with specialist signoff.
-G4: confidential enterprise production with SSO, logs, SLA, disaster recovery and CAD adapter.
-
-The code in the first integration implements parts of G0 and selected pieces of G1-G3 only. Do not claim a production-ready release before all gates are verified. Keep implementation and tests synchronized.
-
-### Non-negotiable output contract
-
-Every generated patent dossier includes:
-A. exact original request, classification and confidentiality decision;
-B. source list, retrieval timestamps, search syntax, pagination and coverage holes;
-C. prior patents, claims / excerpt anchors and counterevidence;
-D. multi-method invention alternatives, mechanism, distinguishing features and rationale;
-E. equations with units, theoretical assumptions, physical model, test plan and faults;
-F. claim-element support table and draft CN application, including figure plan;
-G. open issues, failed steps, legal qualifications, human signoff and file hashes.
-
-No fabricated publication, citation, measurement or patent status. Never automatically submit an application.
-
-
-## Mandatory Crawl4AI and upstream source reuse contract (2026-11-18)
-
-The user specifically requires Crawl4AI as the web extraction engine. Build all browser/webpage parsing through the pinned local Crawl4AI Python library (0.9.5 initially), not ad-hoc browser/HTTP page scrapers. Structured official patent APIs and authorized bulk downloads remain API connectors; this exception is not browser crawling. Use search services (where licensed) to discover URL seeds, then Crawl4AI for permitted articles, patents’ public detail pages where allowed, scientific HTML and technical manuals. Ensure robots.txt checks, per-domain terms registry, explicit host permissions, source snapshots, per-redirect firewall/DNS protection, retries, crawl budget and provenance. Never automate prohibited WIPO PATENTSCOPE public search or bypass website anti-bot controls.
-
-The user explicitly authorizes copying third-party source into Mechanical_Patent for derivative modifications. This is permitted only when the exact source and all dependencies grant the necessary rights. The project includes pinned git submodules for the full MIT/Apache source of:
-- handsomestWei/patent-disclosure-skill
-- PisenAILab/china-patent-figure-skill
-- lianghugjil/patent-template
-- joyboseroy/ideaforge
-- open1s/trinno
-
-To edit the original source inside this repository use scripts/vendor_upstreams.py to create vendor/<name> and commit that resulting folder to the feature branch with original LICENSE, attribution, upstream SHA, modification notice and reproducible tests. Prefer internally maintained adapters over patching upstream modules ad-hoc. Existing submodules are fixed-version source references and do not imply the runtime automatically executes all upstream methods. A Git submodule checkout is performed using git submodule update --init --recursive.
-
-Do not copy wangziying1004/AutoPatent source until the repository owner grants an explicit, suitable license; freely analyze and independently reimplement methods such as 7-stage persistence, citation expansion, reverse claim charts and idea revision. Do not directly import PatZilla AGPL code into this proprietary target without legal compatibility assessment. Crawl4AI Apache-2.0 has its own required attribution statement; preserve NOTICE.
-
-For the single user instruction, produce:
-1. Authenticated China+world patent and NPL retrieval with recorded exact coverage.
-2. Multiple technically distinct inventive candidates from TRIZ, SCAMPER, design thinking, physical cross-domain transfer and FMEA.
-3. Independent evidence-backed closest-prior-art and countersearch claim chart (not a patent grant score).
-4. Reproducible mechanism design with physical equations, units, engineering assumptions, failure modes and actual verification plan.
-5. Revised candidate/portfolio selection with claim-feature support, avoid unsupported predictions and routine substitutions.
-6. Chinese invention patent disclosure and application draft, followed by full independent claim/spec/figure consistency QA.
-7. Auditable JSON, Markdown, editable DOCX and patent line drawings as available, with explicit blockers whenever tools/data are missing.
-8. Engineering + patent expert signoff and manual filing only.
-
-Start from PR #1 and Epic #2 with Issues #3-#10. Keep all running code passing tests. For each source addition, document the exact pinned commit, license compatibility, typed interfaces, upstream tests and security review. If current EPO credentials or cloud model account are not configured, write and test authentic adapters but never label fake fixtures as live worldwide retrieval. Every missing acceptance gate remains open in the issue tracker.
+系统不得自动提交专利，不得虚构正式检索覆盖、DOI、公开号、论文全文、物理计算结果或发明人。

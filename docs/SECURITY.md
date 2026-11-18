@@ -1,17 +1,34 @@
-# Security and legal controls
+# 安全与数据治理
 
-Data classes: PUBLIC, LICENSED, INTERNAL, SECRET, CONTROLLED. Patent drafts, not-yet-filed inventions, SolidWorks assemblies and internal BOM should default to SECRET until reviewed. Search terms can disclose invention direction even when patent contents are public.
+## 信任边界
 
-Current protections: external LLM requires explicit opt-in and HTTPS, outbound patent search requires explicit opt-in, imported patent documents cannot be marked provider-verified, model data and fetched source excerpts are treated as untrusted, stage files are written to a private per-case directory, no deployment secrets are stored in Git, and no automatic filing is implemented.
+用户的未公开发明、SolidWorks 装配、BOM、仿真资料、内部技术交底默认保密。公开专利和论文可合法检索，但外部搜索词可能泄露研发方向，应先做检索词脱敏及外发审批。
 
-Additional production controls to build:
-- company SSO, RBAC+ABAC project/team security, tenant isolation, PostgreSQL RLS, approval separation of duties;
-- classification/redaction layer and DLP audit prior to every model/search egress;
-- credential rotation, egress allowlists, API quotas, retry/backoff, circuit breakers and rate-limit accounting;
-- hashes, provenance, timestamps, model/prompt versions, content revisioning and append-only legally defensible audit history;
-- SBOM, SAST, DAST, dependency pins, protected branch/CI checks and licensing review;
-- lifecycle retention, privacy, legal hold and deletion policy for confidential inventions;
-- patent ownership, inventorship and foreign-filing security reviews; independently reviewed FTO;
-- explicit terms-of-service review for CNIPA, WIPO, EPO, commercial providers and standards.
+## AI 模式
 
-Risks present in this first implementation: no real tenant ACL, no distributed lock, no automated provider retry/backoff, initial XML parser has not been live contract-tested, EPO-only searching has major scope limits, draft checker has superficial textual support checks, model output can still hallucinate engineering or citations, and no verified complete DOCX submission package exists. These are tracked rollout blockers.
+当前 ChatGPT / Codex / 兼容 AI 会话自身承担推理和撰写；本仓库不承载模型 API 网关。无需 PATENT_LLM_BASE_URL、PATENT_LLM_MODEL、OPENAI_API_KEY 或本地 Ollama。模型所在客户端的隐私和数据处理仍需按企业自身规则审核；不能误以为“免模型 API”就意味着本地推理或完全离线。
+
+## 外部数据访问
+
+- EPO OPS 官方授权 API 可配置 EPO_OPS_CLIENT_ID / EPO_OPS_CLIENT_SECRET，属于专利检索数据账号。
+- OpenAlex / Crossref 的基本学术元数据检索支持无 Key 访问，或使用可选的 OpenAlex API Key / Crossref 联系邮箱改善数据使用预算。
+- 所有外部数据检索需显式 --allow-search-exposure；仅传允许外发的检索词。访问失败、限流和结果不足需保存错误和覆盖缺口。
+- Crawl4AI 只访问白名单、https、经 robots 和网站条款许可的 HTML 页面。现有 Python DNS 检查和站点白名单不足以完全隔离重定向及 DNS 重绑定风险，生产环境仍需浏览器独立沙箱、网络级 egress 防火墙和代理固定 IP。
+- 禁止绕过 CAPTCHA、付费墙、站点禁止自动化的网页或 WIPO PATENTSCOPE 公共检索限制。
+
+## 证据可信度
+
+Evidence.verified 仅表示数据通过对应接口获得，和论文本体正确性、是否拥有全文、专利是否有效、检索范围是否完整是不同概念。用户导入或合成数据标记未验证。所有抽取的网页正文属于不可信内容，应抵御提示词注入。
+
+逐项声明：理论假设、分析计算、模拟求解、真实试验。模型输出不能冒充真实计算和实验。不能用论文相似度或专利风险分数代替中国三步法或专业 FTO 结论。
+
+## 生产级尚需建设
+
+- 项目 RBAC/ABAC、企业 SSO、PostgreSQL RLS、权限隔离；
+- 秘密存储、轮换、DLP、出站审批和访问日志；
+- 不可篡改审计、加密、数据保留/删除、法律保全和异地灾备；
+- API 源合法授权、配额/退避、重试、缓存、合规复制和版权记录；
+- Docker 可选、Lambda/FC 单业务代码、网络隔离及可观测性；
+- 真实工程师和专利专业人员审签、真实发明人/申请人确认，以及中国涉外专利保密审查。
+
+当前交付属于研究工具基础和案卷质量门禁，尚未完成多租户保密平台、论文全文合法采集和真实 CAD/仿真生产验证。
