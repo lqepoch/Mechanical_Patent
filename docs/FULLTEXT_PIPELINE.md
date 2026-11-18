@@ -84,3 +84,13 @@ MCP 不直接开放许可登记或下载行为：当前尚未实现可验证的�
 CI 增加 test_literature_fulltext.py 统一测试：许可拦截、OA 来源、安全域名、原文哈希、无原文场景、失败恢复、页码搜索、SQLite 增量迁移、人工批注不覆盖和 MCP 读权限。保持独立项目数据库、旧 CLI、原有检索、专利反证及 LaTeX 业务功能不回退。
 
 后续在生产前补齐：来源许可凭证的不可抵赖签名、实际账户联调、全量 PDF 下载测试、病毒隔离沙箱、集中速率/费用控制、事务 Outbox、分布式 Worker、PDF/图表质量基准、灾备回滚及版税许可审查。按数据权属需要设置内部访问控制、定期备份和删除/保留期策略。
+
+## 页码级原文短引核对与研究记忆门禁（2026-11-19）
+
+现有 FulltextPipeline 可直接验证机器解析页码：status=parsed 且 current fulltext_jobs.pdf_sha256 与 fulltext_blocks.source_pdf_sha256 一致，证据位置采用 p{page}:b{block_no}（例如 p3:b2），并确认文献位于当前案卷。缺页码、过期 PDF、无效块均明确拒绝。该校验基于当前结构化 PDF 解析结果，不能代替人工打开原文核验。
+
+新增的工具：CLI 在 literature 子命令下运行 fulltext-quote --doc-id EV-12位十六进制编号 --anchor p3:b2 --verbatim "从原文抽取的短引"；MCP 使用 patent_literature_fulltext_quote(case_id, doc_id, anchor, verbatim)。返回 exact_match、quote_sha256、block_sha256、source_url、pdf_sha256、parse_sha256、full_text_verified=false 与 verification_level=parsed_text_match_only。
+
+AI 通过 patent_literature_note 以 basis=full_text 写入研究批注时，source_positions 需要1至30个真实的页码/段落锚点，文献数据库会独立验证引用并向 Markdown 追加源 PDF 与解析版本 SHA256。较低层级的摘要级笔记不强求 PDF；不合格的全文证据需要补读实际原文。需留意 PDF 更新后旧笔记的适用性，未来 #52 继续实现引用失效后的自动复核队列。
+
+此功能复用全文流水线现有的 fulltext_jobs、fulltext_blocks、fulltext_blocks_fts，无第二套数据表，避免与其他项目分支重叠。离线回归 test_fulltext_quote.py 覆盖未解析拒绝、真实匹配、错误页码、跨案卷、跨项目和 PDF 哈希变化。

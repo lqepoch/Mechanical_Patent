@@ -29,3 +29,11 @@ PDF 候选 URL、许可证/审查来源、SHA256、解析器版本、解析 JSON
 
 ## 生产级边界
 需额外部署真实 OIDC/ABAC、签名版权审批、统一配额/预算、资源隔离及内容安全扫描方可向企业全面开放下载服务。Docling 的页码/表格/公式定位准确率依靠人工和真实 PDF 金标准集合验收。
+
+## 当前原文页码与短引审查门禁（2026-11-19）
+
+- 合规完成本案卷 fulltext-process 后，从 patent_literature_fulltext_search 获取 doc_id、page_no、block_no 和 source_pdf_sha256，使用 p{page}:b{block}（例如 p3:b2）标注研究引用。
+- 调用 patent_literature_fulltext_quote(case_id,doc_id,anchor,verbatim) 逐字检查短引是否存在于当前解析版本，返回 exact_match、PDF SHA256、解析 SHA256 和 parsed_text_match_only。解析文本命中仍须打开原始 PDF 检查错字、公式、表格和图纸。
+- patent_literature_note(basis=full_text) 必须携带1–30个实际存在的 source_positions；程序拒绝错误页码、缺失段落、其他案卷或已更换 PDF 的失效引用。每个 Markdown 研究批注自动记录 PDF 与解析版本 SHA256。
+- 沿用现有 FulltextPipeline、fulltext_jobs、fulltext_blocks 和 FTS5，禁止创建重复的同名全文索引表。接口详见 docs/FULLTEXT_PIPELINE.md。
+
