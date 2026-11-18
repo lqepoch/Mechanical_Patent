@@ -69,3 +69,11 @@ D. Codex 本地自动发现：
 用户对 Codex 说：“检索全球高海拔消防泵汽蚀专利和学术论文，参考跨行业物理机理生成发明，先反证再写中国发明专利。使用仓库的 patent-autonomous、patent-industry-sources、patent-evaluation 与 patent-pdf-evidence 技能，保留真实来源和审核缺口。”
 
 Codex 可从仓库根目录自动识别 .agents/skills/ 下的简体中文技能。真实专利 MCP 服务连接需要用户独立批准；没有数据库凭证时允许继续合规查找、记录缺口，但不能制造虚假的专利文献和法律结论。
+
+## 6. 第三轮补充：开放引证网络与论文证据验证
+
+- OpenCitations/oc_api：ISC 许可，固定 SHA d9448a6333f2eb9ed305cc05f52e9f287edf4e03；引证 API 关系、日期和引用 DOI。引用数据与代码许可各自独立，更多说明见 CITATION_DISCOVERY.md。
+- Future-House/paper-qa：Apache-2.0，固定 SHA c692d0dfeac4a0296599f7fe21a253a58b7ac12a；重点复用多源论文元数据和证据定位/反证流程，当前项目不启动其默认外部模型运行时。
+- google/patents-public-data：Apache-2.0，固定 SHA d3d08a00e41e411be11b8a1394dd6d84f1312463；仓库2026-04-18已归档，仅用于专利地图、权项抽取及 SQL 方法审查，运行时必须适配最新数据模式。
+- 实际代码：citations.py 读取 OpenCitations v2 的一跳参考/被引关系；case_citations.py 保存批次和更新案卷图谱；lineage.py 加入“引用”关系，严格把新 DOI 标成待全文核对。
+- 风险：开放引证网络并非完整学术文献全集；引用 DOI 不等于引用内容已得到核实。模型还须对每个候选进行专利和论文的反证检索。

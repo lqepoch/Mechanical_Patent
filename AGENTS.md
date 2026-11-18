@@ -102,3 +102,10 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 每一轮候选创新与反证需要可衡量质量：使用 skills/patent-evaluation/SKILL.md 的检索评测工具，对具有企业合法授权的专业机械专利黄金标注集运行 Hit/Recall/MRR，同族去重、缺失样本计零。禁止将 CC BY-NC、许可证不明的数据集放入企业商业评测。第三方评测工具的样本版权与代码许可必须分开审批。
 
 新增上游源码位于 external/patent-client-agents、external/patentkit（均固定 Apache-2.0 源码）；Docling 与 PatentAgentBench 保持可选，分别核查模型权重与数据集许可。完整取舍记录见 docs/INDUSTRY_REUSE.md。
+## 文献引证扩展：参考文献与后续科学进展
+
+完成专利和论文双源首轮检索后，对最关键的真实公开 DOI 读取 skills/patent-citation-discovery/SKILL.md。若保密审批允许，从 OpenCitations v2 查询直接参考和被引论文，并保留来源、方向、检索时间、局限和失败情况。每个新增 DOI 先标记“仅引证元数据”，然后通过 OpenAlex/Crossref 和真实公开原文补齐题目、机理与验证条件。
+
+结合 IdeaForge 的技术关联图谱，区分理论前驱、后续方法改进与引用关系；据此寻找跨行业发明方向。每项新构思随后仍须重新检索专利权利要求与论文，并由独立反证角色和工程角色复核。具体记录格式见 docs/CITATION_DISCOVERY.md。
+
+源代码固定在 external/opencitations-api、external/paper-qa、external/google-patents-examples，使用许可和最新数据接口由企业发布审查单独核实。PaperQA2 上游的额外语言模型与 embedding 调用不能作为本项目默认依赖。

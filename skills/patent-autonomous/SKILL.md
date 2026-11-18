@@ -41,3 +41,7 @@ user-invocable: true
 不同 Agent 可以在宿主支持的范围内并行领取任务，并通过本地 SQLite 索引、任务依赖和审批记录交接。需要独立核验的专利原文，保存原始公开 PDF HTTPS 地址以供在线查看；许可允许时额外归档本地 PDF。研究方向被否定或需要修改时，创建新的 revision 并保留原先的证据、失败原因和结论。
 
 执行失败应调用对应失败/重试流程并保存任务结果；不得绕过保密审批或把未获取的专利全文、论文全文、工程仿真与实验结果标为已完成。企业架构、任务租约、方向决策和本地 PDF 详见 docs/ENTERPRISE_BLUEPRINT.md 与 docs/WORKFLOW_OPERATIONS.md。
+
+## 新增：文献引证深挖
+
+专利+论文双源检索得到关键公开 DOI 后，调用 patent-citation-discovery 的一跳参考/被引检索。将 DOI 引证关系落入相同案卷，扩展跨学科机理、技术趋势和潜在反例，再针对发明候选做新的专利/论文反证。新发现 DOI 只有引证元数据，不代表已读原文或已确认科学结论。具体执行依据 docs/CITATION_DISCOVERY.md。

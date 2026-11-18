@@ -104,3 +104,20 @@ J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出�
 7. GROBID 和 BGE-M3 作为可选后续模块，待企业评测证明业务价值、成本/数据安全可接受后再生产部署。
 
 重要发现：Codex 仓库技能需放在 .agents/skills/ 才能自动发现，现有 14 个简体中文技能已同步，运行 scripts/sync_skill_mirrors.py --check 并在 CI 检测。未经用户明确授权，不连接外部 MCP 账户、上传技术机密或下载论文全文。工程/法律审查和正式专利申请始终由真实人员批准。
+
+## 第三轮开源融合——学术文献引证关联和跨领域发明发现
+
+在全球专利和论文双检索后，优先实施 OpenCitations DOI 引证扩展：
+- 源码 src/mechanical_patent/citations.py、case_citations.py；
+- 任务 Skill：skills/patent-citation-discovery/SKILL.md；
+- 输入真实 DOI，查询 references/citations，保存每批来源和新的潜在论文 DOI；
+- 将引用关系写回 04b_technology_graph.json，将新 DOI 标记为待核验，交由论文 Agent 核查全文；
+- 避免递归无限扩张：查询 DOI 数、单方向结果数、总节点/边、额度和成本均设置预算；
+- 后续应用到专利创新时，必须逐项反证 D1/D2/论文内容，不能用引用数量预测授权概率。
+
+可参考但不作为 AI 运行引擎：
+- external/opencitations-api (ISC)：开放科研引证 API 的成熟实现；
+- external/paper-qa (Apache-2.0)：论文元数据多源核验、科学证据问答和可信引用，但其原生上游默认要求 LLM/Embedding API；
+- external/google-patents-examples (Apache-2.0，2026-04-18 归档)：专利地图、Claim Text Extraction 与 Claim Breadth SQL 方法。对过时的 BigQuery 表结构不得照搬部署。
+
+实现与升级按实际授权、固定 SHA、NOTICE、真实检索来源和 CI 回归执行。增量补检索应记录到同一个案卷及 DOI 引证图谱，人工审批保持必须。

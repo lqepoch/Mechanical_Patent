@@ -27,6 +27,7 @@ jobs:
           - test_pdf_extraction.py
           - test_mcp_bridge.py
           - test_skill_mirrors.py
+          - test_citations.py
     steps:
       - uses: actions/checkout@v4
         with:
