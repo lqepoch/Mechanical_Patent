@@ -142,6 +142,12 @@ class LiteratureMemoryStore:
                   created_at TEXT NOT NULL
                 );
             """)
+            # 原有案卷数据的幂等增量迁移，保留人工研究批注和历史检索状态。
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)")}
+            if "pdf_url" not in columns:
+                db.execute("ALTER TABLE documents ADD COLUMN pdf_url TEXT NOT NULL DEFAULT ''")
+            if "metadata_json" not in columns:
+                db.execute("ALTER TABLE documents ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'")
             try:
                 db.execute(
                     "CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5("
@@ -178,6 +184,9 @@ class LiteratureMemoryStore:
             "source_url": record.url, "publication_date": record.publication_date,
             "fetched_at": record.retrieved_at, "metadata_from_provider": record.verified,
             "full_text_verified": False,
+            "pdf_candidate_url": record.pdf_url,
+            "oa_license": record.paper_metadata.get("license") or "",
+            "access_status": "metadata_only",
         }
         head = "\n".join(
             key + ": " + json.dumps(value, ensure_ascii=False) for key, value in fields.items()
@@ -190,6 +199,8 @@ class LiteratureMemoryStore:
             "来源链接：" + _safe_markdown(record.url, 2000) + "\n\n"
             "公开日期：" + _safe_markdown(record.publication_date, 80) + "\n\n"
             "来源：" + _safe_markdown(record.source, 100) + "\n\n"
+            "PDF 线索：" + _safe_markdown(record.pdf_url, 2000) + "\n\n"
+            "公开许可：" + _safe_markdown(record.paper_metadata.get("license", ""), 160) + "\n\n"
             "## 来源摘要（未视为全文）\n\n"
             + (_safe_markdown(record.abstract, 12000) or "未检索到摘要。") + "\n\n"
             "## 权利要求摘录（如来源提供）\n\n"
@@ -261,16 +272,18 @@ class LiteratureMemoryStore:
                 db.execute(
                     "INSERT INTO documents(doc_id,kind,publication,title,source,source_url,"
                     "published_at,metadata_verified,abstract,claims,content_hash,note_path,"
-                    "first_seen,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                    "first_seen,last_seen,pdf_url,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                     " ON CONFLICT(doc_id) DO UPDATE SET "
                     "title=excluded.title,source=excluded.source,source_url=excluded.source_url,"
                     "published_at=excluded.published_at,metadata_verified=excluded.metadata_verified,"
                     "abstract=excluded.abstract,claims=excluded.claims,content_hash=excluded.content_hash,"
+                    "pdf_url=excluded.pdf_url,metadata_json=excluded.metadata_json,"
                     "last_seen=excluded.last_seen",
                     (doc_id, record.kind, record.publication, record.title, record.source,
                      record.url, record.publication_date, int(record.verified),
                      record.abstract[:12000], record.claims[:50000], fingerprint,
-                     str(file.relative_to(self.root)), now, now),
+                     str(file.relative_to(self.root)), now, now, record.pdf_url,
+                     json.dumps(record.paper_metadata, ensure_ascii=False, sort_keys=True)),
                 )
                 self._index_fts(db, doc_id, body=body)
                 counts["updated" if old else "new"] += 1
