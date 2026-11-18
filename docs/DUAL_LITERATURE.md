@@ -67,3 +67,12 @@ AI 再把论文的流动机理、汽蚀阈值、传感控制和材料知识转�
 - OpenAlex API Reference: https://help.openalex.org/api/
 - Crossref Public API: https://www.crossref.org/documentation/retrieve-metadata/rest-api
 - Crossref authentication & rate limits: https://www.crossref.org/documentation/retrieve-metadata/rest-api/access-and-authentication/
+
+
+## 论文检索多来源标准接口（2026-11-18）
+
+统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
+
+平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
+
+CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。

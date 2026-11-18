@@ -66,3 +66,24 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 - 任何申请提交由真实发明人、企业 IP 管理与专利代理专业人员确认。
 
 详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
+
+## 消防车与机械结构：公开问题驱动的课题发现层（2026-11-18增补）
+
+在既有专利/论文双源检索入口上游增加 **Problem Discovery（课题发现）** 概念层：
+
+公开问题来源/授权工况及故障 → 来源校验与时效识别 → 失效物理与可量化指标 → 跨行业机理映射 → 专利/论文证据检索 → TRIZ/Quality-Diversity 多路线构思 → 权利要求反证 → 工程验证 → 人工课题立项。
+
+**数据治理**：问题源、候选方案与原始证据均有不可变来源 ID、URL、公开日期、实际检索时间、许可状态、内容哈希与抓取范围；国外标准、政府征集任务、商业专利数据库分开记录授权。已过申报期限的数据可以保留技术情报价值，但不能标成可申请项目。公开问题与项目保密构想分别处理，项目各有独立 SQLite；企业化跨项目分析只能发布经授权脱敏的技术问题摘要。
+
+**交付边界**：当前阶段利用已存在的 patent-landscape、patent-ideation、patent-idea-fission、patent-countersearch 和 patent-engineering-review Skills 执行人工发起的发现研究。后续若开发自动增量采集、事件调度、趋势检测、问题库服务和 MCP 工具，需单独创建业务 Issue，编写合法数据源适配器、分源断路器与限流、断点续采、时间版本、幂等去重、集成测试和监控。现有代码未声称已经实现全自动问题挖掘。
+
+**评审边界**：无法证实“尚未发明”；必须保存检索覆盖、竞争权利要求与可能未公开申请的风险。发现候选只生成通俗技术说明和试验计划，申请专利由发明人选择，企业法务/代理人员评审。
+
+
+## 论文检索多来源标准接口（2026-11-18）
+
+统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
+
+平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
+
+CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。

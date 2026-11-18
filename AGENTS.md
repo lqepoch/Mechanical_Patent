@@ -118,3 +118,18 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 新增标准 MCP 服务端 src/mechanical_patent/mcp_server.py，采用官方 MCP Python SDK v2，支持 stdio / Streamable HTTP；服务端本身不绑定外部 LLM API。涉及第三方查询词外发时，执行当前轮企业案卷保密审批；无授权时工具直接拒绝。MCP 提供专利检索、发明树、反证、工程假设、中文申请文件、QA 的统一业务工具与中文总控 Prompt。接口见 docs/MCP_INTERFACE.md。
 
 外部系统接入时，必须将 MCP 放在已实现 OAuth2/OIDC + TLS 的受控网关后，限制回环服务访问和真实组织/项目授权，避免未经授权读取未公开专利内容。当前服务未自带生产身份服务，不具备直接公网部署条件。任何真实试验、仿真、专业签核及正式递交都需要独立证据或真实人员操作。
+
+
+## 新增默认工作流：每项目独立数据库、LaTeX 论文与前沿发明（2026-11-18）
+
+收到任何新的机械发明专利研发任务时，优先确认 project_id；用 ProjectStorage 打开唯一 projects/<project_id>/patents.sqlite3，并让 MCP 进程强制绑定该项目。禁止不同项目共享 SQLite，禁止把旧库在无授权情况下静默合并。旧版 CLI 未声明 project_id 只能用于历史兼容，新任务采用项目模式。
+
+专业检索角色必须使用 patent_index_refresh 执行获准的真实供应商查询，保留来源、最后检查时间、新发现、变更版本、失败原因及上游公开延迟。在线查询失败时保留历史并标记 stale。专利未检索到或数据过期，不能宣称全球不存在该技术。
+
+前沿研究从 patent_frontier_scan 的近期论文 DOI/真实发表日期、patent_variant_plan 的已公开专利公开号及权利要求开始，按照 Co-Scientist 式生成—反思—竞争—进化—聚类—总评、TRIZ/SCAMPER/跨行业类比独立探索，逐个进行二次专利反证并写明确的物理/结构/控制实施方案。科研论文用 patent_manuscript_* 工具维护分章节 LaTeX/BibTeX 初稿与版本，生成 DOCX/HTML/Markdown；正式中国发明申请文件继续走中文专利专业规则包和真实机械附图。无真实实验、仿真或专业审查时明确标示。
+
+关键技能：skills/patent-project-storage/SKILL.md、skills/patent-latex-research/SKILL.md、skills/patent-frontier-innovation/SKILL.md。对应企业安全与 OpenAlex/EPO/Pandoc/Tectonic 资料见 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md。
+
+## 论文平台选择及长期文献记忆（2026-11-18）
+
+论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。

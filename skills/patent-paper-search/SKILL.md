@@ -35,3 +35,14 @@ user-invocable: true
 ## 引证网络深挖
 
 当科研论文提出一个关键物理机制、控制策略或存在技术争议时，读取 patent-citation-discovery 技能。用真实 DOI 对参考文献和后续引用开展一跳扩展，将新 DOI 作为待验证线索，再通过 OpenAlex/Crossref/Crawl4AI 搜索真实原文和相反证据。不能根据引用次数判断专利创造性。
+
+
+## 统一科研数据源与多渠道选择（2026-11-18）
+
+1. 调用 `paper-sources` / MCP `patent_capabilities` 获取平台能力。按问题选择：广域关键词 OpenAlex + Crossref；引文扩展 Semantic Scholar；预印本 arXiv；生医 Europe PMC + PubMed；有许可的机构库 CORE；专利与学术引用协同 Lens。缺少来源时解释覆盖盲区。
+2. 使用明确外发审批后的 `--paper-provider` 或 MCP `paper_sources`。默认 OpenAlex、Crossref、Semantic Scholar；`all` 跳过无商业授权或无凭证的 CORE/Lens；单独选择有价平台必须既提供 Key，又明确 `--allow-paid-paper-apis` / MCP `allow_paid_paper_apis`。
+3. 通过 DOI 合并不同源元数据，统一记录来源列表、作者、引用数、发表日、OA、许可、候选 PDF URL。Unpaywall 仅做 DOI 合法 OA 位置补全（需真实邮件），未获取/核验全文时 `full_text_verified=false`。
+4. 保存 03_papers.json、04_evidence.json、03_paper_memory/EV-*.md，每篇文献独立记忆元数据、可追溯链接、待核对全文的实验/公式和相反证据。优先在项目私有工作空间内持久化，通过 manifest 校验，不将内部技术与大文件提交到公共仓库。
+5. 供应商异常、缺摘要、失效 PDF/非开放许可、限额及 429 时记录缺口并保留可用来源；仅在许可和审批后再下载原文，通过 Docling/PDF 审核核查页码、方程、实验结论，再联动专利权利要求反证。
+
+接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
