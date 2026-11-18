@@ -85,6 +85,10 @@ class BriefTests(unittest.TestCase):
             document, result = render_brief(data, path, known_evidence={"EV-A1"})
             self.assertEqual(result["missing_figures"], [])
             self.assertIn(r"\includegraphics[width=.9\linewidth]{figures/structure.pdf}", document)
+            self.assertLess(document.index(r"\section{结构和接口说明}"),
+                            document.index(r"\includegraphics[width=.9\linewidth]{figures/structure.pdf}"))
+            self.assertLess(document.index(r"\includegraphics[width=.9\linewidth]{figures/structure.pdf}"),
+                            document.index(r"\section{值得保护的技术创新点（初筛）}"))
 
 
 if __name__ == "__main__":
