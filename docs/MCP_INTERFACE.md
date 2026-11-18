@@ -156,3 +156,16 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 `patent_research` 新增可选 `paper_sources: list[str]`、`enrich_unpaywall: bool` 和 `allow_paid_paper_apis: bool`。未提供平台时默认 OpenAlex、Crossref、Semantic Scholar。已登记的保密外发批准对所有外部渠道生效；Lens、CORE 除此以外还需 Token 与商业许可明确批准。
 
 `patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+
+
+## PDF 原文段落证据工具（2026-11-19）
+
+| MCP tool | 输入 | 输出与边界 |
+| --- | --- | --- |
+| patent_literature_fulltext_ingest | case_id, doc_id, pdf_filename, parsed_filename, authorized | 仅读取当前案卷 knowledge/inbox 下 PDF/JSON，需显式本地归档授权，核查原始 PDF SHA256 |
+| patent_literature_passages | case_id, query, doc_id?, limit | 返回可检索段落、p2:b7 等锚点、来源及原件/段落哈希 |
+| patent_literature_quote | case_id,doc_id,anchor,verbatim | 逐字核对解析结果是否包含短引，不能冒充专业人员原文核验 |
+| patent_literature_fulltext_status | case_id,doc_id | 当前解析版本、块数、校验哈希、待人工核验状态 |
+
+原有 patent_literature_search 返回 matched_passages 供智能体先定位原文再写研究记忆。full_text 级 source_positions 必须通过程序验证真实存在；用户获授权使用与资料传输由 MCP 宿主/企业网关负责，服务不执行任意文件系统访问或网络 PDF 下载。接口和 CLI 样例见 docs/FULLTEXT_EVIDENCE.md。
