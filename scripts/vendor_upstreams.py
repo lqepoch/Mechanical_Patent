@@ -16,6 +16,16 @@ from urllib.request import Request, urlopen
 from zipfile import ZipFile
 
 SOURCES = {
+    "patent-client": {
+        "repo": "parkerhancock/patent-client-agents",
+        "sha": "dadfeb3b36092549290a384acf8aefcc76493bc5",
+        "license": "Apache-2.0",
+    },
+    "patentkit": {
+        "repo": "j-hedtke/patentkit",
+        "sha": "47cfa6f7d7fc42e944c76f76b60463d63a086ea3",
+        "license": "Apache-2.0",
+    },
     "chinese-patent": {
         "repo": "handsomestWei/patent-disclosure-skill",
         "sha": "91e3b43a3e6b568c627bc83ffcb73ff453bf0304",
