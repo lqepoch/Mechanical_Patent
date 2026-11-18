@@ -68,11 +68,11 @@ class PaperFullTextService:
         path = Path(original)
         if not original or path.is_symlink() or not path.is_file():
             raise PatentWorkflowError("已登记的 PDF/解析文件不存在或为符号链接。")
-        if path.suffix != suffix or not path.resolve().is_relative_to(expected_root.resolve()):
+        if expected_root.is_symlink() or path.suffix != suffix or not path.resolve().is_relative_to(expected_root.resolve()):
             raise PatentWorkflowError("PDF/解析文件超出项目专属存储空间。")
         return path
 
-    def _save(self, doc_id: str, state: str, **changes: Any) -> None:
+    def _save(self, doc_id: str, state: str, *, claim: bool = False, **changes: Any) -> None:
         columns = {
             "pdf_url", "rights_basis", "rights_reference", "pdf_sha256",
             "pdf_local_path", "pdf_bytes", "parsed_json_path", "parsed_blocks", "last_error",
@@ -81,8 +81,11 @@ class PaperFullTextService:
             raise PatentWorkflowError("无效的 PDF 状态字段。")
         now = utc_now()
         with self.memory.connect(write=True) as db:
-            exists = db.execute("SELECT doc_id FROM paper_fulltext WHERE doc_id=?", (doc_id,)).fetchone()
-            if exists:
+            existing = db.execute("SELECT * FROM paper_fulltext WHERE doc_id=?", (doc_id,)).fetchone()
+            if claim and existing is not None:
+                # Transactional check prevents two concurrent workers from claiming the same DOI.
+                self._guard_busy(dict(existing))
+            if existing:
                 sets = ["state=?", "updated_at=?"] + [key + "=?" for key in changes]
                 values = [state, now] + list(changes.values()) + [doc_id]
                 db.execute("UPDATE paper_fulltext SET " + ",".join(sets) + " WHERE doc_id=?", values)
@@ -134,6 +137,11 @@ class PaperFullTextService:
             raise PatentWorkflowError("PDF 下载必须显式列出已批准的来源域名。")
         current = self._row(doc_id)
         self._guard_busy(current)
+        if current and current["pdf_url"] == url and (
+            current["rights_basis"] != rights_basis
+            or current["rights_reference"] != rights_reference.strip()[:1500]
+        ):
+            raise PatentWorkflowError("本 DOI 的归档权利依据与此前已登记记录不同，需要人工审计后重新批准。")
         if current and current["pdf_url"] == url and current["state"] in {
             "downloaded", "parsed_unverified", "parse_failed"
         }:
@@ -144,7 +152,7 @@ class PaperFullTextService:
                     return self.status(doc_id)
             except (OSError, PatentWorkflowError):
                 pass
-        self._save(doc_id, "downloading", pdf_url=url, rights_basis=rights_basis,
+        self._save(doc_id, "downloading", claim=True, pdf_url=url, rights_basis=rights_basis,
                    rights_reference=rights_reference.strip()[:1500], last_error="")
         try:
             result = self.download_impl(
@@ -187,7 +195,7 @@ class PaperFullTextService:
         output = self.parse_root / (doc_id + "-" + digest + ".json")
         if output.is_symlink():
             raise PatentWorkflowError("PDF 解析结果路径被符号链接替换。")
-        self._save(doc_id, "parsing", last_error="")
+        self._save(doc_id, "parsing", claim=True, last_error="")
         try:
             result = self.parse_impl(pdf, output, authorized=True,
                                      source_url=current["pdf_url"],
@@ -200,12 +208,12 @@ class PaperFullTextService:
             payload = json.loads(output.read_text(encoding="utf-8"))
             if payload.get("source_pdf_sha256") != digest:
                 raise PatentWorkflowError("解析结果引用了不匹配的原始 PDF SHA256。")
-            self._save(doc_id, "parsed_unverified", parsed_json_path=str(output),
-                       parsed_blocks=blocks)
             self.memory.write_machine_extraction(
                 doc_id, pdf_sha256=digest, parsed_json_path=str(output),
                 blocks=blocks, source_url=current["pdf_url"],
             )
+            self._save(doc_id, "parsed_unverified", parsed_json_path=str(output),
+                       parsed_blocks=blocks)
         except (PatentWorkflowError, OSError, KeyError, ValueError, RuntimeError) as exc:
             self._save(doc_id, "parse_failed", last_error=str(exc)[:300])
             raise PatentWorkflowError("本地 PDF 解析失败；原始 PDF 已保留，支持之后重试。") from exc
