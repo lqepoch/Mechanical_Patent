@@ -35,3 +35,11 @@ user-invocable: true
 ## 引证网络深挖
 
 当科研论文提出一个关键物理机制、控制策略或存在技术争议时，读取 patent-citation-discovery 技能。用真实 DOI 对参考文献和后续引用开展一跳扩展，将新 DOI 作为待验证线索，再通过 OpenAlex/Crossref/Crawl4AI 搜索真实原文和相反证据。不能根据引用次数判断专利创造性。
+
+
+
+## 项目论文深分页与持久文献记忆
+
+本技能与 patent-literature-memory/SKILL.md 联用。使用 OpenAlex/Crossref 官方 cursor 分批查询论文并在该项目 knowledge/documents/papers/ 下为每个 DOI/OpenAlex ID 生成单独 MD；去重后的全部元数据和批注索引归属于同项目 literature.sqlite3。OpenAlex 深分页需要免费 API Key；Crossref cursor 过期可按相同查询重新运行，通过 DOI 幂等去重恢复。遇配额、超时或缺失摘要时记录真实缺口。
+
+经授权获取论文全文后记录其结构、关键方程、参数边界、实验结果出处、局限和可迁移机理。使用 patent_literature_note 的 basis 字段区分 metadata、abstract、claims、full_text；声明全文依据时必须有页码/章节。每批次研究先恢复 RESEARCH_RESUME.md，后加载相关文献与未完成队列；定期保存下一轮创新想法与反证关键词。
