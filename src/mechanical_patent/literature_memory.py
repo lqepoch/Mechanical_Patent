@@ -241,7 +241,11 @@ class LiteratureMemoryStore:
                     "SELECT * FROM documents WHERE doc_id=?",
                     (doc_id,),
                 ).fetchone()
-                if old is not None and record.kind == "paper":
+                if (
+                    old is not None and record.kind == "paper"
+                    and (record.paper_metadata or record.pdf_url or old["pdf_url"]
+                         or old["paper_metadata_json"] not in ("", "{}"))
+                ):
                     # Preserve multi-provider provenance even across separate harvest batches.
                     from .paper_sources import merge_paper_records
                     previous = Evidence(
