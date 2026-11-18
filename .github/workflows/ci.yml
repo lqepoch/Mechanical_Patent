@@ -31,6 +31,7 @@ jobs:
           - test_citations.py
           - test_fission_mcp.py
           - test_literature_memory.py
+          - test_literature_evidence.py
           - test_project_latex_frontier.py
           - test_container_deployment.py
           - test_technical_brief.py
