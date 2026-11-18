@@ -145,3 +145,21 @@ bash scripts/deploy_ubuntu26.sh up
 ## 离线论文全文任务与资源边界（2026-11-19）
 
 论文 PDF 与机器解析数据应写入现有数据盘 /data/projects/项目ID/cases/案卷ID/knowledge/fulltext/。默认 GHCR MCP 镜像只安装轻量业务依赖，不自动包含 Docling 模型权重，也不允许模型运行时隐式联网获取权重。通过宿主受控 CLI 或独立审批的解析 Worker 在持久卷上执行时需设置受控离线模型目录、来源域名白名单、外网防火墙、最大文件/页数、资源上限和内容扫描。容器主进程通过只读 MCP 查询已经形成的页码索引与进度。升级前按照原有 SQLite WAL 与 PDF 目录一同做停服一致性备份和恢复演练。详见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+
+## 公开科研问题自动巡检服务（2026-11-19）
+
+已增加 Compose 可选 profile discovery。启用后，独立 source-radar 容器使用同一 GHCR 镜像和持久化磁盘 /data，按3小时周期检索**已经批准的公共 RSS**。不提供公网入口，不向第三方传输内部项目内容。其公共数据库位于 /data/public_source_catalog/sources.sqlite3；每个项目仍有各自独立 /data/projects/.../patents.sqlite3。
+
+    # 启动之前先审查已批准平台和具体 feed_url、出口防火墙与收集许可
+    docker compose run --rm --entrypoint mechanical-patent patent-mcp \
+      source-catalog sources --storage-root /data
+    # 显式启用巡检容器，并保持 MCP 主服务继续运行
+    COMPOSE_PROFILES=discovery docker compose up -d
+    COMPOSE_PROFILES=discovery docker compose logs --tail=100 source-radar
+    # 可只停止此公开巡检 worker，保留 MCP 主服务
+    COMPOSE_PROFILES=discovery docker compose stop source-radar
+
+默认未设置 COMPOSE_PROFILES=discovery 时，该 worker 完全不启动。不得通过编辑 compose 把外部 API 密钥或未公开专利内容注入巡检任务。该服务只负责来源监测和新问题入库；全自动 AI 深度研究还需接入有审批、预算、可恢复队列和独立核验机制的 Agent 调度服务。Dockerfile 原始 TCP HEALTHCHECK 专用于 MCP，worker 禁用该检查，由容器 restart 策略和日志进行初级监控；正式环境应接入真实探针及统一告警。
+
+备份时连同 /data/public_source_catalog/ 一并执行停服一致性备份。灾备恢复应核验审计哈希链并进行故障重试检查，进阶环境另行设计外部签名/只追加事件仓库。
