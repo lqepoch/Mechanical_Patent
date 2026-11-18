@@ -120,6 +120,17 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 外部系统接入时，必须将 MCP 放在已实现 OAuth2/OIDC + TLS 的受控网关后，限制回环服务访问和真实组织/项目授权，避免未经授权读取未公开专利内容。当前服务未自带生产身份服务，不具备直接公网部署条件。任何真实试验、仿真、专业签核及正式递交都需要独立证据或真实人员操作。
 
 
+## 新增默认工作流：每项目独立数据库、LaTeX 论文与前沿发明（2026-11-18）
+
+收到任何新的机械发明专利研发任务时，优先确认 project_id；用 ProjectStorage 打开唯一 projects/<project_id>/patents.sqlite3，并让 MCP 进程强制绑定该项目。禁止不同项目共享 SQLite，禁止把旧库在无授权情况下静默合并。旧版 CLI 未声明 project_id 只能用于历史兼容，新任务采用项目模式。
+
+专业检索角色必须使用 patent_index_refresh 执行获准的真实供应商查询，保留来源、最后检查时间、新发现、变更版本、失败原因及上游公开延迟。在线查询失败时保留历史并标记 stale。专利未检索到或数据过期，不能宣称全球不存在该技术。
+
+前沿研究从 patent_frontier_scan 的近期论文 DOI/真实发表日期、patent_variant_plan 的已公开专利公开号及权利要求开始，按照 Co-Scientist 式生成—反思—竞争—进化—聚类—总评、TRIZ/SCAMPER/跨行业类比独立探索，逐个进行二次专利反证并写明确的物理/结构/控制实施方案。科研论文用 patent_manuscript_* 工具维护分章节 LaTeX/BibTeX 初稿与版本，生成 DOCX/HTML/Markdown；正式中国发明申请文件继续走中文专利专业规则包和真实机械附图。无真实实验、仿真或专业审查时明确标示。
+
+关键技能：skills/patent-project-storage/SKILL.md、skills/patent-latex-research/SKILL.md、skills/patent-frontier-innovation/SKILL.md。对应企业安全与 OpenAlex/EPO/Pandoc/Tectonic 资料见 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md。
+
+
 ## 所有专利项目必执行知识星图
 
 检索或导入新专利/论文后读取 skills/patent-knowledge-atlas/SKILL.md，运行 atlas-index / patent_knowledge_index，维护文档、项目、公开全局三级图谱。每篇文献自动生成独立 generated MD 记忆，技术人员注释保存在 manual MD。AI 从原文中提取的机械结构、作用效果、控制关系必须附存在于本地存档的 quote，且一律待人工复核；词频相似度只用于召回补充检索，绝不可用作创造性证明。跨项目检索严格按 confidentiality 区分，只有“公开”项目可进入 global_public 投影；未实现真实 OIDC+ABAC 之前，禁止以共享知识图谱展示秘密项目间联系。详见 docs/KNOWLEDGE_ATLAS.md。
