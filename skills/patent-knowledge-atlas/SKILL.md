@@ -33,3 +33,8 @@ user-invocable: true
 - 局部 SQLite 只作为单用户工具底座；组织生产需要 Keycloak/OIDC、逐项目 ABAC、访问审计、备份与恢复、索引任务队列、许可证/模型权重审批、规模/召回评测。
 - 大规模相似检索可选择 sqlite-vec 的本地向量索引；只有取得独立模型许可和数据外发批准才允许云 embedding。LightRAG/GraphRAG 需经过全栈依赖和安全评估，现阶段作为可插拔增强而非强制依赖。
 - 删除或更换原始文献后必须重建派生图谱，清理失效引用，并核查保密投影。
+
+
+## 已有文献长期记忆的联动
+
+仓库已有 patent-literature-memory / LiteratureMemoryStore：每篇文献的权威 Markdown、研究批注、全文/摘要证据级别均应使用 patent_literature_read 和 patent_literature_note 维护，不能在星图派生文件中重复写人工作业。Atlas 的 document_memory/generated 是按文献 ID 关联的只读图谱邻居索引；document_memory/manual 为兼容旧图谱注释，但新增的核实技术论证优先写入 LiteratureMemoryStore。资料被收录到项目文献库，但未进入某次 04_evidence.json 研究运行时，须在当前结论中明确其尚未进入该次案卷星图；后续专门建设跨运行全项目聚合索引。
