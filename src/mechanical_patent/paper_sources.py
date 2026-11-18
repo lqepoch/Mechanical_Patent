@@ -368,24 +368,35 @@ class PubMedProvider:
         self.fetch_xml = fetch_xml or _fetch_xml
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 9):
+            raise PatentWorkflowError("PubMed 检索页偏移量无效。")
+        start = int(cursor) if cursor not in (None, "*") else 0
+        size = max(1, min(int(limit), 100))
         base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         params = {"db": "pubmed", "term": query.strip()[:MAX_QUERY],
-                  "retmode": "json", "retmax": max(1, min(limit, 25))}
+                  "retmode": "json", "retstart": start, "retmax": size}
         if self.key:
             params["api_key"] = self.key
         if self.contact_email:
             params["email"] = self.contact_email
         # NCBI 官方单 IP 访问率限制；单进程内保守限速。
         _pace(self.name, 0.4 if not self.key else 0.12)
-        ids = (self.fetch_json(base + "esearch.fcgi?" + parse.urlencode(params))
-               .get("esearchresult") or {}).get("idlist", [])
+        discovery = (self.fetch_json(base + "esearch.fcgi?" + parse.urlencode(params))
+                     .get("esearchresult") or {})
+        ids = discovery.get("idlist", [])
+        count_raw = discovery.get("count")
+        total = int(count_raw) if str(count_raw).isdigit() else None
         if not isinstance(ids, list) or not ids:
-            return []
-        identifiers = [str(x) for x in ids[:25] if str(x).isdigit()]
+            return {"records": [], "next_cursor": None, "total_results": total}
+        identifiers = [str(x) for x in ids[:size] if str(x).isdigit()]
         if not identifiers:
-            return []
+            return {"records": [], "next_cursor": None, "total_results": total}
         detail = {"db": "pubmed", "id": ",".join(identifiers), "retmode": "xml"}
         if self.key:
             detail["api_key"] = self.key
@@ -420,7 +431,12 @@ class PubMedProvider:
                        doi=doi, abstract=abstr, date=date, authors=authors)
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        end = start + len(identifiers)
+        next_cursor = str(end) if (
+            len(identifiers) == size and (total is None or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
 
 
 class COREProvider:
