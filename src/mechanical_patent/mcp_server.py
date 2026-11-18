@@ -20,6 +20,7 @@ from .technical_brief import render_brief
 from .technical_review import inspect_brief
 from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
+from .project_storage import ProjectStorage
 from .quality import inspect_research_case, audit_research_case
 from .workflow import PatentResearch
 
@@ -38,13 +39,11 @@ _READABLE = frozenset({
 class PatentMCPService:
     """传输无关服务层，供 MCP、本地 CLI 与未来 REST 网关共同复用。"""
 
-    def __init__(self, workspace_dir: Path):
-        root = Path(workspace_dir).expanduser()
-        if root.is_symlink():
-            raise PatentWorkflowError("工作空间目录禁止采用符号链接。")
-        root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.root = root.resolve()
-        self.workspace = LocalPatentWorkspace(self.root / "index.sqlite3")
+    def __init__(self, workspace_dir: Path, project_id: str = "local"):
+        # 一个 MCP 进程固定一个项目。不能借助 case_id 查找其他项目。
+        self.project = ProjectStorage(workspace_dir, project_id)
+        self.root = self.project.root
+        self.workspace = self.project.workspace
 
     def _case(self, case_id: str) -> dict[str, Any]:
         if not isinstance(case_id, str) or not _CASE_ID.fullmatch(case_id):
@@ -76,7 +75,7 @@ class PatentMCPService:
 
     def status(self, case_id: str) -> dict[str, Any]:
         record = self._case(case_id)
-        return {"case_id": record["case_id"], "revision": record["revision"],
+        return {"case_id": record["case_id"], "project_id": self.project.project_id, "revision": record["revision"],
                 "status": record["status"], "confidentiality": record["confidentiality"],
                 "outbound_approved": self.workspace.can_egress(case_id),
                 "tasks": record.get("tasks", []), "document_totals": record.get("source_reviews", [])}
@@ -227,7 +226,6 @@ class PatentMCPService:
         save_json(path, data)
         return {"saved": True, "verification_status": verification_status, "engineer_signoff": False}
 
-
     def brief_save(self, case_id: str, run_id: str, candidate_id: str,
                    brief: dict[str, Any]) -> dict[str, Any]:
         """保存并渲染白话技术方案；不触发正式申请稿。"""
@@ -310,11 +308,16 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "contract_version": "1.3",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.3",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
                 "security": "保密审批先于真实检索；HTTP 仅回环监听，由前置 OAuth2/OIDC 网关鉴权。"}
+
+    @server.tool()
+    def patent_project_info() -> dict[str, Any]:
+        """读取当前绑定的项目身份及该项目独立数据库信息。"""
+        return service.project.describe()
 
     @server.tool()
     def patent_case_create(case_id: str, direction: str, confidentiality: str = "秘密") -> dict[str, Any]:
@@ -416,7 +419,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_draft_save(case_id: str, run_id: str, candidate_id: str,
                           draft: dict[str, Any]) -> dict[str, Any]:
-        """仅在独立可信企业审批授权转换后，保存申请底稿并逐权项校验。"""
+        """仅可信企业审批允许申请转换后保存权项、说明书与摘要。"""
         return service.draft_save(case_id, run_id, candidate_id, draft)
 
     @server.tool()
@@ -431,12 +434,16 @@ def create_server(service: PatentMCPService):
             "请以企业级机械发明专利研发智能体身份处理以下技术任务：" + direction
             + "\n操作：先调用 patent_capabilities / patent_case_create；遵守保密审核。"
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
+            + "调用 patent_index_refresh 保持项目索引可追溯，patent_frontier_scan 发现公开前沿，并通过 patent_variant_plan 研究已公开专利的变种；"
+            + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "默认用 patent_brief_save 输出工程技术方案，使用专用模板选择结构、时序、流程、对比图表；"
-            + "执行 patent_brief_audit 审阅工程方案，双人签核后可直接结案；仅在用户明确申请且外部企业审批验签后才可使用 patent_draft_save 生成权要与摘要。"
+            + "默认用 patent_brief_save 输出工程技术方案；只有用户申请决定及企业验签通过才可写专利申请文本；"
+            + "执行 patent_brief_audit 审阅工程方案，双人签核可直接结案；独立批准后才可运行 patent_draft_save 与 patent_quality_audit。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
+    from .mcp_extensions import register_project_research_tools
+    register_project_research_tools(server, service)
     return server
 
 
@@ -444,13 +451,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Mechanical_Patent 官方 MCP SDK v2 服务器")
     parser.add_argument("--workspace", type=Path,
                         default=Path(os.getenv("PATENT_MCP_WORKSPACE", "./private_patent_workspace")))
+    parser.add_argument("--project-id", default=os.getenv("PATENT_MCP_PROJECT_ID"),
+                        help="必须显式绑定项目，项目之间隔离 SQLite、论文和证据目录")
     parser.add_argument("--transport", choices=("stdio", "streamable-http"), default="stdio")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
+    if not args.project_id:
+        parser.error("必须传 --project-id 或 PATENT_MCP_PROJECT_ID，不能部署跨项目共享数据库。")
     if args.transport == "streamable-http" and args.host not in {"127.0.0.1", "::1", "localhost"}:
         parser.error("MCP HTTP 强制绑定回环地址；企业远程接入请经过 HTTPS + OIDC 网关。")
-    service = PatentMCPService(args.workspace)
+    service = PatentMCPService(args.workspace, project_id=args.project_id)
     server = create_server(service)
     if args.transport == "stdio":
         server.run(transport="stdio")

@@ -24,3 +24,6 @@ user-invocable: true
 
 ## MCP 与异常处理
 先调用 patent_capabilities；用户不提出申请决策时不要调用 patent_draft_save。研究错误、来源缺口、图纸缺失均如实保存在案卷，严禁静默降级后宣称通过。参考 docs/MCP_INTERFACE.md、docs/IDEA_FISSION.md 与 docs/WORKFLOW_OPERATIONS.md。
+
+## 前沿专利与 LaTeX 主源（2026-11-18）
+接到一条全新研发指令后，读取 patent-project-storage、patent-frontier-innovation、patent-latex-research 三项技能；锁定当前 project_id 的 SQLite；按实际供应商检索时间刷新专利索引及公开论文前沿。已有专利名称必须先核对真实公开号再裂变。研究论文独立保存分节 LaTeX 和 BibTeX；默认发明成果先生成白话工程技术方案；各个变种均按原权要逐技术特征反证，不能跳过工程实用性验证。

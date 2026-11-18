@@ -4,7 +4,7 @@
 
 当用户给出机械、消防车辆、应急装备、液压或控制系统的技术难题时，当前 ChatGPT、Codex 或兼容 AI 会话应在能力范围内完成以下完整闭环：
 
-保密分级 → 全球专利检索与论文检索 → 创意裂变与反证 → 工程理论论证 → **白话工程技术方案 LaTeX（默认）** → 独立工程评审 → 通过后可归档；仅明确申请且企业可信签名授权时转换中国专利申请文稿。
+保密分级 → 全球专利检索与论文检索 → 技术路线/创意裂变/反证 → 工程理论验证 → **默认工程技术方案及双人评审** → 归档；仅明确申请且企业可信签名授权后转换中国专利申请文件。
 
 **当前 AI 会话负责推理与撰写。** 工具代码负责检索数据、出处记录、案卷状态和确定性检查。用户无需配置 Ollama、Qwen 或模型 API。EPO OPS 等数据供应方可能需要自己的数据访问凭证，这与模型推理权限互相独立。
 
@@ -25,7 +25,7 @@
 4. 多创新路径：TRIZ、SCAMPER、设计思维、FMEA、跨领域物理迁移并行提出候选。
 5. 独立反证：逐候选对比 D1/D2 与相关论文，搜寻显而易见性、已有公开和实施限制。
 6. 工程论证：做量纲一致的理论推导，检查结构、材料、运动、流体/热、控制、强度和安全；列出可证伪试验。
-7. 工程技术方案：优先运行 patent-technical-brief，解释结构、动作、创新和效用，图表根据内容选择；经可信申请转换审批后才运行 patent-drafting-cn。
+7. 技术方案优先：使用 patent-technical-brief 生成 CTeX 技术说明书与按需结构图/时序/流程图；通过双人评审即可结案，只有独立批准后才调用 patent-drafting-cn。
 8. 质量与发布：保存问题清单、证据锚点、权项支持、工程/专利专业人员双重审批待办。
 
 单个 AI 客户端如果不具备并行智能体运行能力，按专业角色依次工作并将产物保存在独立阶段文件中，明确同一模型自审的独立性有限。每阶段使用完整案卷事实和来源编号。
@@ -43,9 +43,10 @@
 - 05_inventions.json：候选发明和区别特征
 - 06_countersearch.json：权利特征与原文反证
 - 07_engineering.json：理论论证、量纲、失败模式及验证计划
-- 08a_technical_brief.json 与 08a_technical_brief.tex：默认白话技术方案及 LaTeX 布局
-- 08b_conversion_approval.json：独立企业审批的当前方案哈希签名（仅可信审批服务写入）
-- 08_application.json：仅获授权后生成的中文交底和申请文件草稿
+- 08a_technical_brief.json/.tex：默认工程方案与图文排版
+- 08c_technical_review.json：工程/IP 双人结案评审签名
+- 08b_conversion_approval.json：另行批准专利文本转换
+- 08_application.json：仅获转换授权后生成正式申请文件草稿
 - 09_quality_gate.json：质量与审批阻断
 - events/*.json：具备内容哈希的本地审计事件
 - manifest.json：文件哈希清单与案卷头事件
@@ -120,6 +121,17 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 新增标准 MCP 服务端 src/mechanical_patent/mcp_server.py，采用官方 MCP Python SDK v2，支持 stdio / Streamable HTTP；服务端本身不绑定外部 LLM API。涉及第三方查询词外发时，执行当前轮企业案卷保密审批；无授权时工具直接拒绝。MCP 提供专利检索、发明树、反证、工程假设、中文申请文件、QA 的统一业务工具与中文总控 Prompt。接口见 docs/MCP_INTERFACE.md。
 
 外部系统接入时，必须将 MCP 放在已实现 OAuth2/OIDC + TLS 的受控网关后，限制回环服务访问和真实组织/项目授权，避免未经授权读取未公开专利内容。当前服务未自带生产身份服务，不具备直接公网部署条件。任何真实试验、仿真、专业签核及正式递交都需要独立证据或真实人员操作。
+
+
+## 新增默认工作流：每项目独立数据库、LaTeX 论文与前沿发明（2026-11-18）
+
+收到任何新的机械发明专利研发任务时，优先确认 project_id；用 ProjectStorage 打开唯一 projects/<project_id>/patents.sqlite3，并让 MCP 进程强制绑定该项目。禁止不同项目共享 SQLite，禁止把旧库在无授权情况下静默合并。旧版 CLI 未声明 project_id 只能用于历史兼容，新任务采用项目模式。
+
+专业检索角色必须使用 patent_index_refresh 执行获准的真实供应商查询，保留来源、最后检查时间、新发现、变更版本、失败原因及上游公开延迟。在线查询失败时保留历史并标记 stale。专利未检索到或数据过期，不能宣称全球不存在该技术。
+
+前沿研究从 patent_frontier_scan 的近期论文 DOI/真实发表日期、patent_variant_plan 的已公开专利公开号及权利要求开始，按照 Co-Scientist 式生成—反思—竞争—进化—聚类—总评、TRIZ/SCAMPER/跨行业类比独立探索，逐个进行二次专利反证并写明确的物理/结构/控制实施方案。科研论文用 patent_manuscript_* 工具维护分章节 LaTeX/BibTeX 初稿与版本，生成 DOCX/HTML/Markdown；正式中国发明申请文件继续走中文专利专业规则包和真实机械附图。无真实实验、仿真或专业审查时明确标示。
+
+关键技能：skills/patent-project-storage/SKILL.md、skills/patent-latex-research/SKILL.md、skills/patent-frontier-innovation/SKILL.md。对应企业安全与 OpenAlex/EPO/Pandoc/Tectonic 资料见 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md。
 
 
 ## 工程技术方案默认交付（2026-11-18）
