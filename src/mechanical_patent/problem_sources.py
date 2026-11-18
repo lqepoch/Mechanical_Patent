@@ -471,7 +471,7 @@ class ProblemSourceRegistry:
         """AI may register a research hypothesis; it cannot attest patent novelty."""
         for field, value in (("problem",problem),("hypothesis",hypothesis),
                              ("falsification",falsification),("domain",domain)):
-            if not isinstance(value,str) or not 5 <= len(value.strip()) <= 1600:
+            if not isinstance(value,str) or not (2 if field=="domain" else 5) <= len(value.strip()) <= 1600:
                 raise PatentWorkflowError(f"{field} 需要明确且有界的技术描述。")
         with self.connect(write=True) as db:
             observation=db.execute("SELECT * FROM observations WHERE id=?",
