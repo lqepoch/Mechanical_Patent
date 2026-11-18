@@ -161,6 +161,16 @@ class PatentMCPService:
         result["case_id"] = case_id
         return result
 
+    def literature_fulltext_batch_status(
+        self, case_id: str, batch_id: str, limit: int = 100,
+    ) -> dict[str, Any]:
+        """本项目 PDF 全文批处理进度与失败详情；只读。"""
+        from .literature_fulltext import LiteratureFullText
+        from .literature_fulltext_batch import FullTextBatchRunner
+        return FullTextBatchRunner(
+            LiteratureFullText(self._memory(case_id))
+        ).status(batch_id, limit=limit)
+
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
@@ -526,6 +536,13 @@ def create_server(service: PatentMCPService):
     ) -> dict[str, Any]:
         """返回项目内指定论文 PDF 页面的结构化段落和坐标。"""
         return service.literature_fulltext_page(case_id, doc_id, page, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_batch_status(
+        case_id: str, batch_id: str, limit: int = 100,
+    ) -> dict[str, Any]:
+        """查看已获授权的 PDF 批处理检查点、失败及完成数，不执行文件下载。"""
+        return service.literature_fulltext_batch_status(case_id, batch_id, limit)
 
     @server.tool()
     def patent_literature_harvest(
