@@ -117,6 +117,19 @@ class PatentMCPService:
     def literature_stats(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).stats()
 
+    def literature_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
+        return {"case_id": case_id, "pending": self._memory(case_id).pending_analysis(limit=limit)}
+
+    def literature_resume(self, case_id: str) -> dict[str, Any]:
+        return self._memory(case_id).read_resume()
+
+    def literature_resume_save(
+        self, case_id: str, analyst: str, markdown: str, expected_sha256: str,
+    ) -> dict[str, Any]:
+        return self._memory(case_id).update_resume(
+            markdown, analyst=analyst, expected_sha256=expected_sha256,
+        )
+
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
@@ -384,6 +397,25 @@ def create_server(service: PatentMCPService):
     def patent_literature_stats(case_id: str) -> dict[str, Any]:
         """文献累计规模、已分析数、未完分页任务及研究恢复文档位置。"""
         return service.literature_stats(case_id)
+
+    @server.tool()
+    def patent_literature_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
+        """批量读取尚未写入实质研究分析的文献队列，逐篇处理。"""
+        return service.literature_pending(case_id, limit)
+
+    @server.tool()
+    def patent_literature_resume(case_id: str) -> dict[str, Any]:
+        """恢复项目最新研究任务、假设、证据与后续方向。"""
+        return service.literature_resume(case_id)
+
+    @server.tool()
+    def patent_literature_resume_save(
+        case_id: str, analyst: str, markdown: str, expected_sha256: str,
+    ) -> dict[str, Any]:
+        """乐观锁更新研究快照并归档旧版，防止上下文压缩和并发覆盖。"""
+        return service.literature_resume_save(
+            case_id, analyst, markdown, expected_sha256,
+        )
 
     @server.tool()
     def patent_literature_harvest(
