@@ -52,6 +52,13 @@ def add_literature_parser(subparsers: Any) -> None:
     pdf_pages.add_argument("--page", required=True, type=int)
     pdf_pages.add_argument("--limit", type=int, default=30)
 
+    oa = subs.add_parser("oa-enrich", help="通过已批准的 DOI 查询补全 Unpaywall 合法 OA 位置")
+    oa.add_argument("--doc-id", required=True)
+    oa.add_argument("--workflow-case-id", required=True)
+    oa.add_argument("--workspace-db", required=True, type=Path)
+    oa.add_argument("--allow-search-exposure", action="store_true")
+    oa.add_argument("--authorized", action="store_true")
+
     pdf_fetch = subs.add_parser("pdf-fetch", help="仅在审批与合法使用证明齐全后下载候选 PDF")
     pdf_fetch.add_argument("--doc-id", required=True)
     pdf_fetch.add_argument("--allowed-host", action="append", required=True)
@@ -122,27 +129,30 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
-    elif command in {"pdf-status", "pdf-pages", "pdf-fetch", "pdf-parse"}:
+    elif command in {"pdf-status", "pdf-pages", "pdf-fetch", "pdf-parse", "oa-enrich"}:
         from .paper_fulltext import PaperFullTextService
         service = PaperFullTextService(memory)
         if command == "pdf-status":
             result = service.status(args.doc_id)
         elif command == "pdf-pages":
             result = service.pages(args.doc_id, page=args.page, limit=args.limit)
-        elif command == "pdf-fetch":
+        elif command in {"pdf-fetch", "oa-enrich"}:
             if not args.authorized or not args.allow_search_exposure:
-                raise PatentWorkflowError("PDF 下载需要明确授权并通过检索词外发审批。")
+                raise PatentWorkflowError("DOI 外部查询及 PDF 下载需要明确授权并通过检索词外发审批。")
             if args.project_dir.name != args.workflow_case_id:
                 raise PatentWorkflowError("PDF 下载案卷编号与项目目录不匹配。")
             from .local_workspace import LocalPatentWorkspace
             workspace = LocalPatentWorkspace(args.workspace_db)
             if not workspace.can_egress(args.workflow_case_id):
                 raise PatentWorkflowError("当前案卷缺少已登记的外发保密审批。")
-            result = service.download(
-                args.doc_id, authorized=True, allowed_hosts=set(args.allowed_host),
-                rights_basis=args.rights_basis, rights_reference=args.rights_reference,
-                max_bytes=args.max_bytes,
-            )
+            if command == "oa-enrich":
+                result = service.enrich_oa(args.doc_id, authorized=True)
+            else:
+                result = service.download(
+                    args.doc_id, authorized=True, allowed_hosts=set(args.allowed_host),
+                    rights_basis=args.rights_basis, rights_reference=args.rights_reference,
+                    max_bytes=args.max_bytes,
+                )
         else:
             result = service.parse(
                 args.doc_id, authorized=args.authorized,
