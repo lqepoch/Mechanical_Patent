@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .core import PatentWorkflowError, coverage, deduplicate, evidence_id, save_json, utc_now, validate_draft
+from .chinese_skill import load_chinese_drafting_guidance
 
 
 def source_view(records, limit=16):
@@ -31,6 +32,7 @@ class PatentResearch:
         self.hashes, self.errors = {}, list(web_errors or [])
         self.supplemental_sources = list(supplemental_sources or [])
         self.web_documents = list(web_documents or [])
+        self.cn_skill = load_chinese_drafting_guidance()
 
     def save(self, name, data):
         self.hashes[name] = save_json(self.case_dir / name, data)
@@ -63,7 +65,8 @@ class PatentResearch:
         self.save("00_intake.json", {
             "case_id": case_id, "created_at": utc_now(), "direction": direction,
             "provider": self.provider.name, "model": getattr(self.llm, "model", "injected"),
-            "confidential": True,
+            "confidential": True, "chinese_drafting_skill_available": self.cn_skill["available"],
+            "chinese_drafting_skill_files": self.cn_skill["files"],
         })
 
         plan = self.llm.ask("SEARCH_STRATEGIST",
@@ -159,14 +162,19 @@ class PatentResearch:
                 '"claim_support":[{"claim":1,"specification_passage":""}],"figure_plan":[]}. '
                 "Produce a detailed Chinese invention APPLICATION DRAFT with reproducible embodiments, "
                 "connections, actions, suitable parameters with reasoned bounds, alternatives, figure plan. "
-                "Keep claimed distinguishing mechanisms supported by the description. "
+                Keep claimed distinguishing mechanisms supported by the description. "
+                "Copy the exact supporting passage from the description into each claim_support item for deterministic matching. "
+                "Apply the upstream Chinese drafting practice where consistent with actual engineering and law. "
+                + self.cn_skill["guidance"][:14000] + " "
                 "Do not invent experimental verification, fake measurements or inventors.",
                 {"direction": direction, "candidate": candidates[chosen],
                  "feasibility": engineering[chosen]["assessment"],
-                 "challenge": challenges[chosen]["assessment"], "prior_art": source_view(records)})
+                 "challenge": challenges[chosen]["assessment"], "prior_art": source_view(records),
+                 "upstream_skill_files": self.cn_skill["files"]})
             issues = validate_draft(draft, records, candidates[chosen])
         self.save("08_application_draft.json", {
             "candidate_index": chosen, "draft": draft, "issues": issues, "filing_authorized": False,
+            "chinese_drafting_skill_available": self.cn_skill["available"],
         })
         report = {
             "case_id": case_id, "selected_candidate": chosen,
