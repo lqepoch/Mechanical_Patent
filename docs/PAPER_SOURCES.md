@@ -80,3 +80,7 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 - CORE https://core.ac.uk/services/api
 - Lens https://docs.api.lens.org/request-scholar.html
 - Unpaywall https://unpaywall.org/products/api
+
+## 全文环节扩展（2026-11-19）
+
+合法论文 PDF 获取和 Docling 离线索引已通过新的 `LiteratureFullText` 与原有项目 SQLite 直接串联。已有 DOI 及各类论文元数据均可成为候选，实际复制和缓存须记录许可证/合同凭证，另需明确项目审批、域名白名单，解析后保留 SHA256+页码+bbox 和待核验状态。参见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
