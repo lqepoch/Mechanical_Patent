@@ -125,10 +125,10 @@ class PatentIndex:
             raise PatentWorkflowError("检索词或条数越界。")
         if not 1 <= max_age_hours <= 168:
             raise PatentWorkflowError("时效阈值应为1至168小时。")
-        token = term.replace("\\","\\\\").replace("%","\\%").replace("_","\\_")
+        token = term.replace("#","##").replace("%","#%").replace("_","#_")
         with self.workspace.connect() as db:
             docs = db.execute("""SELECT payload,first_seen,last_seen FROM patent_index_current
-                WHERE case_id=? AND (publication LIKE ? ESCAPE '\' OR payload LIKE ? ESCAPE '\')
+                WHERE case_id=? AND (publication LIKE ? ESCAPE '#' OR payload LIKE ? ESCAPE '#')
                 ORDER BY last_seen DESC LIMIT ?""",
                 (case_id,"%"+token+"%","%"+token+"%",limit)).fetchall()
             check = db.execute("""SELECT query,provider,checked_at,status,error FROM patent_index_checks
