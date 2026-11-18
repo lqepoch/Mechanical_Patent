@@ -215,7 +215,22 @@ class PatentResearch:
             ],
         }
         self.save("09_quality_gate.json", quality)
-        self.save("manifest.json", {"case_id": case_id, "sha256": self.hashes, "generated_at": utc_now()})
+        from .lineage import build_case_graph
+        from .audit import append_audit_event, verify_audit_chain
+        graph = build_case_graph(self.case_dir)
+        self.hashes["04b_technology_graph.json"] = sha256(
+            (self.case_dir / "04b_technology_graph.json").read_bytes()
+        ).hexdigest()
+        append_audit_event(
+            self.case_dir, stage="任务接收", action="完成双源基础检索与案卷建立",
+            actor="系统工具", role="系统",
+            payload={"case_id": case_id, "patent_count": len(patents),
+                     "paper_count": len(papers), "source_errors": len(self.errors)},
+        )
+        self.save("manifest.json", {
+            "case_id": case_id, "sha256": self.hashes, "generated_at": utc_now(),
+            "audit_chain_head": verify_audit_chain(self.case_dir)["head_sha256"],
+        })
         self._write_agent_handoff(direction, patents, papers, quality)
         return quality
 
@@ -252,42 +267,6 @@ class PatentResearch:
 
 
 def validate_case(case_dir: Path) -> dict[str, Any]:
-    """Re-run static document gates on AI-authored files. Never grants filing approval."""
-    path = Path(case_dir)
-    patents = _stored_records(path / "02_patents.json")
-    papers = _stored_records(path / "03_papers.json")
-    ideas_data = json.loads((path / "05_inventions.json").read_text(encoding="utf-8"))
-    draft_data = json.loads((path / "08_application.json").read_text(encoding="utf-8"))
-    ideas = ideas_data.get("candidates", [])
-    draft = draft_data.get("draft")
-    issues: list[str] = []
-    if not isinstance(ideas, list) or not ideas:
-        issues.append("No concrete invention candidates have been recorded.")
-    if not isinstance(draft, dict):
-        issues.append("No Chinese application draft has been recorded.")
-    if not papers:
-        issues.append("No scholarly paper metadata available; dual-search coverage is incomplete.")
-    if isinstance(draft, dict):
-        idea = ideas[0] if isinstance(ideas, list) and ideas else {}
-        issues.extend(validate_draft(draft, patents, idea if isinstance(idea, dict) else {}))
-    output = {
-        "status": "needs_human_review" if not issues else "research_incomplete",
-        "filing_authorized": False,
-        "human_signoff": False,
-        "issues": issues,
-        "evidence_counts": {"patents": len(patents), "papers": len(papers)},
-        "note": "Passing static gates is not patentability or legality clearance.",
-    }
-    save_json(path / "09_quality_gate.json", output)
-    hashes = {}
-    for name in sorted([
-        "00_intake.json", "01_search_plan.json", "02_patents.json",
-        "03_papers.json", "04_evidence.json", "05_inventions.json",
-        "06_countersearch.json", "07_engineering.json",
-        "08_application.json", "09_quality_gate.json",
-    ]):
-        file = path / name
-        if file.is_file():
-            hashes[name] = sha256(file.read_bytes()).hexdigest()
-    save_json(path / "manifest.json", {"generated_at": utc_now(), "sha256": hashes})
-    return output
+    """执行企业级确定性质检，保存证据关联报告和本地审计事件。"""
+    from .quality import audit_research_case
+    return audit_research_case(case_dir)
