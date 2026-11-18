@@ -46,9 +46,47 @@ def main(argv: list[str] | None = None) -> int:
     validate = sub.add_parser("validate", help="Check AI-written evidence-linked application draft")
     validate.add_argument("--case-dir", required=True, type=Path)
     add_workspace_parser(sub)
+    benchmark = sub.add_parser("benchmark", help="按授权标注集评测专利检索排序、同族召回率")
+    benchmark.add_argument("--gold", required=True, type=Path)
+    benchmark.add_argument("--results", required=True, type=Path)
+    benchmark.add_argument("--rights", required=True, type=Path)
+    benchmark.add_argument("--output", required=True, type=Path)
+    extract = sub.add_parser("parse-pdf", help="本地离线 Docling PDF 解析和页码出处记录")
+    extract.add_argument("--input", required=True, type=Path)
+    extract.add_argument("--output", required=True, type=Path)
+    extract.add_argument("--source-url", default="")
+    extract.add_argument("--docling-artifacts", type=Path)
+    extract.add_argument("--authorized", action="store_true")
+    bridge = sub.add_parser("mcp-import", help="导入有授权的行业专利 MCP 结构化返回，待核实原始文献")
+    bridge.add_argument("--input", required=True, type=Path)
+    bridge.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "mcp-import":
+            from .mcp_bridge import import_mcp_json
+            result = import_mcp_json(args.input, args.output)
+            print("外部专利证据入库条目:", result["records"])
+            print("证据核验状态:", result["status"])
+            print("来源记录 SHA-256:", result["payload_sha256"])
+            return 0
+        if args.command == "benchmark":
+            from .benchmarks import run_benchmark
+            result = run_benchmark(args.gold, args.results, args.rights, args.output)
+            print("评测样本数:", result["case_count"])
+            print("排序召回指标:", result["metrics"])
+            print("评测报告保存至:", args.output)
+            return 0
+        if args.command == "parse-pdf":
+            from .pdf_extraction import parse_local_pdf
+            result = parse_local_pdf(
+                args.input, args.output, authorized=args.authorized,
+                source_url=args.source_url, artifacts=args.docling_artifacts,
+            )
+            print("PDF 离线解析状态:", result["status"])
+            print("页码段落数:", result["blocks"])
+            print("SHA-256:", result["sha256"])
+            return 0
         if args.command == "workspace":
             return handle_workspace(args)
         if args.command == "validate":

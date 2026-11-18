@@ -156,3 +156,40 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 本地文献资料保存公开号、DOI、标题、摘要、公开日期、数据源、核验结论和来源链接。原始公开 PDF 保存真实 public_pdf_url，可直接在线打开；经站点许可和明确授权后，可另外下载原始 PDF 到本地以 SHA-256 去重。原始 PDF 的在线核对始终是优先的真实性依据。
 
 默认命令行只显示任务状态与公开文献定位信息，避免把未申请的技术方向、完整审查理由或内部路径写入终端日志。正式企业身份与审签需使用组织权限系统；本地 SQLite 和日志属于可验证基础能力，尚未达到多租户生产级安全标准。
+
+
+## 新增行业级检索/解析/质量评测能力（2026-11-18）
+
+**零 LLM API、当前 ChatGPT/Codex 自行推理**。本轮扩充：
+
+- Patent Client Agents：经过许可的多国专利 MCP/Python 客户端，完整 Apache-2.0 源码固定在 external/patent-client-agents，需用户自己在 MCP 客户端确认安装/授权。结构化结果可经 mcp-import 导入，状态默认为待核验。
+- patentkit：完整 Apache-2.0 源码固定在 external/patentkit，供专业权项拆解、标准数据模型与检索系统二次开发；其可选 AI API 不作为本系统的默认依赖。
+- Docling：可选离线 PDF 解析，保留页码、正文、坐标、原始 PDF SHA-256。正式阅读先核对真实公开 PDF；模型资源须单独预置并审核许可。
+- 企业专利检索评测：真实授权的黄金标注集，严格计算 Hit@K、Recall@K、MRR@K；缺失预测按零分处理，同族可以展开评测，非商业或未知授权的数据集默认拒绝。
+- **Codex 原生 Skills 自动发现**：仓库增加 .agents/skills 下 14 个简体中文技能镜像，CI 严格对照 skills/ canonical 内容。更新技能后运行 python scripts/sync_skill_mirrors.py；检查运行 python scripts/sync_skill_mirrors.py --check。
+
+安装基础组件不要求模型 API：
+
+    python -m pip install -e .
+    python -m unittest discover -s tests -v
+
+用户自愿配置行业专利 MCP：
+
+    python -m pip install -e '.[patent-mcp]'
+
+若还未主动连接到 Codex/ChatGPT 的 MCP 工具，此命令只安装代码依赖，不能代替用户确认连接。实际 Codex 插件入口以 https://docs.patentclient.com/ 的当前安装指引为准。
+
+行业 MCP 已获取结构化结果后：
+
+    python -m mechanical_patent mcp-import --input 外部专利工具结果.json --output cases/待核验专利.json
+
+只用于本地获准的原始 PDF：
+
+    python -m pip install -e '.[pdf]'
+    python -m mechanical_patent parse-pdf --input patent_library/原始公开专利.pdf --output cases/原文页码.json --source-url https://真实原始公开地址 --docling-artifacts 本地模型资源目录 --authorized
+
+零外部数据的合成示例（仅检查计算程序，不能代表真实专利性能）：
+
+    python -m mechanical_patent benchmark --gold examples/benchmark_demo/gold.jsonl --results examples/benchmark_demo/results.jsonl --rights examples/benchmark_demo/rights.json --output cases/synthetic-scores.json
+
+具体使用边界、许可证和后续工程计划见 docs/INDUSTRY_REUSE.md。

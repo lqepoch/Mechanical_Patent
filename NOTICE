@@ -14,3 +14,16 @@ open1s/trinno (MIT), f35f322898a92a525a2a87ce4b48a7052dc531d0
 
 Each pinned upstream checkout retains its original LICENSE, notices, copyright and history.
 No endorsement implied. AutoPatent code not copied because a clear redistribution license was not observed.
+
+Additional pinned upstream source references:
+- parkerhancock/patent-client-agents — Apache-2.0, commit dadfeb3b36092549290a384acf8aefcc76493bc5
+- j-hedtke/patentkit — Apache-2.0, commit 47cfa6f7d7fc42e944c76f76b60463d63a086ea3
+Optional local parser:
+- Docling — MIT code license, optional Python runtime. Third-party model weight licenses
+  must be assessed separately before enterprise use.
+Evaluation inspiration:
+- PatSnap PatentAgentBench: repository code/documentation MIT; individual benchmarks
+  and materials have separate terms, never automatically vendored.
+- PatSnap patent-bench: benchmark datasets CC BY-NC 4.0; prohibited for commercial
+  evaluation without separately granted rights. Its selected Apache-2.0 metric
+  implementation is not copied into this repository.
