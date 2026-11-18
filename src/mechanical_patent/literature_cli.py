@@ -122,6 +122,7 @@ def handle_literature(args: argparse.Namespace) -> int:
         )
     elif command == "ingest-pdf":
         from .literature_evidence import FullTextEvidence
+        FullTextEvidence._check_id(args.doc_id)
         if not args.authorized:
             raise PatentWorkflowError("未获得明确的文献使用与本地归档授权。")
         pdf = args.pdf
