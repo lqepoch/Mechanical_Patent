@@ -123,3 +123,36 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 - docs/ARCHITECTURE.md、docs/SECURITY.md、docs/UPSTREAM_AUDIT.md
 
 研究中不虚构公开号、DOI、授权状态、实验结果或发明人；不承诺全球查全、授权成功或自由实施（FTO）。
+
+
+## 企业级统一工作流与本地专利库
+
+在双源检索和 AI 撰写之外，项目已加入本地可恢复的任务依赖图与证据索引，支持多 AI 角色领取任务、独立核验检索结果、选择继续/调整方向、记录反证和工程验证，以及申请草稿审核。
+
+详细架构：docs/ENTERPRISE_BLUEPRINT.md。
+简体中文操作手册：docs/WORKFLOW_OPERATIONS.md。
+13 个 Agent 说明：agents/README.md。
+11 个专用 Skills：skills/ 目录。
+
+创建案卷并检查状态：
+
+    python -m mechanical_patent workspace --db cases/index.sqlite3 create \
+      --case-id PUMP-001 --direction "高海拔消防泵快速吸水结构研究"
+
+    python -m mechanical_patent workspace --db cases/index.sqlite3 status \
+      --case-id PUMP-001
+
+保密审批完成后，当前 AI 可以在同一案卷 ID 下检索：
+
+    python -m mechanical_patent research \
+      --workflow-case-id PUMP-001 --workspace-db cases/index.sqlite3 \
+      --direction "高海拔消防泵快速吸水结构研究" \
+      --patent-query "fire pump vacuum priming" \
+      --paper-query "cavitation low ambient pressure" \
+      --allow-search-exposure --case-dir cases/PUMP-001-r01
+
+绑定案卷时，即使指定 --allow-search-exposure，程序也会检查当前轮次保密审批，未获授权则拒绝外部检索。AI 客户端负责推演和起草，不需要模型 API 凭证。
+
+本地文献资料保存公开号、DOI、标题、摘要、公开日期、数据源、核验结论和来源链接。原始公开 PDF 保存真实 public_pdf_url，可直接在线打开；经站点许可和明确授权后，可另外下载原始 PDF 到本地以 SHA-256 去重。原始 PDF 的在线核对始终是优先的真实性依据。
+
+默认命令行只显示任务状态与公开文献定位信息，避免把未申请的技术方向、完整审查理由或内部路径写入终端日志。正式企业身份与审签需使用组织权限系统；本地 SQLite 和日志属于可验证基础能力，尚未达到多租户生产级安全标准。
