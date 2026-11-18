@@ -103,21 +103,23 @@ class LiteratureHarvester:
                     not isinstance(item, Evidence) for item in incoming
                 ):
                     raise PatentWorkflowError("供应商返回无效文献列表。")
-                if len(incoming) > requested:
-                    raise PatentWorkflowError("供应商超出单页采集预算。")
+                consumed = page.get("consumed_records", len(incoming))
+                if (type(consumed) is not int or consumed < len(incoming)
+                        or consumed > requested):
+                    raise PatentWorkflowError("供应商返回的原始分页数量超过预算或与已解析记录不符。")
                 counts = self.memory.ingest_many(incoming)
                 new += counts["new"]
                 updated += counts["updated"]
                 unchanged += counts["unchanged"]
                 local_pages += 1
                 pages += 1
-                records += len(incoming)
+                records += consumed
                 next_cursor = page.get("next_cursor")
                 if next_cursor is not None and (
                     not isinstance(next_cursor, str) or len(next_cursor) > 4096
                 ):
                     raise PatentWorkflowError("供应商返回的游标无效。")
-                if not incoming or not next_cursor:
+                if not consumed or not next_cursor:
                     state, cursor = "complete", None
                 else:
                     if next_cursor in {previous, cursor}:

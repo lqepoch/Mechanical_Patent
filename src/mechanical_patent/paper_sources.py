@@ -309,7 +309,8 @@ class SemanticScholarBulkProvider(SemanticScholarProvider):
         if not rows:
             token = None
         return {"records": merge_paper_records(out),
-                "next_cursor": token, "total_results": payload.get("total")}
+                "next_cursor": token, "total_results": payload.get("total"),
+                "consumed_records": len(rows)}
 
 
 class ArxivProvider:
