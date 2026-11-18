@@ -247,6 +247,16 @@ class PatentMCPService:
     def fission_frontier(self, case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         return self._board(case_id, run_id).frontier(top_k)
 
+    def fission_crossovers(self, case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        return self._board(case_id, run_id).plan_crossovers(limit)
+
+    def fission_reject(self, case_id: str, run_id: str, candidate_id: str,
+                       reason: str, learned_constraints: list[str],
+                       source_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._board(case_id, run_id).reject(
+            candidate_id, reason, learned_constraints, source_ids
+        )
+
     def fission_promote(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         return self._board(case_id, run_id).promote(candidate_id)
 
@@ -398,7 +408,7 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.6",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
                 "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -533,6 +543,20 @@ def create_server(service: PatentMCPService):
     def patent_idea_frontier(case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         """质量—多样性筛选：每类技术轴和创新方法优先保留一个方案。"""
         return service.fission_frontier(case_id, run_id, top_k)
+
+    @server.tool()
+    def patent_idea_crossovers(case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        """在不同技术轴间配对经评分的假说，要求跨结构/控制/流体接口与协同效应。"""
+        return service.fission_crossovers(case_id, run_id, limit)
+
+    @server.tool()
+    def patent_idea_reject(case_id: str, run_id: str, candidate_id: str,
+                           reason: str, learned_constraints: list[str],
+                           source_ids: list[str] | None = None) -> dict[str, Any]:
+        """归档失败技术路线，向后续裂变提供具体的禁区、反证和失败约束。"""
+        return service.fission_reject(
+            case_id, run_id, candidate_id, reason, learned_constraints, source_ids
+        )
 
     @server.tool()
     def patent_idea_promote(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
