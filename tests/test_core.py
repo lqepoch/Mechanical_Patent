@@ -65,7 +65,7 @@ class EvidenceTests(unittest.TestCase):
             "description": {k: "text" for k in (
                 "technical_field", "background", "technical_problem", "technical_solution",
                 "beneficial_effects", "embodiments", "drawings")},
-            "claim_support": [{"claim": 1, "specification_passage": "Regulated inlet disclosed in embodiment 1"}],
+            "claim_support": [{"claim": 1, "specification_passage": "text"}],
         }
         self.assertEqual(validate_draft(draft, [patent()], {"mechanism": "m", "enabling_details": "e"}), [])
         self.assertTrue(any("source-verified" in x for x in validate_draft(
