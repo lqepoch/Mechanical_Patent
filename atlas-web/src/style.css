@@ -1,0 +1,24 @@
+:root {font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9eef7;background:#081120;font-synthesis:none}
+*{box-sizing:border-box} body{margin:0} .app{display:grid;grid-template-columns:330px minmax(0,1fr);min-height:100vh}
+.panel{background:#111d30;border-right:1px solid #334155;padding:28px 22px;display:flex;flex-direction:column;gap:20px;min-height:100vh}
+h1{font-size:25px;letter-spacing:.02em;margin:8px 0 4px}
+h2{font-size:15px;margin:0 0 16px;color:#dbeafe}
+p{line-height:1.6;color:#94a3b8;font-size:13px;margin:0}
+.eyebrow{font-size:10px;letter-spacing:.18em;font-weight:700;color:#38bdf8}
+section{border-top:1px solid #314059;padding-top:17px}
+.file-label{font-size:13px;font-weight:600;background:#2563eb;padding:11px 15px;border-radius:8px;cursor:pointer;text-align:center}
+.file-label:hover{background:#1d4ed8}
+#graph-file{display:none}.notice{font-size:12px;color:#9db5cf;line-height:1.55}
+.control{display:flex;flex-direction:column;gap:9px;font-size:12px;color:#94a3b8;margin-bottom:14px}
+input[type=search]{border:1px solid #334155;background:#0b1728;border-radius:8px;padding:10px;color:#f8fafc;min-width:0}
+input[type=range]{width:100%}.check{font-size:12px;color:#ccd9ea;display:flex;gap:8px;align-items:center;margin-top:10px}
+.detail{font-size:12px;color:#c6d1df;overflow-wrap:anywhere;line-height:1.7}
+.detail-field{margin-bottom:7px}.detail b{color:#93c5fd}
+.detail a{color:#7dd3fc}.disclaimer{font-size:11px;margin-top:auto;border-top:1px solid #334155;padding-top:15px}
+.canvas-panel{min-height:100vh;display:flex;flex-direction:column;position:relative}
+.toolbar{padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #283b52;color:#cbd5e1;font-size:12px;gap:10px}
+.buttons{display:flex;gap:8px}button{font-family:inherit;border:1px solid #40526b;color:#e2e8f0;background:#15243b;padding:7px 10px;border-radius:7px;cursor:pointer}
+button:hover{background:#293e5e}#graph{flex:1;min-height:550px;width:100%;background:radial-gradient(ellipse at center,#14233a 0%,#081120 75%)}
+.legend{position:absolute;left:20px;bottom:14px;display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#a8bed8;pointer-events:none}
+.legend span:nth-child(1){color:#60a5fa}.legend span:nth-child(2){color:#4ade80}.legend span:nth-child(3){color:#fbbf24}
+@media(max-width:800px){.app{grid-template-columns:1fr}.panel{min-height:auto;gap:12px}.canvas-panel{min-height:65vh}#graph{min-height:440px}.legend{position:static;padding:14px}}
