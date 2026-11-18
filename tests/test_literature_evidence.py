@@ -157,6 +157,33 @@ class FulltextEvidenceTests(unittest.TestCase):
             self.assertTrue((self.memory.root / entry["archive_json"]).is_file())
             self.assertTrue((self.memory.root / entry["archive_pdf"]).is_file())
 
+    def test_parser_timestamp_does_not_duplicate_revision_and_archive_tamper_is_detected(self):
+        original = self.fulltext.attach(
+            self.doc_id, self.parsed, self.pdf, authorized=True,
+        )
+        data = json.loads(self.parsed.read_text(encoding="utf-8"))
+        data["processed_at"] = "2099-01-01T00:00:00+00:00"
+        self.parsed.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        same = self.fulltext.attach(
+            self.doc_id, self.parsed, self.pdf, authorized=True,
+        )
+        self.assertEqual(same["status"], "unchanged")
+        self.assertEqual(original["parsed_sha256"], same["parsed_sha256"])
+        with self.memory.connect() as db:
+            row = db.execute(
+                "SELECT archive_pdf FROM fulltext_revisions WHERE doc_id=?",
+                (self.doc_id,),
+            ).fetchone()
+            count = db.execute(
+                "SELECT COUNT(*) FROM fulltext_revisions WHERE doc_id=?",
+                (self.doc_id,),
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
+        archive = self.memory.root / row["archive_pdf"]
+        archive.write_bytes(b"%PDF-1.4\nTAMPERED")
+        with self.assertRaises(PatentWorkflowError):
+            self.fulltext.attach(self.doc_id, self.parsed, self.pdf, authorized=True)
+
     def test_mismatch_crosscase_and_permission_rejected(self):
         with self.assertRaises(PatentWorkflowError):
             self.fulltext.attach(self.doc_id, self.parsed, self.pdf, authorized=False)
