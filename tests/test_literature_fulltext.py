@@ -149,7 +149,7 @@ class FullTextTests(unittest.TestCase):
         self.assertEqual(self.pipeline.status(self.doc_id)["state"], "parsed_unreviewed")
         self.memory.write_analysis(
             self.doc_id, analyst="researcher", basis="abstract",
-            analysis={"engineering_problem": "Need new inlet NPSH design"},
+            analysis={"plain_summary": "Need new inlet NPSH design"},
         )
         before = self.memory.read(self.doc_id)["markdown"]
         self.memory.ingest_many([self.paper])
@@ -202,6 +202,29 @@ class FullTextTests(unittest.TestCase):
         self.assertEqual(len(requests), 1)
         self.assertEqual(result["state"], "staged")
         self.assertEqual(result["source_url"], self.paper.pdf_url)
+
+    def test_metadata_refresh_keeps_pdf_url_and_cross_source_ids(self):
+        alternate = Evidence(
+            publication=self.publication, title="High altitude cavitation",
+            url="https://doi.org/" + self.publication,
+            source="crossref", retrieved_at="2026-11-20T00:00:00Z",
+            kind="paper", abstract="Newer metadata, no PDF link", verified=True,
+            paper_metadata={
+                "doi": self.publication, "sources": ["crossref"],
+                "source_ids": {"crossref": self.publication},
+            },
+        )
+        self.memory.ingest_many([alternate])
+        with self.memory.connect() as db:
+            row = db.execute(
+                "SELECT pdf_url,paper_metadata_json FROM documents WHERE doc_id=?",
+                (self.doc_id,),
+            ).fetchone()
+        self.assertEqual(row["pdf_url"], self.paper.pdf_url)
+        meta = json.loads(row["paper_metadata_json"])
+        self.assertEqual(meta["sources"], ["openalex", "crossref"])
+        self.assertIn("crossref", meta["source_ids"])
+        self.assertIn(self.paper.pdf_url, self.memory.read(self.doc_id)["markdown"])
 
     def test_no_pdf_url_forbids_remote_fetch(self):
         other = Evidence(
