@@ -48,7 +48,7 @@ class FakeModel:
             return {
                 "title": "A dual-valve pump inlet", "abstract": "A sequenced pair of inlet valves.",
                 "claims": ["1. A pump inlet with valves A and B."],
-                "claim_support": [{"claim": 1, "specification_passage": "Embodiment: two valves A and B."}],
+                "claim_support": [{"claim": 1, "specification_passage": "Engineering description"}],
                 "description": {key: "Engineering description" for key in (
                     "technical_field", "background", "technical_problem", "technical_solution",
                     "beneficial_effects", "embodiments", "drawings")},
