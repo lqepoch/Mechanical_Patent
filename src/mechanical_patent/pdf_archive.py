@@ -1,20 +1,23 @@
-"""专利原始 PDF 的可选合规本地归档。
+"""经用户授权的公开专利 PDF 本地归档：来源留存、内容寻址和 TLS 固定 IP。
 
-默认以公开 PDF 的原始 HTTPS 链接提供在线核对；用户明确授权且网站
-条款允许时，另存一份内容寻址的 PDF 到本地，记录 SHA-256 与来源。
+仅接受已核对的公开 PDF 原始 HTTPS URL，拒绝域名白名单以外的来源、
+重定向、私网 IP、非 PDF 内容和过大的响应。HTML 网页采集统一走 Crawl4AI。
 
-浏览器/网页内容采集一律走 Crawl4AI；本模块仅针对已知且合法授权的
-原始 PDF 二进制文件进行直接下载，不能用来搜索、绕开网站访问控制。
+注意：本模块保证请求直接连接经公网 IP 核验的目的地，不调用系统代理；
+企业部署仍要叠加独立出站防火墙、许可证策略和内容安全扫描。
 """
 from __future__ import annotations
 
 from hashlib import sha256
+from http.client import HTTPSConnection, HTTPResponse
+import ipaddress
 import os
 from pathlib import Path
 import socket
+import ssl
 import tempfile
 from typing import Callable, Any
-from urllib import error, request
+from urllib.parse import urlsplit
 
 from .core import PatentWorkflowError
 from .local_workspace import LocalPatentWorkspace
@@ -24,11 +27,89 @@ MAX_PDF_BYTES = 40 * 1024 * 1024
 BLOCK_SIZE = 64 * 1024
 
 
-class _BlockRedirect(request.HTTPRedirectHandler):
-    """在发生任何重定向时中止，避免跳转到未获许可的站点。"""
+class _PinnedHTTPSConnection(HTTPSConnection):
+    """连接已核验的公网 IP，同时用原主机名完成 SNI 和 TLS 证书验证。"""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise PatentWorkflowError("PDF 下载发生重定向；请先核验最终地址并将其加入来源索引。")
+    def __init__(self, hostname: str, verified_ip: str, *, timeout: int):
+        super().__init__(
+            hostname, port=443, timeout=timeout, context=ssl.create_default_context()
+        )
+        self._verified_ip = verified_ip
+
+    def connect(self) -> None:
+        raw = socket.create_connection((self._verified_ip, 443), self.timeout)
+        try:
+            self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+        except BaseException:
+            raw.close()
+            raise
+
+
+class _PinnedResponse:
+    def __init__(self, conn: HTTPSConnection, result: HTTPResponse, original_url: str):
+        self.conn = conn
+        self.result = result
+        self.original_url = original_url
+        self.headers = result.headers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        try:
+            self.result.close()
+        finally:
+            self.conn.close()
+
+    def geturl(self) -> str:
+        return self.original_url
+
+    def read(self, limit: int) -> bytes:
+        return self.result.read(limit)
+
+
+def _open_verified_pdf(
+    source: str, *, timeout: int,
+    resolve: Callable[..., Any] = socket.getaddrinfo,
+) -> _PinnedResponse:
+    """解析且严格检查公网地址，建立不跟随跳转的直接 HTTPS 连接。"""
+    parts = urlsplit(source)
+    hostname = parts.hostname
+    if parts.scheme != "https" or not hostname or parts.port not in {None, 443}:
+        raise PatentWorkflowError("仅支持标准 HTTPS PDF 来源。")
+    try:
+        infos = resolve(hostname, 443, type=socket.SOCK_STREAM)
+        addresses = []
+        for info in infos:
+            ip = ipaddress.ip_address(info[4][0])
+            if not ip.is_global:
+                raise PatentWorkflowError("PDF 来源解析到了非公网 IP，已阻断。")
+            addresses.append(str(ip))
+    except (OSError, IndexError, TypeError, ValueError) as exc:
+        raise PatentWorkflowError("无法安全解析公开 PDF 服务器地址。") from exc
+    if not addresses:
+        raise PatentWorkflowError("公开 PDF 来源无可验证的公网 IP。")
+    conn = _PinnedHTTPSConnection(hostname, addresses[0], timeout=timeout)
+    resource = parts.path or "/"
+    if parts.query:
+        resource += "?" + parts.query
+    try:
+        conn.request("GET", resource, headers={
+            "Host": hostname,
+            "User-Agent": "MechanicalPatentEvidence/0.2",
+            "Accept": "application/pdf",
+            "Connection": "close",
+        })
+        reply = conn.getresponse()
+        if reply.status != 200:
+            conn.close()
+            raise PatentWorkflowError(
+                f"公开 PDF 返回 HTTP {reply.status}；重定向与异常状态均不自动跟随。"
+            )
+        return _PinnedResponse(conn, reply, source)
+    except BaseException:
+        conn.close()
+        raise
 
 
 def download_pdf(
@@ -37,36 +118,31 @@ def download_pdf(
     resolve: Callable[..., Any] = socket.getaddrinfo,
     opener: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
-    """仅从允许的 HTTPS 域名读取 PDF，按内容哈希保存；不替用户判断版权。
-
-    opener 和 resolve 可替换为模拟实现，保证 CI 不访问真实互联网。
-    生产环境还需由出站代理绑定域名解析 IP、强制禁止内部网段访问。
-    """
+    """本地合规归档。opener 与 resolve 只用于离线测试及明确授权的适配器。"""
     source = validate_web_url(url, set(allowed_hosts), resolve=resolve)
     if not 1_000 <= max_bytes <= MAX_PDF_BYTES:
-        raise PatentWorkflowError("PDF 大小限制不合法。")
+        raise PatentWorkflowError("PDF 大小预算不合法。")
     storage = Path(destination_dir)
     storage.mkdir(parents=True, exist_ok=True)
-    writer = opener or request.build_opener(_BlockRedirect()).open
     temp_name = ""
     size = 0
     digest = sha256()
     try:
-        req = request.Request(
-            source,
-            headers={"User-Agent": "MechanicalPatentEvidence/0.1", "Accept": "application/pdf"},
+        response = (
+            opener(source, timeout=timeout)
+            if opener is not None else
+            _open_verified_pdf(source, timeout=timeout, resolve=resolve)
         )
-        with writer(req, timeout=timeout) as response:
-            final = response.geturl()
-            if final != source:
-                raise PatentWorkflowError("PDF 原始来源地址被重定向或变更。")
+        with response:
+            if response.geturl() != source:
+                raise PatentWorkflowError("公开 PDF 地址发生变更或重定向，已中止下载。")
             declared_type = str(response.headers.get("Content-Type", "")).split(";", 1)[0].lower()
             if declared_type in {"text/html", "application/xhtml+xml", "text/plain"}:
-                raise PatentWorkflowError("原始链接返回了网页或文本，缺少 PDF。")
+                raise PatentWorkflowError("来源返回网页或非 PDF 文本。")
             with tempfile.NamedTemporaryFile(
-                prefix=".pdf-", suffix=".tmp", dir=storage, delete=False,
-            ) as tmp:
-                temp_name = tmp.name
+                prefix=".pdf-", suffix=".tmp", dir=storage, delete=False
+            ) as file:
+                temp_name = file.name
                 first = True
                 while True:
                     chunk = response.read(BLOCK_SIZE)
@@ -75,33 +151,30 @@ def download_pdf(
                     if first:
                         first = False
                         if not chunk.startswith(b"%PDF-"):
-                            raise PatentWorkflowError("原始文件没有合法的 PDF 文件头。")
+                            raise PatentWorkflowError("公开原文不存在合法 PDF 文件头。")
                     size += len(chunk)
                     if size > max_bytes:
-                        raise PatentWorkflowError("PDF 超过许可的单文档下载大小。")
+                        raise PatentWorkflowError("公开 PDF 大小超出下载预算。")
                     digest.update(chunk)
-                    tmp.write(chunk)
+                    file.write(chunk)
                 if not size:
-                    raise PatentWorkflowError("PDF 文件为空。")
-                tmp.flush()
-                os.fsync(tmp.fileno())
+                    raise PatentWorkflowError("公开 PDF 为空。")
+                file.flush()
+                os.fsync(file.fileno())
         checksum = digest.hexdigest()
-        final_path = (storage / (checksum + ".pdf")).resolve()
-        if final_path.exists():
-            if sha256(final_path.read_bytes()).hexdigest() != checksum:
-                raise PatentWorkflowError("同名 PDF 本地文件的内容哈希不匹配。")
+        target = (storage / (checksum + ".pdf")).resolve()
+        if target.is_file():
+            if sha256(target.read_bytes()).hexdigest() != checksum:
+                raise PatentWorkflowError("同名文献本地内容损坏或被替换。")
         else:
-            os.replace(temp_name, final_path)
+            os.replace(temp_name, target)
             temp_name = ""
         return {
-            "url": source, "local_pdf_path": str(final_path),
-            "sha256": checksum, "bytes": size, "content_type": "application/pdf",
-            "online_url": source,
+            "url": source, "local_pdf_path": str(target),
+            "sha256": checksum, "bytes": size, "online_url": source,
         }
-    except error.HTTPError as exc:
-        raise PatentWorkflowError(f"公开 PDF 下载失败：HTTP {exc.code}") from exc
-    except error.URLError as exc:
-        raise PatentWorkflowError("公开 PDF 网络不可达，请使用索引中的原始链接在线核验。") from exc
+    except (OSError, ssl.SSLError, TimeoutError) as exc:
+        raise PatentWorkflowError("原始公开 PDF 下载失败；可继续在线打开来源核验。") from exc
     finally:
         if temp_name:
             Path(temp_name).unlink(missing_ok=True)
@@ -109,18 +182,17 @@ def download_pdf(
 
 def archive_patent(
     workspace: LocalPatentWorkspace, *, case_id: str, doc_id: str,
-    storage_dir: Path, allowed_hosts: set[str],
-    authorized: bool, **download_kwargs: Any,
+    storage_dir: Path, allowed_hosts: set[str], authorized: bool,
+    **download_kwargs: Any,
 ) -> dict[str, Any]:
-    """用户授权后归档真实专利 PDF；原始在线链接永久保留。"""
     if not authorized:
-        raise PatentWorkflowError("本地 PDF 归档需要明确的下载授权和网站使用许可。")
-    record = workspace.pdf_source(case_id, doc_id)
-    if record["kind"] != "patent":
-        raise PatentWorkflowError("此归档入口仅接受专利文献。")
-    url = record["public_pdf_url"]
+        raise PatentWorkflowError("归档公开 PDF 需要明确授权和网站许可。")
+    source = workspace.pdf_source(case_id, doc_id)
+    if source["kind"] != "patent":
+        raise PatentWorkflowError("仅可归档专利原始 PDF。")
+    url = source["public_pdf_url"]
     if not url:
-        raise PatentWorkflowError("未建立已核对的原始 PDF 链接，请先用 doc-review 录入。")
+        raise PatentWorkflowError("没有已核对的公开 PDF 原始地址；请先记录在线来源。")
     result = download_pdf(
         url, Path(storage_dir), allowed_hosts=allowed_hosts, **download_kwargs
     )
