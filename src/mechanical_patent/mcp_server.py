@@ -133,6 +133,34 @@ class PatentMCPService:
             markdown, analyst=analyst, expected_sha256=expected_sha256,
         )
 
+    def literature_fulltext_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        """项目级 PDF 来源、许可与离线解析状态；不含全文或秘钥。"""
+        from .literature_fulltext import LiteratureFullText
+        return LiteratureFullText(self._memory(case_id)).status(doc_id)
+
+    def literature_fulltext_search(
+        self, case_id: str, query: str, doc_id: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """返回已解析但仍待原文审核的 PDF 页码、段落与来源哈希。"""
+        from .literature_fulltext import LiteratureFullText
+        hits = LiteratureFullText(self._memory(case_id)).search(
+            query, doc_id=doc_id, limit=limit,
+        )
+        return {"case_id": case_id, "matches": hits, "count": len(hits),
+                "review_status": "awaiting_original_pdf_review"}
+
+    def literature_fulltext_page(
+        self, case_id: str, doc_id: str, page: int,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        from .literature_fulltext import LiteratureFullText
+        result = LiteratureFullText(self._memory(case_id)).page(
+            doc_id, page, limit=limit,
+        )
+        result["case_id"] = case_id
+        return result
+
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
@@ -479,6 +507,25 @@ def create_server(service: PatentMCPService):
         return service.literature_resume_save(
             case_id, analyst, markdown, expected_sha256,
         )
+
+    @server.tool()
+    def patent_literature_fulltext_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """读取本项目的原始 PDF SHA256、版权证据及结构化处理状态。"""
+        return service.literature_fulltext_status(case_id, doc_id)
+
+    @server.tool()
+    def patent_literature_fulltext_search(
+        case_id: str, query: str, doc_id: str | None = None, limit: int = 20,
+    ) -> dict[str, Any]:
+        """对已授权、已解析论文全文做页码级搜索；结果待原始 PDF 复核。"""
+        return service.literature_fulltext_search(case_id, query, doc_id, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_page(
+        case_id: str, doc_id: str, page: int, limit: int = 100,
+    ) -> dict[str, Any]:
+        """返回项目内指定论文 PDF 页面的结构化段落和坐标。"""
+        return service.literature_fulltext_page(case_id, doc_id, page, limit)
 
     @server.tool()
     def patent_literature_harvest(
