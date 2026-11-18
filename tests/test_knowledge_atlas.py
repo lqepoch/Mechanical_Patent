@@ -9,7 +9,7 @@ import unittest
 
 from mechanical_patent.core import PatentWorkflowError, evidence_id, Evidence, save_json
 from mechanical_patent.knowledge_atlas import (
-    case_atlas, global_public_atlas, index_case_atlas,
+    case_atlas, global_public_atlas, index_case_atlas, record_document_fact,
 )
 
 
@@ -104,6 +104,32 @@ class KnowledgeAtlasTests(unittest.TestCase):
             index_case_atlas(self.case, threshold=-1)
         with self.assertRaises(PatentWorkflowError):
             case_atlas(self.case, scope="project", min_score=2.0)
+
+    def test_document_facts_require_actual_quote_and_remain_unverified(self):
+        doc_id = evidence_id(Evidence.from_dict(self.docs[0]))
+        original = self.docs[0]["claims"]
+        with self.assertRaises(PatentWorkflowError):
+            record_document_fact(
+                self.case, doc_id, subject="机械密封", predicate="包含",
+                object="引水结构", quote="编造的不存在证据段落"
+            )
+        result = record_document_fact(
+            self.case, doc_id, subject="机械密封", predicate="包含",
+            object="引水结构", quote=original, location="权利要求1"
+        )
+        self.assertTrue(result["quote_matches_archived_text"])
+        self.assertFalse(result["technical_relation_verified"])
+        index_case_atlas(self.case)
+        view = case_atlas(self.case, scope="project", max_nodes=100)
+        candidates = [edge for edge in view["edges"]
+                      if edge["method"] == "ai_review_pending"]
+        self.assertTrue(candidates)
+        self.assertTrue(all(edge["source_ref"] == doc_id for edge in candidates))
+        with self.assertRaises(PatentWorkflowError):
+            record_document_fact(
+                self.case, doc_id, subject="密封", predicate="发明具有创造性",
+                object="引水", quote=original
+            )
 
     def test_model_relations_never_equate_to_patentability(self):
         result = index_case_atlas(self.case, threshold=0.01)
