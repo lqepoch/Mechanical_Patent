@@ -127,6 +127,11 @@ class LiteratureMemoryStore:
                   updated_at TEXT NOT NULL,
                   error TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS resume_audit(
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  analyst TEXT NOT NULL, old_hash TEXT NOT NULL,
+                  new_hash TEXT NOT NULL, recorded_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS note_audit(
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   doc_id TEXT NOT NULL REFERENCES documents(doc_id),
@@ -442,3 +447,58 @@ class LiteratureMemoryStore:
                 "error=excluded.error",
                 (query_id, provider, query, cursor, pages, records, state, utc_now(), error[:1000]),
             )
+
+
+    def pending_analysis(self, *, limit: int = 30) -> list[dict[str, Any]]:
+        """分批提供 AI 下一轮要读的文献，避免一次性注入1000篇全文。"""
+        with self.connect() as db:
+            rows = db.execute(
+                "SELECT doc_id,kind,title,publication,source_url,note_path,"
+                "abstract FROM documents WHERE analysis_count=0 "
+                "ORDER BY published_at DESC,doc_id LIMIT ?",
+                (max(1, min(int(limit), 100)),),
+            ).fetchall()
+        return [
+            {"doc_id": r["doc_id"], "kind": r["kind"], "title": r["title"],
+             "publication": r["publication"], "source_url": r["source_url"],
+             "note_path": r["note_path"], "abstract_excerpt": r["abstract"][:700]}
+            for r in rows
+        ]
+
+    def read_resume(self) -> dict[str, Any]:
+        path = self.root / "RESEARCH_RESUME.md"
+        if path.is_symlink():
+            raise PatentWorkflowError("研究恢复入口禁止符号链接。")
+        body = path.read_text(encoding="utf-8")
+        return {"markdown": body, "sha256": sha256(body.encode("utf-8")).hexdigest(),
+                "path": str(path)}
+
+    def update_resume(
+        self, markdown: str, *, expected_sha256: str, analyst: str,
+    ) -> dict[str, str]:
+        """带乐观锁的研究状态更新；旧版快照归档，避免多 Agent 覆写。"""
+        if not isinstance(markdown, str) or not 30 <= len(markdown) <= 50000:
+            raise PatentWorkflowError("研究恢复摘要长度须为30至50000字符。")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256 or ""):
+            raise PatentWorkflowError("更新项目摘要需要先读取当前 SHA256。")
+        analyst = str(analyst).strip()[:100]
+        if not analyst:
+            raise PatentWorkflowError("需要研究总结提交者标识。")
+        path = self.root / "RESEARCH_RESUME.md"
+        with self.connect(write=True) as db:
+            current = self.read_resume()
+            if current["sha256"] != expected_sha256:
+                raise PatentWorkflowError("项目研究摘要已被另一个智能体修改，必须重新读取合并。")
+            history = self.root / "resume_history" / (expected_sha256 + ".md")
+            if not history.is_file():
+                _atomic_text(history, current["markdown"])
+            body = markdown.rstrip() + "\n"
+            _atomic_text(path, body)
+            digest = sha256(body.encode("utf-8")).hexdigest()
+            db.execute(
+                "INSERT INTO resume_audit(analyst,old_hash,new_hash,recorded_at)"
+                " VALUES(?,?,?,?)",
+                (analyst, expected_sha256, digest, utc_now()),
+            )
+        return {"sha256": digest, "previous_sha256": expected_sha256,
+                "path": str(path)}
