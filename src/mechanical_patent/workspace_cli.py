@@ -45,6 +45,17 @@ def add_workspace_parser(subparsers: Any) -> None:
     finish.add_argument("--actor", required=True)
     finish.add_argument("--result-file", required=True, type=Path)
 
+    heartbeat = subs.add_parser("heartbeat", help="执行长时任务时续约租约")
+    heartbeat.add_argument("--task-id", required=True, type=int)
+    heartbeat.add_argument("--actor", required=True)
+    heartbeat.add_argument("--lease-seconds", type=int, default=1800)
+
+    failed = subs.add_parser("fail", help="记录任务失败、回退至队列或进入人工阻断")
+    failed.add_argument("--task-id", required=True, type=int)
+    failed.add_argument("--actor", required=True)
+    failed.add_argument("--reason", required=True)
+    failed.add_argument("--no-retry", action="store_true")
+
     revise = subs.add_parser("revise", help="经方向评审后开启新一轮研究，保留旧轮次")
     revise.add_argument("--case-id", required=True)
     revise.add_argument("--actor", required=True)
@@ -105,6 +116,15 @@ def handle_workspace(args: argparse.Namespace) -> int:
             if not isinstance(data, dict):
                 raise ValueError("任务结果文件必须为 JSON 对象。")
             result = workspace.finish(args.task_id, actor=args.actor, result=data)
+        elif command == "heartbeat":
+            result = workspace.heartbeat(
+                args.task_id, actor=args.actor, lease_seconds=args.lease_seconds
+            )
+        elif command == "fail":
+            result = workspace.fail(
+                args.task_id, actor=args.actor,
+                reason=args.reason, retryable=not args.no_retry
+            )
         elif command == "revise":
             number = workspace.next_revision(
                 args.case_id, actor=args.actor,
