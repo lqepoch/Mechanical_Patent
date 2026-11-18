@@ -262,7 +262,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.2",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.3",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -372,12 +372,16 @@ def create_server(service: PatentMCPService):
             "请以企业级机械发明专利研发智能体身份处理以下技术任务：" + direction
             + "\n操作：先调用 patent_capabilities / patent_case_create；遵守保密审核。"
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
+            + "调用 patent_index_refresh 保持项目索引可追溯，patent_frontier_scan 发现公开前沿，并通过 patent_variant_plan 研究已公开专利的变种；"
+            + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "只有通过证据移交门槛的候选方可写申请；使用 patent_draft_save，"
             + "执行 patent_quality_audit，完整输出差异、工程假设、权要、摘要及审查问题。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
+    from .mcp_extensions import register_project_research_tools
+    register_project_research_tools(server, service)
     return server
 
 
