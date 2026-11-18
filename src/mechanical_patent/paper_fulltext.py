@@ -120,6 +120,32 @@ class PaperFullTextService:
             if age < 1800:
                 raise PatentWorkflowError("已有 PDF 下载或解析任务进行中，请通过状态接口确认后重试。")
 
+    def enrich_oa(self, doc_id: str, *, authorized: bool, enricher: Any | None = None) -> dict[str, Any]:
+        """Opt-in DOI lookup: it discovers an OA link without downloading copyrighted content."""
+        paper = self._paper(doc_id)
+        if not authorized:
+            raise PatentWorkflowError("OA DOI 外部查询需要案卷保密外发批准。")
+        from .core import Evidence
+        from .paper_sources import UnpaywallEnricher
+        meta = paper["paper_metadata"]
+        doi = str(meta.get("doi") or paper["publication"])
+        if not doi.startswith("10.") or "/" not in doi:
+            raise PatentWorkflowError("此文献没有有效 DOI，无法调用 Unpaywall。")
+        record = Evidence(
+            kind="paper", publication=paper["publication"],
+            title=paper["title"], url=paper["source_url"], source=paper["source"],
+            retrieved_at=utc_now(), abstract=paper["abstract"],
+            publication_date=paper["publication_date"],
+            verified=paper["metadata_verified"], pdf_url=paper["pdf_url"],
+            paper_metadata=meta,
+        )
+        enriched = (enricher or UnpaywallEnricher()).enrich(record)
+        self.memory.ingest_many([enriched])
+        return {"doc_id": doc_id, "pdf_url": enriched.pdf_url,
+                "oa_status": enriched.paper_metadata.get("oa_status"),
+                "full_text_verified": False, "source": "unpaywall",
+                "note": "候选 OA URL 已保存；下载前仍须获得确切许可。"}
+
     def download(
         self, doc_id: str, *, authorized: bool, allowed_hosts: set[str],
         rights_basis: str, rights_reference: str, max_bytes: int = MAX_PDF_BYTES,

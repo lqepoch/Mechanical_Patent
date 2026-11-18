@@ -600,7 +600,7 @@ class UnpaywallEnricher:
 
     def enrich(self, paper: Evidence) -> Evidence:
         doi = _doi(paper.paper_metadata.get("doi") or paper.publication)
-        if paper.kind != "paper" or not doi or doi.startswith(("arxiv:", "pmid:", "core:", "lens:")):
+        if paper.kind != "paper" or not doi.startswith("10.") or "/" not in doi:
             return paper
         url = "https://api.unpaywall.org/v2/" + parse.quote(doi, safe="/") + "?" + parse.urlencode({"email": self.email})
         payload = self.fetch_json(url)

@@ -384,7 +384,8 @@ class LiteratureMemoryStore:
         with self.connect() as db:
             row = db.execute(
                 "SELECT doc_id,kind,publication,title,source,source_url,pdf_url,"
-                "paper_metadata_json FROM documents WHERE doc_id=?", (doc_id,),
+                "paper_metadata_json,abstract,published_at,metadata_verified "
+                "FROM documents WHERE doc_id=?", (doc_id,),
             ).fetchone()
         if row is None or row["kind"] != "paper":
             raise PatentWorkflowError("项目知识库中找不到指定论文。")
@@ -392,6 +393,8 @@ class LiteratureMemoryStore:
             "doc_id": row["doc_id"], "publication": row["publication"],
             "title": row["title"], "source": row["source"],
             "source_url": row["source_url"], "pdf_url": row["pdf_url"],
+            "abstract": row["abstract"], "publication_date": row["published_at"],
+            "metadata_verified": bool(row["metadata_verified"]),
             "paper_metadata": json.loads(row["paper_metadata_json"] or "{}"),
         }
 
