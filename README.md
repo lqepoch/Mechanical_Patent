@@ -238,6 +238,26 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
 
 
+## 2026-11-18：每项目独立 SQLite、最新索引、LaTeX 论文和前沿发明雷达
+
+所有新 MCP 运行实例都必须显式绑定项目。每项目独立 projects/<project-id>/patents.sqlite3（WAL、来源历史和案卷审计）；项目间无共享业务 SQLite：
+
+    python -m pip install -e ".[mcp]"
+    python -m mechanical_patent.mcp_server --workspace ./private_patent_workspace --project-id PM80 --transport stdio
+
+Codex MCP 客户端配置时应当为每个项目设置独立的 server 项与 --project-id；例如另一个项目使用 --project-id PM120。当前一个 MCP 实例管理一个项目内的多个案卷，底层 ProjectStorage 对项目 ID 与文件路径进行隔离验证。
+
+新增 MCP 工具：
+- patent_project_info：本项目数据库和案卷数量。
+- patent_index_refresh / patent_index_search / patent_index_history：每次真实供应商请求、项目索引及文献历史版本。
+- patent_frontier_scan：检索近期 OpenAlex 真实公开论文，保留 DOI、发表日期、时间和来源。
+- patent_variant_plan：针对已有真实公开专利名称或公开号生成八种创新变体研究任务；AI 继续具体设计和反证。
+- patent_manuscript_create/read/edit/revisions/export：按章节维护 LaTeX 主源稿、BibTeX 与修订历史，Pandoc 导出 DOCX/HTML/Markdown。
+- 旧 patent_idea_*：负责多代裂变、父子谱系、工程反证和申请候选优选。
+
+详细查看 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md；对应三个中文 Skills 已同步到 .agents/skills。单纯安装完成不代表已经获得 EPO 官方数据授权、企业身份认证、完整全球检索覆盖或真实机械仿真能力。
+
+
 ## 🔭 三级知识星图与文献记忆
 
 新增可审计的文献知识星图，覆盖单份专利/论文、单个研发案卷、仅获批准公开的跨项目研究网络。单研究运行独立保存 knowledge.sqlite3，自动记录文献关键词、引用、TF-IDF 候选相似关系、已有技术谱系与逐字校验后仍待人工复核的技术三元组；每个文档创建 document_memory/generated/EV-*.md，人工维护的 manual/ 文件不被覆盖。
