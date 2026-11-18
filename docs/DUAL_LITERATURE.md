@@ -89,3 +89,7 @@ AI 再把论文的流动机理、汽蚀阈值、传感控制和材料知识转�
 平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+## 论文原文获取与反证的可信边界（2026-11-19）
+
+开放来源的真实 PDF URL 若经许可和项目保密审批，可在项目中排队安全下载、离线解析，记录 PDF SHA256、块编号与页码；其机理、试验及技术效果仍须与原始 PDF 逐页核验。MCP 的全文检索结果一律提示机器提取待核查。科研正文和专利的证据关系更新前应审查引用位置；目录和实现见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。

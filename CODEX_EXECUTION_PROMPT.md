@@ -162,3 +162,7 @@ J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出�
 代码入口：src/mechanical_patent/project_storage.py、patent_index.py、latex_manuscript.py、frontier_radar.py、mcp_extensions.py。MCP 工具协议由 tests/test_project_latex_frontier.py 及 tests/test_fission_mcp.py 验收。CI 必须同时跑离线模拟场景、真实 Pandoc 转换、MCP SDK v2 发现/调用；任何红灯先修复再合并。
 
 未解决工作开 Issue，保留明确验收、数据许可、跨云部署、回滚与真实生产测试。任何新颖性、创造性、FTO 结论仍须独立人工专业审查。
+
+## 对追加需求的 Codex 执行要求：多代构思交叉与反向学习
+
+在原有流程中调用 patent_idea_crossovers，通过父系至少两个不同技术轴生成真实耦合结构；注册时写入 parent_ids、synergy、interface_definition，逐一列出机械连接、流体/电气交互、边界条件和可证伪试验。发现明显不可行方案则调用 patent_idea_reject，记录 source_ids、具体失败原因和 learned_constraints。后续裂变必须读 avoid_failed_constraints。质量—多样性评分只排序研发资源，不生成法律认定；通过独立反证、工程评审和人工批准后方可转申请底稿。更新每个对应 Skill、标准 MCP 契约、测试并确保 Codex 镜像一致。

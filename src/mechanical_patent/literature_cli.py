@@ -58,6 +58,47 @@ def add_literature_parser(subparsers: Any) -> None:
     harvest.add_argument("--max-seconds", type=int, default=600)
     harvest.add_argument("--refresh", action="store_true")
 
+    rights = subs.add_parser("fulltext-plan", help="经案卷权限与开放许可证审核登记 PDF 任务")
+    rights.add_argument("--doc-id", required=True)
+    rights.add_argument("--workflow-case-id", required=True)
+    rights.add_argument("--workspace-db", required=True, type=Path)
+    rights.add_argument("--rights-actor", required=True)
+    rights.add_argument("--rights-reference", required=True)
+    rights.add_argument("--rights-approved", action="store_true")
+
+    download = subs.add_parser("fulltext-process", help="执行一次安全 PDF 获取及离线 Docling 解析")
+    download.add_argument("--doc-id", required=True)
+    download.add_argument("--workflow-case-id", required=True)
+    download.add_argument("--workspace-db", required=True, type=Path)
+    download.add_argument("--allow-download", action="store_true")
+    download.add_argument("--allow-host", action="append", default=[], help="PDF 原始站点的精确域名白名单")
+    download.add_argument("--max-bytes", type=int, default=40 * 1024 * 1024)
+    download.add_argument("--docling-artifacts", type=Path,
+                          help="经许可、事先下载好的离线 Docling 模型目录")
+    download.add_argument("--download-only", action="store_true")
+
+    status = subs.add_parser("fulltext-status", help="按文献编号查看原文获取/解析状态")
+    status.add_argument("--doc-id", required=True)
+    passages = subs.add_parser("fulltext-search", help="从已解析 PDF 中检索页码级技术证据")
+    passages.add_argument("--query", required=True)
+    passages.add_argument("--limit", type=int, default=20)
+    pending_files = subs.add_parser("fulltext-pending", help="查看需要重试或继续解析的论文任务")
+    pending_files.add_argument("--limit", type=int, default=30)
+
+
+def _assert_fulltext_approval(args: argparse.Namespace) -> None:
+    """项目目录与案卷外发审批必须同时匹配，防止跨项目权限借用。"""
+    root = args.project_dir.expanduser().resolve()
+    database = args.workspace_db.expanduser().resolve()
+    if root.name != args.workflow_case_id or root.parent.name != "cases":
+        raise PatentWorkflowError("全文任务必须限定在指定研发案卷的项目目录。")
+    if database != root.parent.parent / "patents.sqlite3":
+        raise PatentWorkflowError("全文任务的权限数据库必须与实际项目存储一致。")
+    from .local_workspace import LocalPatentWorkspace
+    workspace = LocalPatentWorkspace(database)
+    if not workspace.can_egress(args.workflow_case_id):
+        raise PatentWorkflowError("当前案卷未通过真实出站审批，禁止远程全文获取。")
+
 
 def handle_literature(args: argparse.Namespace) -> int:
     memory = LiteratureMemoryStore(args.project_dir)
@@ -95,6 +136,30 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
+    elif command in {"fulltext-plan", "fulltext-process", "fulltext-status",
+                     "fulltext-search", "fulltext-pending"}:
+        from .literature_fulltext import FulltextPipeline
+        pipeline = FulltextPipeline(memory)
+        if command == "fulltext-status":
+            result = pipeline.status(args.doc_id)
+        elif command == "fulltext-search":
+            result = {"records": pipeline.search(args.query, limit=args.limit),
+                      "review_status": "awaiting_original_pdf_review"}
+        elif command == "fulltext-pending":
+            result = {"jobs": pipeline.pending(limit=args.limit)}
+        else:
+            _assert_fulltext_approval(args)
+            if command == "fulltext-plan":
+                result = pipeline.queue(
+                    args.doc_id, rights_actor=args.rights_actor,
+                    rights_reference=args.rights_reference, authorized=args.rights_approved,
+                )
+            else:
+                result = pipeline.process(
+                    args.doc_id, allowed_hosts=set(args.allow_host),
+                    authorized=args.allow_download, artifacts=args.docling_artifacts,
+                    max_bytes=args.max_bytes, parse=not args.download_only,
+                )
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")

@@ -123,6 +123,32 @@ class PatentMCPService:
     def literature_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
         return {"case_id": case_id, "pending": self._memory(case_id).pending_analysis(limit=limit)}
 
+    def literature_fulltext_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        """只读查询原文下载/解析进度，不授予使用许可证。"""
+        from .literature_fulltext import FulltextPipeline
+        row = FulltextPipeline(self._memory(case_id)).status(doc_id)
+        safe = {key: value for key, value in row.items()
+                if key in {"doc_id", "status", "attempts", "last_updated",
+                           "pdf_sha256", "parse_sha256", "extracted_blocks",
+                           "full_text_verified", "error"}}
+        return {"case_id": case_id, **safe}
+
+    def literature_fulltext_search(self, case_id: str, query: str,
+                                   limit: int = 20) -> dict[str, Any]:
+        """全文逐段索引；返回页码、SHA 和机器解析未核验说明。"""
+        from .literature_fulltext import FulltextPipeline
+        rows = FulltextPipeline(self._memory(case_id)).search(query, limit=limit)
+        for row in rows:
+            row["content"] = row["content"][:1800]
+        return {"case_id": case_id, "query": query[:160], "matches": rows,
+                "count": len(rows), "full_text_verified": False}
+
+    def literature_fulltext_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
+        """列出当前项目尚未完成的 PDF 任务，供授权 CLI 执行。"""
+        from .literature_fulltext import FulltextPipeline
+        return {"case_id": case_id,
+                "jobs": FulltextPipeline(self._memory(case_id)).pending(limit=limit)}
+
     def literature_resume(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).read_resume()
 
@@ -246,6 +272,16 @@ class PatentMCPService:
 
     def fission_frontier(self, case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         return self._board(case_id, run_id).frontier(top_k)
+
+    def fission_crossovers(self, case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        return self._board(case_id, run_id).plan_crossovers(limit)
+
+    def fission_reject(self, case_id: str, run_id: str, candidate_id: str,
+                       reason: str, learned_constraints: list[str],
+                       source_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._board(case_id, run_id).reject(
+            candidate_id, reason, learned_constraints, source_ids
+        )
 
     def fission_promote(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         return self._board(case_id, run_id).promote(candidate_id)
@@ -398,7 +434,7 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.6",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
                 "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -467,6 +503,22 @@ def create_server(service: PatentMCPService):
         return service.literature_pending(case_id, limit)
 
     @server.tool()
+    def patent_literature_fulltext_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """查询指定论文合法 PDF 下载及离线 Docling 解析状态。"""
+        return service.literature_fulltext_status(case_id, doc_id)
+
+    @server.tool()
+    def patent_literature_fulltext_search(case_id: str, query: str,
+                                          limit: int = 20) -> dict[str, Any]:
+        """按 PDF 原文页码/段落检索可追溯的机器解析证据。"""
+        return service.literature_fulltext_search(case_id, query, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
+        """查询等待许可、下载、重试及解析的论文任务。"""
+        return service.literature_fulltext_pending(case_id, limit)
+
+    @server.tool()
     def patent_literature_resume(case_id: str) -> dict[str, Any]:
         """恢复项目最新研究任务、假设、证据与后续方向。"""
         return service.literature_resume(case_id)
@@ -533,6 +585,20 @@ def create_server(service: PatentMCPService):
     def patent_idea_frontier(case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         """质量—多样性筛选：每类技术轴和创新方法优先保留一个方案。"""
         return service.fission_frontier(case_id, run_id, top_k)
+
+    @server.tool()
+    def patent_idea_crossovers(case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        """在不同技术轴间配对经评分的假说，要求跨结构/控制/流体接口与协同效应。"""
+        return service.fission_crossovers(case_id, run_id, limit)
+
+    @server.tool()
+    def patent_idea_reject(case_id: str, run_id: str, candidate_id: str,
+                           reason: str, learned_constraints: list[str],
+                           source_ids: list[str] | None = None) -> dict[str, Any]:
+        """归档失败技术路线，向后续裂变提供具体的禁区、反证和失败约束。"""
+        return service.fission_reject(
+            case_id, run_id, candidate_id, reason, learned_constraints, source_ids
+        )
 
     @server.tool()
     def patent_idea_promote(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:

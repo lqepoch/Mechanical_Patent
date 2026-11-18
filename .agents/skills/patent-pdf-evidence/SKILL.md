@@ -28,3 +28,7 @@ user-invocable: true
 ## 输出
 
 PDF 文件哈希、原始在线链接、解析器版本、页码、原文段落、可得文字坐标和待核对状态。若 PDF 加密、无可读文本、使用权限不足、模型依赖缺失或解析失败，立即标记为人工核对；不得把空白文字当成不存在技术。
+
+## 文献 PDF 自动化证据流水线（2026-11-19）
+
+优先读取 `docs/FULLTEXT_PIPELINE.md` 与 `patent-fulltext-processing` Skill。通过项目出站审批和真实 OA 许可核查后，使用已有 pinned TLS 下载器与离线 Docling；保留 SHA256、供应商 URL、PDF 文件内容哈希、机器解析结果、页码/文本块，记录失败/重试/可恢复状态。来自 MCP 的页码检索均标为 awaiting_original_pdf_review。未知许可、私人 IP、重定向、非 PDF、重复超过次数、超额度需阻断并人工复核。

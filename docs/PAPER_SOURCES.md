@@ -80,3 +80,7 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 - CORE https://core.ac.uk/services/api
 - Lens https://docs.api.lens.org/request-scholar.html
 - Unpaywall https://unpaywall.org/products/api
+
+## OA 全文处理流水线（2026-11-19）
+
+论文平台返回的 `pdf_url`、`paper_metadata.is_open_access`、`license` 将归入同项目 `knowledge/literature.sqlite3` 的 pdf_url / metadata_json；原文须满足许可白名单、保密外发批准与逐篇审批后，才由受控 CLI 下载、通过 Docling 离线解析并生成页码证据索引。上千篇元数据已有 OpenAlex/Crossref 的游标分页断点，新增 PDF 处理使用单文献队列、租约、错误与完整性校验，绝不自动采集缺乏授权的内容。详见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
