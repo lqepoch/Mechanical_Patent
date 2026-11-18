@@ -53,3 +53,14 @@ user-invocable: true
 5. 供应商异常、缺摘要、失效 PDF/非开放许可、限额及 429 时记录缺口并保留可用来源；仅在许可和审批后再下载原文，通过 Docling/PDF 审核核查页码、方程、实验结论，再联动专利权利要求反证。
 
 接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
+
+
+## PDF 授权取证与长文档解析（2026-11-19）
+
+1. 为每篇论文核对 DOI 和来源所标注的 OA/许可；pdf_url 仅是候选，不允许凭一个链接直接认定可合法归档。
+2. 在项目私有环境执行 `literature pdf-fetch`，提供 case_id、workflow DB、已批准域名、合法版权依据和明确授权；下载使用 DNS 钉扎 HTTPS、SHA256 和 PDF 格式/大小校验，失败保存故障而不触碰既有分析。
+3. 配置经许可的本地 Docling artifacts，执行 `literature pdf-parse`；获得 JSON 页码/段落并自动更新单篇 Markdown 的机器区。全部输出保持 parsed_unverified。
+4. 通过 `patent_paper_pdf_status`、`patent_paper_pdf_page` 或 CLI pdf-pages 定位原文，再按页写入机理、工况、公式、证伪实验及与专利权利要求的差异；每段结论携带实际页码和文件 SHA256。
+5. 对于重新获取或换版本的 PDF，校验 SHA256；技术人员复核后再进入证据/发明审核阶段。文件不明、许可证无效、模型缺失、来源重定向或文件损坏时明确阻断。
+
+具体接口见 docs/PAPER_FULLTEXT.md。网页链接或自动结构化转换均不能代替人工核验原始公开 PDF。

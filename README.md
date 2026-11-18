@@ -316,3 +316,16 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ```
 
 参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
+
+## 论文 PDF 取证与逐篇记忆（2026-11-19）
+
+学术 DOI 摘要库已具备可追溯的 PDF 候选链接。新增显式权限的两段式流程：
+
+```bash
+python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-status --doc-id EV-XXXXXXXXXXXX
+python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-fetch --doc-id EV-XXXXXXXXXXXX --allowed-host repository.example.org --rights-basis open_license --rights-reference "已审查的原文许可证明及位置" --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3 --allow-search-exposure --authorized
+python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-parse --doc-id EV-XXXXXXXXXXXX --docling-artifacts /private/models/docling --authorized
+python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-pages --doc-id EV-XXXXXXXXXXXX --page 2
+```
+
+原文 URL 必须来自已登记的论文元数据；无法证明合法使用权或 PDF 原文不符则阻断。下载与本地 Docling 解析可分别重试，结果按 SHA256、页码、来源和审核状态持久化。远端 MCP 提供项目内只读状态和页码工具。完整说明：[docs/PAPER_FULLTEXT.md](docs/PAPER_FULLTEXT.md)。

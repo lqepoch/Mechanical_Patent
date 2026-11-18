@@ -156,3 +156,12 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 `patent_research` 新增可选 `paper_sources: list[str]`、`enrich_unpaywall: bool` 和 `allow_paid_paper_apis: bool`。未提供平台时默认 OpenAlex、Crossref、Semantic Scholar。已登记的保密外发批准对所有外部渠道生效；Lens、CORE 除此以外还需 Token 与商业许可明确批准。
 
 `patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+## 项目隔离的论文 PDF 证据查询（2026-11-19）
+
+增加两个只读 MCP 工具：
+
+- `patent_paper_pdf_status(case_id, doc_id)`：读取该案卷内的 PDF、版权审查与机器解析状态；无文献则报错。
+- `patent_paper_pdf_page(case_id, doc_id, page, limit=30)`：读取 Docling 页码段落、来源 PDF SHA256 和待核验状态。不会自动向外部供应商查询或下载。
+
+鉴于当前 MCP 仍依赖外部企业身份网关，自动下载/解析操作通过 `literature pdf-fetch/pdf-parse` CLI 在本地授权执行；写权限经当前案卷 egress 审批、URL 域名白名单、明确许可证据和离线模型门禁。全文原始证据文件不会经 MCP 返回二进制。参见 docs/PAPER_FULLTEXT.md。

@@ -80,3 +80,12 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 - CORE https://core.ac.uk/services/api
 - Lens https://docs.api.lens.org/request-scholar.html
 - Unpaywall https://unpaywall.org/products/api
+
+
+## 论文 PDF 权利门禁与机器页码证据（2026-11-19）
+
+项目级 `LiteratureMemoryStore` 现在可以记录原生 `pdf_url`、`paper_metadata_json` 和跨检索批次来源谱系；原有分析笔记保持独立且不被新元数据覆盖。新增 `PaperFullTextService` 将论文 PDF 分为 `not_downloaded → downloading → downloaded → parsing → parsed_unverified`，失败为 `download_failed` 或 `parse_failed` 并允许重试。仅在检索词外发获批、合法全文使用依据可查、域名白名单和明确操作授权同时满足时触发下载。
+
+下载调用已有 DNS 钉扎 HTTPS/PDF 头/大小上限/不跟随重定向的 `download_pdf`；按 SHA256 内容寻址，留在项目私有 `knowledge/pdf_objects`。离线解析重用 Docling `parse_local_pdf`，模型须预装本地 artifacts，输出 `knowledge/pdf_extracted` 的逐页 JSON。自动状态写入论文 MD 的机器区，研究人员/AI 批注区长期保存，全文结论标记待原始 PDF 复核。
+
+本次 MCP 增加只读 `patent_paper_pdf_status` 和 `patent_paper_pdf_page`；写入操作通过具有企业权限审计的本地 CLI `literature pdf-fetch` 和 `literature pdf-parse` 执行。任何 AI 不得自行猜测版权许可，不得从未核实的机器提取中产生已验证的实验结论。操作和状态见 [PAPER_FULLTEXT.md](PAPER_FULLTEXT.md)。

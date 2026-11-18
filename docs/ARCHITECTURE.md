@@ -122,3 +122,12 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+
+## 论文 PDF 权利门禁与机器页码证据（2026-11-19）
+
+项目级 `LiteratureMemoryStore` 现在可以记录原生 `pdf_url`、`paper_metadata_json` 和跨检索批次来源谱系；原有分析笔记保持独立且不被新元数据覆盖。新增 `PaperFullTextService` 将论文 PDF 分为 `not_downloaded → downloading → downloaded → parsing → parsed_unverified`，失败为 `download_failed` 或 `parse_failed` 并允许重试。仅在检索词外发获批、合法全文使用依据可查、域名白名单和明确操作授权同时满足时触发下载。
+
+下载调用已有 DNS 钉扎 HTTPS/PDF 头/大小上限/不跟随重定向的 `download_pdf`；按 SHA256 内容寻址，留在项目私有 `knowledge/pdf_objects`。离线解析重用 Docling `parse_local_pdf`，模型须预装本地 artifacts，输出 `knowledge/pdf_extracted` 的逐页 JSON。自动状态写入论文 MD 的机器区，研究人员/AI 批注区长期保存，全文结论标记待原始 PDF 复核。
+
+本次 MCP 增加只读 `patent_paper_pdf_status` 和 `patent_paper_pdf_page`；写入操作通过具有企业权限审计的本地 CLI `literature pdf-fetch` 和 `literature pdf-parse` 执行。任何 AI 不得自行猜测版权许可，不得从未核实的机器提取中产生已验证的实验结论。操作和状态见 [PAPER_FULLTEXT.md](PAPER_FULLTEXT.md)。
