@@ -17,6 +17,8 @@ from uuid import uuid4
 from .core import Evidence, PatentWorkflowError, evidence_id, save_json, validate_draft
 from .ideation_fission import FissionBoard, AXES, METHODS, SCORE_FIELDS
 from .technical_brief import render_brief
+from .figure_pipeline import prepare_figures, read_figure_plan
+from .figure_worker import sync_figures
 from .technical_review import inspect_brief
 from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
@@ -32,6 +34,8 @@ _READABLE = frozenset({
     "04_evidence.json", "04b_technology_graph.json", "05_inventions.json",
     "05a_idea_fission.json", "06_countersearch.json", "07_engineering.json",
     "08_application.json", "08a_technical_brief.json", "08a_technical_brief.tex",
+    "08d_figure_plan.json", "08e_figure_render.json", "08f_figure_sync.json",
+    "08g_pdf_build.json",
     "09_quality_gate.json", "10_enterprise_quality.json",
     "manifest.json", "AGENT_NEXT_STEPS.md",
 })
@@ -117,23 +121,37 @@ class PatentMCPService:
             analysis=analysis, source_positions=source_positions,
         )
 
-    def paper_pdf_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
-        """读取所属项目论文的 PDF/解析状态，不启动网络或模型。"""
-        from .paper_fulltext import PaperFullTextService
-        return PaperFullTextService(self._memory(case_id)).status(doc_id)
-
-    def paper_pdf_page(self, case_id: str, doc_id: str,
-                       page: int, limit: int = 30) -> dict[str, Any]:
-        """读取待核验的原文页码段落；下一步由 AI 做有位置标注的技术分析。"""
-        from .paper_fulltext import PaperFullTextService
-        return PaperFullTextService(self._memory(case_id)).pages(
-            doc_id, page=page, limit=limit)
-
     def literature_stats(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).stats()
 
     def literature_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
         return {"case_id": case_id, "pending": self._memory(case_id).pending_analysis(limit=limit)}
+
+    def literature_fulltext_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        """只读查询原文下载/解析进度，不授予使用许可证。"""
+        from .literature_fulltext import FulltextPipeline
+        row = FulltextPipeline(self._memory(case_id)).status(doc_id)
+        safe = {key: value for key, value in row.items()
+                if key in {"doc_id", "status", "attempts", "last_updated",
+                           "pdf_sha256", "parse_sha256", "extracted_blocks",
+                           "full_text_verified", "error"}}
+        return {"case_id": case_id, **safe}
+
+    def literature_fulltext_search(self, case_id: str, query: str,
+                                   limit: int = 20) -> dict[str, Any]:
+        """全文逐段索引；返回页码、SHA 和机器解析未核验说明。"""
+        from .literature_fulltext import FulltextPipeline
+        rows = FulltextPipeline(self._memory(case_id)).search(query, limit=limit)
+        for row in rows:
+            row["content"] = row["content"][:1800]
+        return {"case_id": case_id, "query": query[:160], "matches": rows,
+                "count": len(rows), "full_text_verified": False}
+
+    def literature_fulltext_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
+        """列出当前项目尚未完成的 PDF 任务，供授权 CLI 执行。"""
+        from .literature_fulltext import FulltextPipeline
+        return {"case_id": case_id,
+                "jobs": FulltextPipeline(self._memory(case_id)).pending(limit=limit)}
 
     def literature_resume(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).read_resume()
@@ -165,15 +183,14 @@ class PatentMCPService:
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
             "semantic-scholar": SemanticScholarProvider,
             "semantic-scholar-bulk": SemanticScholarBulkProvider,
-            "arxiv": ArxivProvider,
-            "europe-pmc": EuropePMCProvider, "pubmed": PubMedProvider,
-            "epo-ops": EPOOPSProvider,
+            "arxiv": ArxivProvider, "europe-pmc": EuropePMCProvider,
+            "pubmed": PubMedProvider, "epo-ops": EPOOPSProvider,
         }
         if provider not in options:
             raise PatentWorkflowError("不支持的文献数据源。")
         budget = HarvestBudget(
             max_documents=max(1, min(int(max_documents), 10000)),
-            page_size=20 if provider == "epo-ops" else page_size,
+            page_size=20 if provider == "epo-ops" else int(page_size),
             max_pages=max(1, min(int(max_pages), 20)),
             max_seconds=120,
         )
@@ -266,6 +283,16 @@ class PatentMCPService:
 
     def fission_frontier(self, case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         return self._board(case_id, run_id).frontier(top_k)
+
+    def fission_crossovers(self, case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        return self._board(case_id, run_id).plan_crossovers(limit)
+
+    def fission_reject(self, case_id: str, run_id: str, candidate_id: str,
+                       reason: str, learned_constraints: list[str],
+                       source_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._board(case_id, run_id).reject(
+            candidate_id, reason, learned_constraints, source_ids
+        )
 
     def fission_promote(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         return self._board(case_id, run_id).promote(candidate_id)
@@ -368,6 +395,52 @@ class PatentMCPService:
             "conversion_authorized": False, "filing_authorized": False,
         }
 
+    def figure_prepare(self, case_id: str, run_id: str, candidate_id: str,
+                       wanted: list[str] | None = None) -> dict[str, Any]:
+        """仅生成本案卷可编辑图源与哈希计划，绝不执行系统渲染命令。"""
+        folder = self._folder(case_id, run_id)
+        result = prepare_figures(folder, candidate_id=candidate_id, wanted=wanted)
+        from .audit import append_audit_event
+        append_audit_event(folder, stage="工程技术方案", action="生成可编辑图源与渲染计划",
+                           actor="MCP 工具", role="系统",
+                           payload={"candidate_id": candidate_id, "source_ids": [x["id"] for x in result["entries"]]})
+        return result
+
+    def figure_source(self, case_id: str, run_id: str, figure_id: str) -> dict[str, Any]:
+        """按图源编号读取固定白名单内的可编辑工程原理图内容。"""
+        folder = self._folder(case_id, run_id)
+        plan, _ = read_figure_plan(folder)
+        match = next((x for x in plan["entries"] if x["id"] == figure_id), None)
+        if match is None:
+            raise PatentWorkflowError("该研究运行没有此图源编号。")
+        source = (folder / match["source"]).read_text(encoding="utf-8")
+        return {"id": figure_id, "source": match["source"], "format": match["renderer"],
+                "source_sha256": match["source_sha256"], "content": source,
+                "geometry_proven": False}
+
+    def figure_status(self, case_id: str, run_id: str) -> dict[str, Any]:
+        folder = self._folder(case_id, run_id)
+        try:
+            plan, _ = read_figure_plan(folder)
+        except PatentWorkflowError:
+            return {"status": "not_prepared", "files": [], "filing_authorized": False}
+        status = {"status": plan["status"], "files": [
+            {"id": x["id"], "kind": x["kind"], "source": x["source"], "asset": x["asset"],
+             "source_sha256": x["source_sha256"]}
+            for x in plan["entries"]],
+            "render_executed_by_mcp": False, "filing_authorized": False}
+        record = folder / "08e_figure_render.json"
+        if record.is_file() and not record.is_symlink():
+            result = json.loads(record.read_text(encoding="utf-8"))
+            status["worker_status"] = result.get("status", "unknown")
+            status["rendered_count"] = len(result.get("rendered", []))
+            status["failure_count"] = len(result.get("failures", []))
+        return status
+
+    def figure_sync(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """只验证渲染产物并更新图文，不启动浏览器、CAD 或 LaTeX。"""
+        return sync_figures(self._folder(case_id, run_id), candidate_id=candidate_id)
+
     def brief_audit(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """独立审查工程技术方案，可双人签核归档，无须生成权利要求书。"""
         return inspect_brief(self._folder(case_id, run_id), case_id=case_id,
@@ -418,7 +491,7 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.6",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
                 "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -477,17 +550,6 @@ def create_server(service: PatentMCPService):
         )
 
     @server.tool()
-    def patent_paper_pdf_status(case_id: str, doc_id: str) -> dict[str, Any]:
-        """查找此项目内该论文的获许可 PDF 及 Docling 处理状态。"""
-        return service.paper_pdf_status(case_id, doc_id)
-
-    @server.tool()
-    def patent_paper_pdf_page(case_id: str, doc_id: str,
-                              page: int, limit: int = 30) -> dict[str, Any]:
-        """按页查询机器提取的 PDF 文本与页码位置，人工仍需核查。"""
-        return service.paper_pdf_page(case_id, doc_id, page, limit)
-
-    @server.tool()
     def patent_literature_stats(case_id: str) -> dict[str, Any]:
         """文献累计规模、已分析数、未完分页任务及研究恢复文档位置。"""
         return service.literature_stats(case_id)
@@ -496,6 +558,22 @@ def create_server(service: PatentMCPService):
     def patent_literature_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
         """批量读取尚未写入实质研究分析的文献队列，逐篇处理。"""
         return service.literature_pending(case_id, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """查询指定论文合法 PDF 下载及离线 Docling 解析状态。"""
+        return service.literature_fulltext_status(case_id, doc_id)
+
+    @server.tool()
+    def patent_literature_fulltext_search(case_id: str, query: str,
+                                          limit: int = 20) -> dict[str, Any]:
+        """按 PDF 原文页码/段落检索可追溯的机器解析证据。"""
+        return service.literature_fulltext_search(case_id, query, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
+        """查询等待许可、下载、重试及解析的论文任务。"""
+        return service.literature_fulltext_pending(case_id, limit)
 
     @server.tool()
     def patent_literature_resume(case_id: str) -> dict[str, Any]:
@@ -566,6 +644,20 @@ def create_server(service: PatentMCPService):
         return service.fission_frontier(case_id, run_id, top_k)
 
     @server.tool()
+    def patent_idea_crossovers(case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        """在不同技术轴间配对经评分的假说，要求跨结构/控制/流体接口与协同效应。"""
+        return service.fission_crossovers(case_id, run_id, limit)
+
+    @server.tool()
+    def patent_idea_reject(case_id: str, run_id: str, candidate_id: str,
+                           reason: str, learned_constraints: list[str],
+                           source_ids: list[str] | None = None) -> dict[str, Any]:
+        """归档失败技术路线，向后续裂变提供具体的禁区、反证和失败约束。"""
+        return service.fission_reject(
+            case_id, run_id, candidate_id, reason, learned_constraints, source_ids
+        )
+
+    @server.tool()
     def patent_idea_promote(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """将证据关联的候选交给反证/工程/撰写流程；不授予专利法律结论。"""
         return service.fission_promote(case_id, run_id, candidate_id)
@@ -592,6 +684,27 @@ def create_server(service: PatentMCPService):
                           brief: dict[str, Any]) -> dict[str, Any]:
         """保存工程人员看得懂的技术方案并输出按需组合的LaTeX，不生成权利要求。"""
         return service.brief_save(case_id, run_id, candidate_id, brief)
+
+    @server.tool()
+    def patent_figure_prepare(case_id: str, run_id: str, candidate_id: str,
+                              wanted: list[str] | None = None) -> dict[str, Any]:
+        """从已保存的研发事实中生成可编辑 draw.io/Mermaid 图源和安全渲染计划。"""
+        return service.figure_prepare(case_id, run_id, candidate_id, wanted)
+
+    @server.tool()
+    def patent_figure_source(case_id: str, run_id: str, figure_id: str) -> dict[str, Any]:
+        """按图示ID读取可编辑图源及SHA，不提供任意文件路径读取。"""
+        return service.figure_source(case_id, run_id, figure_id)
+
+    @server.tool()
+    def patent_figure_status(case_id: str, run_id: str) -> dict[str, Any]:
+        """检查图示源和隔离渲染器结果，不执行外部程序。"""
+        return service.figure_status(case_id, run_id)
+
+    @server.tool()
+    def patent_figure_sync(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """核实所有PDF输出的哈希后将配图写入新的工程说明书版本。"""
+        return service.figure_sync(case_id, run_id, candidate_id)
 
     @server.tool()
     def patent_brief_audit(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
@@ -625,7 +738,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "默认用 patent_brief_save 输出工程技术方案；只有用户申请决定及企业验签通过才可写专利申请文本；"
+            + "默认用 patent_brief_save 输出工程技术方案，允许 patent_figure_prepare 生成可编辑图源，隔离worker导出后用 patent_figure_sync 校验；只有用户申请决定及企业验签通过才可写专利申请文本；"
             + "执行 patent_brief_audit 审阅工程方案，双人签核可直接结案；独立批准后才可运行 patent_draft_save 与 patent_quality_audit。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
