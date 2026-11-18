@@ -236,3 +236,16 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 备注：GitHub 上包含服务端与离线测试，但并不意味着全球数据检索渠道已经全部开通、生产认证已经部署或机械仿真已经执行。专业专利申请前须复核权利要求、公开充分性、工程实现和权属。
 
 跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
+
+
+## ✅ 默认工程技术方案书（2026-11-18）
+
+用户给出技术创新问题时，默认研发产物为自然语言工程技术方案，不强行撰写权利要求/说明书。结合结构、操作步骤和现有公开来源选择 CAD/STEP 结构线稿、draw.io 原理图、Mermaid 流程/时序图、技术比较表及验证计划；CTeX/XeLaTeX 排版，源文件可修改。
+
+- 规范：docs/TECHNICAL_BRIEF_STANDARD.md
+- 新 Skill：skills/patent-technical-brief/SKILL.md（Codex 自动发现镜像同步）
+- 模板：src/mechanical_patent/templates/engineering_brief.tex
+- 输入样例：examples/technical_brief_demo.json（示意输入，并非真实成果）
+- MCP：patent_brief_save、patent_conversion_status（原 patent_draft_save 现在强制验证独立审批签名）
+
+工程方案审核通过后可以归档结束。仅用户明确申请并通过企业可信签名审批，才允许使用申请转换工具。生产级身份与权限治理仍在 Issue #25 追踪。

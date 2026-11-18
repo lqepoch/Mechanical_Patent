@@ -13,7 +13,9 @@
     ├─ TRIZ / SCAMPER / FMEA / Design Thinking / 跨领域创新
     ├─ 专利 + 论文独立反证
     ├─ 工程理论计算、可行性与验证计划
-    ├─ 中国发明专利交底、申请与独立审核
+    ├─ 白话工程技术方案（LaTeX；按需CAD/draw.io/Mermaid与图表）
+    ├─ 通过后内部归档或待用户正式申请决定
+    ├─ 仅可信验签通过后进行中国发明专利文件转换与独立审核
     └─ 必要人工门禁
     ↓
 统一证据与案卷（JSON、Markdown、DOCX / CAD 输出待接入）
@@ -37,7 +39,8 @@
 
 CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE_LANDSCAPE
 → PARALLEL_INNOVATIONS → PATENT/PAPER_COUNTERSEARCH → PHYSICS_REVIEW
-→ CLAIM_SUPPORT → CN_DRAFT → STATIC_QA → ENGINEERING_REVIEW
+→ ENGINEERING_TECHNICAL_BRIEF → ENGINEERING_REVIEW → [ARCHIVE_COMPLETE 或 ITERATE]
+→ [USER_FILING_DECISION + TRUSTED_SIGNED_CONVERSION_APPROVAL] → CN_DRAFT
 → PATENT_PROFESSIONAL_REVIEW → MANUAL_FILING_DECISION
 
 每个步骤有文档和来源，失败需报告并保留部分结果。缺少真实数据库、正文或关键实验时，可继续创建理论构想与标记缺口的申请草稿，但不能把审核门禁设为通过。
@@ -66,3 +69,8 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 - 任何申请提交由真实发明人、企业 IP 管理与专利代理专业人员确认。
 
 详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
+
+
+## 2026-11-18 架构升级：白话技术方案优先
+
+按 docs/TECHNICAL_BRIEF_STANDARD.md 构建两个独立审查关口：默认一项发明的一份可读技术方案；仅另行获得签名授权才可进入申报材料。模块化 CTeX 模板和安全图源引用见 src/mechanical_patent/technical_brief.py，转换审批门禁见 src/mechanical_patent/filing_gate.py。该改动不改变现有 EPO/论文来源审批方式；真实组织身份仍需与 #25 集成。

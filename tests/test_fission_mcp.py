@@ -125,12 +125,12 @@ class FissionAndMCPTests(unittest.TestCase):
             "claim_support": [{"claim": 1,
                 "specification_passage": "单向阀与旁路水力联动，排气支路独立控制。"}],
         }
-        saved = self.service.draft_save(self.case_id, self.run_id, root["id"], draft)
-        self.assertTrue(saved["saved"])
-        self.assertFalse(saved["filing_authorized"])
-        self.assertEqual(saved["draft_issues"], [])
+        # 未经可信企业审批签名，不得由 AI 擅自进入申请格式写作。
+        with self.assertRaises(PatentWorkflowError):
+            self.service.draft_save(self.case_id, self.run_id, root["id"], draft)
+        self.assertFalse(self.service.conversion_status(
+            self.case_id, self.run_id, root["id"])["conversion_authorized"])
         audit = self.service.quality(self.case_id, self.run_id)
-        self.assertEqual(audit["status"], "needs_human_review")
         self.assertFalse(audit["filing_authorized"])
         self.assertTrue(self.service.read_artifact(self.case_id, self.run_id,
                                                    "05a_idea_fission.json")["content"]["candidates"])
@@ -225,7 +225,8 @@ class FissionAndMCPTests(unittest.TestCase):
                 for name in ("patent_case_create", "patent_research", "patent_idea_plan",
                              "patent_idea_register", "patent_idea_evaluate", "patent_idea_frontier",
                              "patent_countersearch_record", "patent_engineering_record",
-                             "patent_draft_save", "patent_quality_audit", "patent_run_create",
+                             "patent_draft_save", "patent_brief_save", "patent_conversion_status",
+                             "patent_quality_audit", "patent_run_create",
                              "patent_source_import"):
                     self.assertIn(name, names)
                 result = await client.call_tool("patent_capabilities", {})

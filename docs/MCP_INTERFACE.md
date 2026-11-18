@@ -100,3 +100,12 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 ### 其他数据供应商接入
 
 已有 Patsnap、Patent Client Agents 等授权检索能力的客户端，调用 patent_run_create 生成本地 RUN，再用 patent_source_import 导入结构化文献（publication/title/url/source/kind/abstract/claims 等）。所有输入一律标记为未核验，自动记入本地来源索引、检索词记录及技术证据图谱；随后须打开真实公开 PDF、核验权利要求与公开日期，再进入正式反证。此工具适用于 Factrix 的供应商无关集成，生产级高并发事务需转 PostgreSQL。
+
+
+## 白话技术方案优先与申请转换许可（v1.2，2026-11-18）
+
+- patent_brief_save(case_id, run_id, candidate_id, brief)：保存当前候选的结构化白话技术方案并输出 08a_technical_brief.json/.tex。必备字段、可选配图和版式见 docs/TECHNICAL_BRIEF_STANDARD.md。无图则省略或列待补清单；不会生成申请权利要求。
+- patent_conversion_status(case_id, run_id, candidate_id)：只读查询可信企业审批系统对同一方案 SHA256 的 HMAC 签名是否有效，返回 conversion_authorized 与永远为 false 的 filing_authorized。
+- patent_draft_save：新增强制可信审批验签门禁。必须由独立审批服务生成 08b_conversion_approval.json 并通过 PATENT_CONVERSION_APPROVAL_KEY 验签；AI/MCP 无签名端点。方案一旦修改，旧审批自然失效；正式向专利局提交仍需要独立的审批和授权人员。
+
+旧版客户端直接调用 patent_draft_save 将收到明确拒绝；改走 patent_brief_save 并由企业审批系统完成转换决定。签名与真实人身绑定的生产化由 #25 完成，当前本地签名控制只适合受控私有工作空间。

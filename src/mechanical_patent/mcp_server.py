@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from .core import Evidence, PatentWorkflowError, evidence_id, save_json, validate_draft
 from .ideation_fission import FissionBoard, AXES, METHODS, SCORE_FIELDS
+from .technical_brief import render_brief
+from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
 from .quality import inspect_research_case, audit_research_case
 from .workflow import PatentResearch
@@ -26,7 +28,8 @@ _READABLE = frozenset({
     "00_intake.json", "01_search_plan.json", "02_patents.json", "03_papers.json",
     "04_evidence.json", "04b_technology_graph.json", "05_inventions.json",
     "05a_idea_fission.json", "06_countersearch.json", "07_engineering.json",
-    "08_application.json", "09_quality_gate.json", "10_enterprise_quality.json",
+    "08_application.json", "08a_technical_brief.json", "08a_technical_brief.tex",
+    "09_quality_gate.json", "10_enterprise_quality.json",
     "manifest.json", "AGENT_NEXT_STEPS.md",
 })
 
@@ -223,8 +226,46 @@ class PatentMCPService:
         save_json(path, data)
         return {"saved": True, "verification_status": verification_status, "engineer_signoff": False}
 
+
+    def brief_save(self, case_id: str, run_id: str, candidate_id: str,
+                   brief: dict[str, Any]) -> dict[str, Any]:
+        """保存并渲染白话技术方案；不触发正式申请稿。"""
+        folder = self._folder(case_id, run_id)
+        if not isinstance(brief, dict) or len(json.dumps(brief, ensure_ascii=False)) > 180_000:
+            raise PatentWorkflowError("技术方案须为不超过180KB的结构化对象。")
+        inventions = json.loads((folder / "05_inventions.json").read_text(encoding="utf-8")).get("candidates", [])
+        if not any(i.get("id") == candidate_id for i in inventions):
+            raise PatentWorkflowError("技术方案必须绑定已经移交的发明候选。")
+        if brief.get("candidate_id") != candidate_id:
+            raise PatentWorkflowError("技术方案与已选定的候选编号不同。")
+        known = set()
+        for raw in json.loads((folder / "04_evidence.json").read_text(encoding="utf-8")).get("records", []):
+            known.add(evidence_id(Evidence.from_dict(raw)))
+        latex, review = render_brief(brief, folder, known_evidence=known)
+        outfile = folder / "08a_technical_brief.tex"
+        if outfile.is_symlink() or (folder / "08a_technical_brief.json").is_symlink():
+            raise PatentWorkflowError("方案输出文件不允许是符号链接。")
+        save_json(folder / "08a_technical_brief.json", brief)
+        outfile.write_text(latex, encoding="utf-8")
+        from .audit import append_audit_event
+        append_audit_event(folder, stage="工程技术方案", action="生成白话工程方案及LaTeX模板",
+                           actor="MCP 工具", role="工具",
+                           payload={"candidate_id": candidate_id,
+                                    "brief_sha256": sha256((folder / "08a_technical_brief.json").read_bytes()).hexdigest(),
+                                    "tex_sha256": sha256(outfile.read_bytes()).hexdigest()})
+        return {
+            "saved": True, "candidate_id": candidate_id, "review": review,
+            "json_artifact": "08a_technical_brief.json",
+            "latex_artifact": "08a_technical_brief.tex",
+            "conversion_authorized": False, "filing_authorized": False,
+        }
+
+    def conversion_status(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        return conversion_status(self._folder(case_id, run_id), case_id, run_id, candidate_id)
+
     def draft_save(self, case_id: str, run_id: str, candidate_id: str, draft: dict[str, Any]) -> dict[str, Any]:
         folder = self._folder(case_id, run_id)
+        require_conversion_approval(folder, case_id, run_id, candidate_id)
         if not isinstance(draft, dict) or len(json.dumps(draft, ensure_ascii=False)) > 300_000:
             raise PatentWorkflowError("申请正文须为有界的结构化 JSON 对象。")
         ideas = json.loads((folder / "05_inventions.json").read_text(encoding="utf-8")).get("candidates", [])
@@ -263,7 +304,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "contract_version": "1.1",
+        return {"service": "Mechanical_Patent", "contract_version": "1.2",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -351,9 +392,20 @@ def create_server(service: PatentMCPService):
                                           falsification_tests, verification_status)
 
     @server.tool()
+    def patent_brief_save(case_id: str, run_id: str, candidate_id: str,
+                          brief: dict[str, Any]) -> dict[str, Any]:
+        """保存工程人员看得懂的技术方案并输出按需组合的LaTeX，不生成权利要求。"""
+        return service.brief_save(case_id, run_id, candidate_id, brief)
+
+    @server.tool()
+    def patent_conversion_status(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """只读检查真实企业审批签名是否允许由技术方案转换为专利申请底稿。"""
+        return service.conversion_status(case_id, run_id, candidate_id)
+
+    @server.tool()
     def patent_draft_save(case_id: str, run_id: str, candidate_id: str,
                           draft: dict[str, Any]) -> dict[str, Any]:
-        """保存 AI 起草的中国发明权利要求/说明书/摘要并校验逐权项支持。"""
+        """仅在独立可信企业审批授权转换后，保存申请底稿并逐权项校验。"""
         return service.draft_save(case_id, run_id, candidate_id, draft)
 
     @server.tool()
@@ -370,8 +422,8 @@ def create_server(service: PatentMCPService):
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "只有通过证据移交门槛的候选方可写申请；使用 patent_draft_save，"
-            + "执行 patent_quality_audit，完整输出差异、工程假设、权要、摘要及审查问题。"
+            + "默认用 patent_brief_save 输出工程技术方案，使用专用模板选择结构、时序、流程、对比图表；"
+            + "执行 patent_quality_audit，输出创新点、机理、结构、试验及证据缺口；仅在用户明确申请且外部企业审批验签后才可使用 patent_draft_save 生成权要与摘要。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
     return server
