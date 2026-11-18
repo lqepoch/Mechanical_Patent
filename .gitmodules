@@ -25,3 +25,15 @@
 [submodule "external/patentkit"]
 	path = external/patentkit
 	url = https://github.com/j-hedtke/patentkit.git
+
+[submodule "external/opencitations-api"]
+	path = external/opencitations-api
+	url = https://github.com/opencitations/oc_api.git
+
+[submodule "external/paper-qa"]
+	path = external/paper-qa
+	url = https://github.com/Future-House/paper-qa.git
+
+[submodule "external/google-patents-examples"]
+	path = external/google-patents-examples
+	url = https://github.com/google/patents-public-data.git

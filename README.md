@@ -193,3 +193,20 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
     python -m mechanical_patent benchmark --gold examples/benchmark_demo/gold.jsonl --results examples/benchmark_demo/results.jsonl --rights examples/benchmark_demo/rights.json --output cases/synthetic-scores.json
 
 具体使用边界、许可证和后续工程计划见 docs/INDUSTRY_REUSE.md。
+
+## 文献引证图谱（第三轮行业开源融合）
+
+新增 OpenCitations 官方 DOI 引证网络，能够以一篇已公开论文为起点，找到其参考文献和后来引用它的研究，帮助当前 ChatGPT/Codex 发现跨领域物理机理与反证线索。不会自动调用其他 AI 模型，也不会把 DOI 引用关系认作论文理论或专利创造性的证据。
+
+前置条件：已有通过 research 建立的案卷，且项目保密审批允许对外查询公开 DOI。
+
+    python -m mechanical_patent citations \
+      --case-dir cases/已有研究案卷 \
+      --doi 10.1162/qss_a_00023 \
+      --direction both --max-links 25 --allow-search-exposure
+
+示例 DOI 来自 OpenCitations 文档，仅用于演示命令格式，并未核实与消防泵技术相关。
+
+结果保留 04c_paper_citations.json、每一批 citation_batches/<hash>.json、更新后的 04b_technology_graph.json 及事件哈希链。通过新的专利论文交叉验证 Skill 对新 DOI 进一步核实论文元数据、真实全文和技术可迁移性。
+
+源码及许可证已固定为 git submodule：external/opencitations-api（ISC）、external/paper-qa（Apache-2.0）、external/google-patents-examples（Apache-2.0，原仓库已归档）。详细说明见 docs/CITATION_DISCOVERY.md；新增的 skills/patent-citation-discovery/SKILL.md 与 Codex 的 .agents/skills 镜像保持一致。

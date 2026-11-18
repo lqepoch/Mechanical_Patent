@@ -27,3 +27,11 @@ Evaluation inspiration:
 - PatSnap patent-bench: benchmark datasets CC BY-NC 4.0; prohibited for commercial
   evaluation without separately granted rights. Its selected Apache-2.0 metric
   implementation is not copied into this repository.
+
+Scientific citation and patent landscaping upstream code (source-only git submodules):
+- opencitations/oc_api — ISC, commit d9448a6333f2eb9ed305cc05f52e9f287edf4e03
+  OpenCitations data and API terms are distinct from this code license.
+- Future-House/paper-qa — Apache-2.0, commit c692d0dfeac4a0296599f7fe21a253a58b7ac12a
+  Default runtime needs its own LLM/embedding provider; this project does not launch it.
+- google/patents-public-data — Apache-2.0, commit d3d08a00e41e411be11b8a1394dd6d84f1312463
+  Upstream was archived 2026-04-18; SQL examples are historical references only.

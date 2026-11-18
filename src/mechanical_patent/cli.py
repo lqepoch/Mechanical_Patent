@@ -60,9 +60,44 @@ def main(argv: list[str] | None = None) -> int:
     bridge = sub.add_parser("mcp-import", help="导入有授权的行业专利 MCP 结构化返回，待核实原始文献")
     bridge.add_argument("--input", required=True, type=Path)
     bridge.add_argument("--output", required=True, type=Path)
+    citations = sub.add_parser("citations", help="公开 DOI 的 OpenCitations 一跳参考与被引关系，保存进已有研发案卷")
+    citations.add_argument("--doi", action="append", required=True, help="种子论文 DOI，可重复最多 8 次")
+    citations.add_argument("--case-dir", required=True, type=Path)
+    citations.add_argument("--direction", choices=["references", "citations", "both"], default="both")
+    citations.add_argument("--max-links", type=int, default=25)
+    citations.add_argument("--allow-search-exposure", action="store_true")
+    citations.add_argument("--workflow-case-id", help="需要工作流保密批准的现有案卷编号")
+    citations.add_argument("--workspace-db", type=Path, help="工作流数据库路径")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "citations":
+            if not args.allow_search_exposure:
+                raise PatentWorkflowError("外部 DOI 引证查询需要明确的 --allow-search-exposure 审批。")
+            if args.workflow_case_id:
+                from .local_workspace import LocalPatentWorkspace
+                database = args.workspace_db or (args.case_dir.parent / "index.sqlite3")
+                workspace = LocalPatentWorkspace(database)
+                intake_path = args.case_dir / "00_intake.json"
+                if not intake_path.is_file():
+                    raise PatentWorkflowError("找不到对应的研究案卷。")
+                import json
+                intake = json.loads(intake_path.read_text(encoding="utf-8"))
+                if intake.get("case_id") != args.workflow_case_id:
+                    raise PatentWorkflowError("研发案卷编号与工作流授权的项目不一致。")
+                if not workspace.can_egress(args.workflow_case_id):
+                    raise PatentWorkflowError("该研发案卷尚未通过外部检索保密审批。")
+            from .case_citations import update_case_citations
+            result = update_case_citations(
+                args.case_dir, args.doi,
+                direction=args.direction, max_links=args.max_links,
+            )
+            print("学术引证检索状态:", result["status"])
+            print("累计引用关系:", result["total_edges"])
+            print("发现待进一步验证的 DOI:", result["next_doi_candidates"])
+            print("数据质量限制与接口错误数:", len(result["query_errors"]))
+            print("申请提交授权: false")
+            return 0 if not result["query_errors"] else 2
         if args.command == "mcp-import":
             from .mcp_bridge import import_mcp_json
             result = import_mcp_json(args.input, args.output)

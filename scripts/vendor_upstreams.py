@@ -16,6 +16,21 @@ from urllib.request import Request, urlopen
 from zipfile import ZipFile
 
 SOURCES = {
+    "opencitations-api": {
+        "repo": "opencitations/oc_api",
+        "sha": "d9448a6333f2eb9ed305cc05f52e9f287edf4e03",
+        "license": "ISC",
+    },
+    "paper-qa": {
+        "repo": "Future-House/paper-qa",
+        "sha": "c692d0dfeac4a0296599f7fe21a253a58b7ac12a",
+        "license": "Apache-2.0",
+    },
+    "google-patent-examples": {
+        "repo": "google/patents-public-data",
+        "sha": "d3d08a00e41e411be11b8a1394dd6d84f1312463",
+        "license": "Apache-2.0",
+    },
     "patent-client": {
         "repo": "parkerhancock/patent-client-agents",
         "sha": "dadfeb3b36092549290a384acf8aefcc76493bc5",
@@ -107,6 +122,8 @@ def vendor(name: str, output_dir: Path) -> str:
             raise ValueError("MIT license verification failed.")
         if source["license"] == "Apache-2.0" and "apache license" not in content:
             raise ValueError("Apache-2.0 license verification failed.")
+        if source["license"] == "ISC" and "isc license" not in content:
+            raise ValueError("ISC license verification failed.")
         metadata = {
             "source": source["repo"], "git_commit": source["sha"], "license": source["license"],
             "archive_sha256": sha256(raw).hexdigest(),
