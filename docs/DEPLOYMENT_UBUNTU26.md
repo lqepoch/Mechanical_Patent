@@ -141,3 +141,7 @@ bash scripts/deploy_ubuntu26.sh up
 ## LaTeX 文件导出能力
 
 运行镜像包含 Pandoc，支持当前项目的 LaTeX 源稿导出 DOCX、HTML、Markdown；MCP 接口由当前调用端 AI 负责推理和修改。在线 MCP 容器故意不安装 TeX/PDF 编译器，不具备不可信 TeX 安全隔离；PDF 编译须按 docs/LATEX_WORKFLOW.md 部署独立离线受控构建服务。
+
+## 离线论文全文任务与资源边界（2026-11-19）
+
+论文 PDF 与机器解析数据应写入现有数据盘 /data/projects/项目ID/cases/案卷ID/knowledge/fulltext/。默认 GHCR MCP 镜像只安装轻量业务依赖，不自动包含 Docling 模型权重，也不允许模型运行时隐式联网获取权重。通过宿主受控 CLI 或独立审批的解析 Worker 在持久卷上执行时需设置受控离线模型目录、来源域名白名单、外网防火墙、最大文件/页数、资源上限和内容扫描。容器主进程通过只读 MCP 查询已经形成的页码索引与进度。升级前按照原有 SQLite WAL 与 PDF 目录一同做停服一致性备份和恢复演练。详见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。

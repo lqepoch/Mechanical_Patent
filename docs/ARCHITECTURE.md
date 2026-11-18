@@ -122,3 +122,7 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+## 论文 PDF 证据流水线（2026-11-19）
+
+已有 `literature_memory.py` 的项目独立 SQLite + Markdown 与论文 API 归一化继续保留。新增 `literature_fulltext.py` 管理全文任务的 license/oa/url/rights、downloaded/parsed 状态、内容 SHA256、租约和页码索引，复用 `pdf_archive.py` 的固定公网 IP TLS PDF 下载与 `pdf_extraction.py` 的 Docling 离线解析。MCP 只读暴露 fulltext status/search/pending；CLI 对外网文件获取继续调用项目身份与案卷出站审批。所有全文结论需要人工针对真实 PDF 独立复核。详细设计见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
