@@ -36,3 +36,7 @@ user-invocable: true
 
 ## 以最新公开资料驱动的发明树
 读取 patent-frontier-innovation：对当期 OpenAlex 公开论文和授权专利数据源开展前沿扫描，再按最新专利真实标题/公开号生成八种差异化任务；使用已有 Idea Fission 工具保存多代谱系和不同技术轴的证据。技术新颖性、FTO 和理论可实施性保持独立人工复核。
+
+## 真正的想法裂变闭环
+
+围绕至少两种独立技术轴的已评价方案调用 `patent_idea_crossovers`，再以 `parent_ids`、`synergy` 和 `interface_definition` 登记双亲组合，提供耦合原理、机械接口、约束条件与可证伪实验。被专利反证或物理条件否定的方案调用 `patent_idea_reject` 存为失败记忆，下一轮读取 `avoid_failed_constraints`。该操作保留父子谱系，不修改真实文献状态和法律创造性结论。完整步骤见 patent-idea-fission。
