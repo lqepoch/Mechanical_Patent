@@ -140,6 +140,27 @@ class LocalWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(self.db.pdf_source("X003", doc_id)["verification_status"], "已核验")
 
+    def test_source_content_update_revokes_previous_verification(self):
+        from dataclasses import replace
+        self.db.create_case("X005", "消防泵液压装置结构设计")
+        original = evidence("patent")
+        code = self.db.upsert_document("X005", original)
+        self.db.review_document(
+            "X005", code, actor="独立核验人", accepted=True,
+            rationale="已核对原始公开文献的标题、日期和摘要。",
+        )
+        self.assertEqual(self.db.pdf_source("X005", code)["verification_status"], "已核验")
+        amended = replace(original, abstract="原来记录被新公开资料更新了内容")
+        self.db.upsert_document("X005", amended)
+        self.assertEqual(self.db.pdf_source("X005", code)["verification_status"], "待核验")
+        # 完全一致的重复导入，不应再次撤销人工已核验状态。
+        self.db.review_document(
+            "X005", code, actor="独立核验人", accepted=True,
+            rationale="重新打开原始 PDF 核查了新版本内容。",
+        )
+        self.db.upsert_document("X005", amended)
+        self.assertEqual(self.db.pdf_source("X005", code)["verification_status"], "已核验")
+
     def test_wrong_actor_or_expired_lease_cannot_finish(self):
         self.db.create_case("X004", "发动机泵耦合改善")
         lease = self.db.claim("X004", role="保密与权限智能体", actor="本人", lease_seconds=60)
