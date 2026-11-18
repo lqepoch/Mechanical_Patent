@@ -94,8 +94,14 @@ class PatentMCPService:
         self, case_id: str, query: str, kind: str | None = None, limit: int = 20,
     ) -> dict[str, Any]:
         """返回可查证的文献与稳定 MD 地址，避免把千篇正文塞入上下文。"""
-        records = self._memory(case_id).search(query, limit=limit, kind=kind)
-        return {"case_id": case_id, "matches": records, "count": len(records)}
+        memory = self._memory(case_id)
+        records = memory.search(query, limit=limit, kind=kind)
+        from .literature_evidence import FullTextEvidence
+        passages = FullTextEvidence(memory).search(
+            query, limit=max(1, min(limit, 40))
+        )
+        return {"case_id": case_id, "matches": records, "count": len(records),
+                "matched_passages": passages, "passage_count": len(passages)}
 
     def literature_read(
         self, case_id: str, doc_id: str, max_chars: int = 24000,
@@ -132,6 +138,51 @@ class PatentMCPService:
         return self._memory(case_id).update_resume(
             markdown, analyst=analyst, expected_sha256=expected_sha256,
         )
+
+    def literature_fulltext_ingest(
+        self, case_id: str, doc_id: str, pdf_filename: str,
+        parsed_filename: str, authorized: bool = False,
+    ) -> dict[str, Any]:
+        """MCP 仅能读取当前案卷固定 inbox 目录中的合法 PDF/JSON 文件名。"""
+        self._case(case_id)
+        if not authorized:
+            raise PatentWorkflowError("用户未批准本案卷的本地全文归档。")
+        for value, suffix in ((pdf_filename, ".pdf"), (parsed_filename, ".json")):
+            if (not isinstance(value, str)
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value)
+                or not value.endswith(suffix)):
+                raise PatentWorkflowError("原始文件名无效；只能从当前案卷 inbox 读取。")
+        memory = self._memory(case_id)
+        inbox = memory.root / "inbox"
+        if inbox.is_symlink():
+            raise PatentWorkflowError("案卷导入目录禁止符号链接。")
+        from .literature_evidence import FullTextEvidence
+        return FullTextEvidence(memory).attach(
+            doc_id, inbox / parsed_filename, inbox / pdf_filename,
+            authorized=authorized,
+        )
+
+    def literature_passages(
+        self, case_id: str, query: str, doc_id: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        from .literature_evidence import FullTextEvidence
+        passages = FullTextEvidence(self._memory(case_id)).search(
+            query, doc_id=doc_id, limit=limit,
+        )
+        return {"case_id": case_id, "passages": passages, "count": len(passages)}
+
+    def literature_quote(
+        self, case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        from .literature_evidence import FullTextEvidence
+        return FullTextEvidence(self._memory(case_id)).quote(
+            doc_id, anchor, verbatim,
+        )
+
+    def literature_fulltext_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        from .literature_evidence import FullTextEvidence
+        return FullTextEvidence(self._memory(case_id)).status(doc_id)
 
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
@@ -479,6 +530,36 @@ def create_server(service: PatentMCPService):
         return service.literature_resume_save(
             case_id, analyst, markdown, expected_sha256,
         )
+
+    @server.tool()
+    def patent_literature_fulltext_ingest(
+        case_id: str, doc_id: str, pdf_filename: str,
+        parsed_filename: str, authorized: bool = False,
+    ) -> dict[str, Any]:
+        """从当前案卷 knowledge/inbox 读取授权 PDF 和解析 JSON，绑定SHA256并建立全文索引。"""
+        return service.literature_fulltext_ingest(
+            case_id, doc_id, pdf_filename, parsed_filename, authorized,
+        )
+
+    @server.tool()
+    def patent_literature_passages(
+        case_id: str, query: str, doc_id: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """检索段落并返回准确的页码、来源 PDF 哈希及证据锚点。"""
+        return service.literature_passages(case_id, query, doc_id, limit)
+
+    @server.tool()
+    def patent_literature_quote(
+        case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        """逐字核对提取文本中的短引，结果仅证明解析文本命中。"""
+        return service.literature_quote(case_id, doc_id, anchor, verbatim)
+
+    @server.tool()
+    def patent_literature_fulltext_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """返回当前原始PDF、结构化段落版本与待人工核验标记。"""
+        return service.literature_fulltext_status(case_id, doc_id)
 
     @server.tool()
     def patent_literature_harvest(
