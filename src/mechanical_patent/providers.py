@@ -124,13 +124,31 @@ class EPOOPSProvider:
             raise PatentWorkflowError("EPO unavailable; provider error was recorded.") from exc
 
     def search(self, term: str, *, limit: int = 10) -> list[Evidence]:
-        limit = max(1, min(limit, 20))
+        return self.search_page(term, limit=limit)["records"]
+
+    def search_page(
+        self, term: str, *, cursor: str | None = None, limit: int = 20,
+    ) -> dict[str, object]:
+        """按 OPS Range 有界翻页。游标是本地偏移量，绝不调用未授权网页抓取。"""
+        limit = max(1, min(int(limit), 20))
         term = term.strip()[:180]
         if not term:
-            return []
+            return {"records": [], "next_cursor": None, "total_results": None}
+        start = 1 if cursor in (None, "*", "") else int(cursor)
+        if not 1 <= start <= 2000:
+            raise PatentWorkflowError("EPO OPS 当前检索结果超过允许的窗口，请细化检索式。")
+        limit = min(limit, 2001 - start)
         cql = "ti=" + '"' + term.replace('"', "") + '"'
         path = "/rest-services/published-data/search/biblio?" + parse.urlencode({"q": cql})
-        return parse_epo_xml(self._get(path, {"X-OPS-Range": f"1-{limit}"}), limit=limit)
+        found = parse_epo_xml(
+            self._get(path, {"X-OPS-Range": f"{start}-{start + limit - 1}"}),
+            limit=limit,
+        )
+        next_cursor = (
+            str(start + len(found))
+            if len(found) == limit and start + len(found) <= 2000 else None
+        )
+        return {"records": found, "next_cursor": next_cursor, "total_results": None}
 
     def claims(self, publication: str) -> str:
         """Claims are fetched separately: search/biblio responses do not prove claim coverage."""

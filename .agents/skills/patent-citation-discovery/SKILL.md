@@ -55,3 +55,9 @@ user-invocable: true
 OpenCitations 引证网络具有数据覆盖缺口；引用关系不能证明论文理论、专利新颖性或工业可实施性。新增节点必须标记“仅引证元数据、未核实全文”，不得虚构论文标题、实验数据或授权状态。
 
 来源：OpenCitations 官方 API 文档 https://api.opencitations.net/index/v2 ；代码来源 https://github.com/opencitations/oc_api 。OpenCitations 开放数据许可和 API 访问条件应定期复核。
+
+
+
+## 引证文献的长期记忆
+
+对新增真实 DOI 引证节点，通过 OpenAlex/Crossref 填写可核查的标题、DOI、来源和摘要，再导入项目知识库形成一文一篇 MD；原始 DOI 引证关系的发现不等于取得论文全文。用 patent_literature_note 将前驱实验、后续改进、跨学科机理迁移和反证线索写进各篇文献，最终更新 RESEARCH_RESUME.md 记录仍需验证的引用边。

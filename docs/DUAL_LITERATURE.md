@@ -67,3 +67,17 @@ AI 再把论文的流动机理、汽蚀阈值、传感控制和材料知识转�
 - OpenAlex API Reference: https://help.openalex.org/api/
 - Crossref Public API: https://www.crossref.org/documentation/retrieve-metadata/rest-api
 - Crossref authentication & rate limits: https://www.crossref.org/documentation/retrieve-metadata/rest-api/access-and-authentication/
+
+
+## 千篇双源文献的增量检索、落盘与研读
+
+新增 literature CLI 和 patent_literature_* MCP 工具。单词默认预算最多1000条、每页100、最多30页或600秒；预算是上限，不等于一定发现1000篇，也不意味着查全所有专利。官方 OpenAlex Cursor 超过第一页需要免费 API Key；Crossref cursor 约五分钟会过期，可从头幂等重检；EPO OPS 免费额度与频率受官方公平使用政策控制。论文来源合法元数据、摘要、权利要求与全文必须分别记载可用性。
+
+    python -m mechanical_patent literature --project-dir private/cases/X01 stats
+    python -m mechanical_patent literature --project-dir private/cases/X01 search --query "消防泵汽蚀"
+    python -m mechanical_patent literature --project-dir private/cases/X01 pending --limit 20
+    python -m mechanical_patent literature --project-dir private/cases/X01 harvest --provider openalex --provider crossref --query "centrifugal pump cavitation" --workflow-case-id X01 --workspace-db private/index.sqlite3 --max-documents 1000 --allow-search-exposure
+
+每发现一篇资料，立即生成带证据编号和可打开链接的 Markdown。AI 按每批10–30篇进行白话技术解读，记录原理、结构、控制、参数、作用效果、缺点、反证、创新点和跨文献连接；basis 标记 metadata/abstract/claims/full_text，声称读过完整原文必须记录页码/章节。研究快照 RESEARCH_RESUME.md 保存当前事实、发明候选、未解决问题、下次任务。元数据自动成文不等于实质读完。
+
+开源复用：官方 OpenAlex、Crossref 元数据 API；已有引证扩展 OpenCitations；合法全文可接已有 Docling PDF 解析、PaperQA2 证据检索方式及 GROBID TEI，但要核查模型权重、版权和使用许可。大规模批量离线可评估 OpenAlex Snapshot，降低反复 API 查询成本。专业检索覆盖用已授权的召回金标准持续验证。

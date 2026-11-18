@@ -27,3 +27,9 @@ user-invocable: true
 
 ## 前沿专利与 LaTeX 主源（2026-11-18）
 接到一条全新研发指令后，读取 patent-project-storage、patent-frontier-innovation、patent-latex-research 三项技能；锁定当前 project_id 的 SQLite；按实际供应商检索时间刷新专利索引及公开论文前沿。已有专利名称必须先核对真实公开号再裂变。研究论文独立保存分节 LaTeX 和 BibTeX；默认发明成果先生成白话工程技术方案；各个变种均按原权要逐技术特征反证，不能跳过工程实用性验证。
+
+## 长周期研发与会话级记忆恢复
+
+每个自动研发任务必须读取 patent-literature-memory/SKILL.md；按 case_id 将全文检索索引和文献 MD 存入该项目的知识目录。代理当前会话开始时读取 patent_literature_resume，并使用 patent_literature_search/read 查找已有研究结论与支持原文。对缺失资料开展经过保密审批的批量多源分页检索，先将每篇资料创建来源可追溯 MD，然后调用 patent_literature_pending 逐批研读；每篇写明白话作用、技术机理、构型、参数、局限、创新转移和反证检索线索，通过 patent_literature_note 落盘。阶段末用 resume_save 保存研究状态/下一次任务，使用 SHA256 防覆盖，遇版本变化重新合并。
+
+长期研究既要提高跨文献检索广度，也要区分“被发现、已读摘要、已读权要、已读完整原文、已验证技术结论”多个等级。已入库数不可等同完成审查。用户批准专利申请后再将已选定的白话发明方案转换为代理形式的专利稿，完整资料和未申请发明始终受密级控制。
