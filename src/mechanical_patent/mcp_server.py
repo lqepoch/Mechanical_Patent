@@ -248,6 +248,27 @@ class PatentMCPService:
         folder = self._folder(case_id, run_id)
         return audit_research_case(folder) if persist else inspect_research_case(folder)
 
+    def knowledge_index(self, case_id: str, run_id: str, top_k: int = 8,
+                        threshold: float = 0.15) -> dict[str, Any]:
+        """在本案卷物理隔离的 SQLite 中重建可重复图谱和文献记忆。"""
+        from .knowledge_atlas import index_case_atlas
+        return index_case_atlas(self._folder(case_id, run_id), top_k=top_k,
+                                threshold=threshold)
+
+    def knowledge_graph(self, case_id: str, run_id: str, scope: str = "project",
+                        document_id: str = "", max_nodes: int = 250,
+                        min_score: float = 0.0) -> dict[str, Any]:
+        """读取项目或单文献邻域，并附每条边的证据性质与计算方法。"""
+        from .knowledge_atlas import case_atlas
+        return case_atlas(self._folder(case_id, run_id), scope=scope,
+                          document_id=document_id, max_nodes=max_nodes,
+                          min_score=min_score)
+
+    def knowledge_global_public(self, max_nodes: int = 250) -> dict[str, Any]:
+        """仅汇总已正式标记为公开的项目；保密案卷一律不输出。"""
+        from .knowledge_atlas import global_public_atlas
+        return global_public_atlas(self.root, max_nodes=max_nodes)
+
 
 def create_server(service: PatentMCPService):
     """由 MCP SDK 生成正式 tools/list、JSON Schema、资源与提示词。"""
@@ -265,7 +286,8 @@ def create_server(service: PatentMCPService):
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         return {"service": "Mechanical_Patent", "contract_version": "1.1",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
-                "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
+                "knowledge_atlas": {"scopes": ["document", "project", "global_public"], "offline": True},
+                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
                 "security": "保密审批先于真实检索；HTTP 仅回环监听，由前置 OAuth2/OIDC 网关鉴权。"}
 
@@ -302,6 +324,25 @@ def create_server(service: PatentMCPService):
     def patent_case_artifact(case_id: str, run_id: str, artifact: str) -> dict[str, Any]:
         """在白名单内读取结构化案卷证据、研究报告与申请底稿。"""
         return service.read_artifact(case_id, run_id, artifact)
+
+    @server.tool()
+    def patent_knowledge_index(case_id: str, run_id: str, top_k: int = 8,
+                               threshold: float = 0.15) -> dict[str, Any]:
+        """离线建立单文献/单项目知识星图及每文献 Markdown 记忆；不调用外部 AI。"""
+        return service.knowledge_index(case_id, run_id, top_k, threshold)
+
+    @server.tool()
+    def patent_knowledge_graph(case_id: str, run_id: str, scope: str = "project",
+                               document_id: str = "", max_nodes: int = 250,
+                               min_score: float = 0.0) -> dict[str, Any]:
+        """提取有证据属性的项目星图或单文献邻域，兼容 Cytoscape.js。"""
+        return service.knowledge_graph(case_id, run_id, scope, document_id,
+                                       max_nodes, min_score)
+
+    @server.tool()
+    def patent_knowledge_global_public(max_nodes: int = 250) -> dict[str, Any]:
+        """只读已公开项目的全球投影；无法查看秘密、内部或受控案卷。"""
+        return service.knowledge_global_public(max_nodes)
 
     @server.tool()
     def patent_idea_plan(case_id: str, run_id: str, parent_id: str = "",
@@ -368,6 +409,7 @@ def create_server(service: PatentMCPService):
             "请以企业级机械发明专利研发智能体身份处理以下技术任务：" + direction
             + "\n操作：先调用 patent_capabilities / patent_case_create；遵守保密审核。"
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
+            + "先调用 patent_knowledge_index 和 patent_knowledge_graph 找到相关文献；算法相似度仅作二次检索线索；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "只有通过证据移交门槛的候选方可写申请；使用 patent_draft_save，"
