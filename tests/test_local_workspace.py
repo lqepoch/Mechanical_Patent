@@ -161,6 +161,29 @@ class LocalWorkflowTests(unittest.TestCase):
         self.db.upsert_document("X005", amended)
         self.assertEqual(self.db.pdf_source("X005", code)["verification_status"], "已核验")
 
+    def test_heartbeat_retry_and_manual_failure_block(self):
+        self.db.create_case("X006", "消防泵进水控制方案")
+        initial = self.db.claim("X006", role="保密与权限智能体", actor="授权人")
+        renewed = self.db.heartbeat(
+            initial["task_id"], actor="授权人", lease_seconds=2400
+        )
+        self.assertEqual(renewed["status"], "运行中")
+        retry = self.db.fail(
+            initial["task_id"], actor="授权人",
+            reason="可信来源暂时故障", retryable=True,
+        )
+        self.assertEqual(retry["status"], "待领取")
+        claimed = self.db.claim("X006", role="保密与权限智能体", actor="第二位员工")
+        self.assertEqual(claimed["task_id"], initial["task_id"])
+        blocked = self.db.fail(
+            claimed["task_id"], actor="第二位员工",
+            reason="申请资料不允许向外部披露", retryable=False,
+        )
+        self.assertEqual(blocked["status"], "已阻断")
+        self.assertIsNone(
+            self.db.claim("X006", role="保密与权限智能体", actor="第三位员工")
+        )
+
     def test_wrong_actor_or_expired_lease_cannot_finish(self):
         self.db.create_case("X004", "发动机泵耦合改善")
         lease = self.db.claim("X004", role="保密与权限智能体", actor="本人", lease_seconds=60)
