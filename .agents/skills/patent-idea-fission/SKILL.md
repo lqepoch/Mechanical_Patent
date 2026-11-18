@@ -37,3 +37,9 @@ user-invocable: true
 当不同技术轴的候选已分别通过研发评分时，调用 `patent_idea_crossovers` 获取交叉任务。AI 必须解释两种机理真正耦合的原因，填写 `parent_ids`（2–3个父构思），`inventive_method=组合创新`、`synergy`、`interface_definition`、结构/控制实施步骤和证伪试验，再调用 `patent_idea_register`。仅有并列功能或更改常规参数的组合仍需继续反证。不要让文本相似度参与法律创造性判断。
 
 当已知文献或物理分析否定一条研究路线，调用 `patent_idea_reject` 保存 reason、learned_constraints、来源编号（可选）；下一轮 `patent_idea_plan` 必须读取 `avoid_failed_constraints` 并避免重复踩坑。失败路线保留且不能直接重评、晋级或参与交叉，必须新建有完整实施细节的修复子案。案例和契约见 docs/IDEA_FISSION.md、docs/MCP_INTERFACE.md。
+
+### 失败子案修复与可信检索门禁
+
+已归档为 `rejected_research_route` 的候选可以作为单亲本“修复来源”，但新构思必须使用新的 ID，并显式提交 `parent_id`、`repair_of_failed_route=true` 和 `repair_rationale`，描述如何具体消除原来的失败约束。原失败假说持续留档，不允许直接重评或晋级；失败路线也不能参加多亲本交叉。
+
+`patent_idea_promote` 现在额外要求案卷真实存在一份 `verified=true` 且带原文权利要求的专利来源，同时该来源必须出现在构思的 `evidence_ids` 与评审 `countersearch_refs` 中。导入的第三方检索结果默认 `verified=false`，无法通过这一安全门禁。此状态只证明来源被核验，并不代表权利要求反证已通过法律审查。
