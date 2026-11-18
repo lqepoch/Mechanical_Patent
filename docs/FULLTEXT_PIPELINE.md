@@ -68,3 +68,30 @@ MCP 只读工具：patent_literature_fulltext_status / patent_literature_fulltex
 - https://unpaywall.org/api
 - https://docling-project.github.io/docling/reference/document_converter/
 - https://grobid.readthedocs.io/en/latest/Coordinates-in-PDF/
+
+## 批次执行、断点恢复和预算（2026-11-19）
+
+获准论文清单 JSON 格式（每篇独立许可条件）：
+
+    {
+      "items": [
+        {
+          "doc_id": "EV-123456789ABC",
+          "source": "local",
+          "input": "/approved/papers/article.pdf",
+          "rights_basis": "cc-by",
+          "rights_reference": "https://creativecommons.org/licenses/by/4.0/",
+          "parse": true
+        }
+      ]
+    }
+
+执行与恢复：
+
+    python -m mechanical_patent literature --project-dir /secure/CASE_ID fulltext-batch       --manifest /approved/manifest.json --authorized       --docling-artifacts /approved/models/docling --max-documents 100       --max-total-bytes 2147483648 --max-seconds 900 --max-attempts 3
+
+输出批次 FTB-编号。后续可再次运行相同清单以自动跳过已完成文献，重试失败条目；达到失败次数上限需经审核后使用 --refresh。批次状态通过 fulltext-batch-status --batch-id FTB-... 查询，MCP 亦提供 patent_literature_fulltext_batch_status。
+
+联网单篇须使用 source=remote 与 allowed_hosts:[域名]，且 CLI 需要 --allow-search-exposure、--workflow-case-id 和 --workspace-db；同一批次内有远程记录时必须审批当前案卷，审批后才进入原 PDF 下载器。
+
+批处理记录只包含 manifest SHA256、文献编号、完成状态、尝试次数、原 PDF 哈希、错误摘要和更新时间；不得上传包含内部审批或原文路径的清单。当前单个 CLI 进程负责执行，支持可恢复检查点，跨节点多 worker 的分布式租约与背压仍待后续正式运行环境实现。

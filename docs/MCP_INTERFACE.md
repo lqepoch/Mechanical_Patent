@@ -160,3 +160,7 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 ## 论文全文段落检索扩展（2026-11-19）
 
 MCP 新增 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,doc_id?,limit?)`、`patent_literature_fulltext_page(case_id,doc_id,page,limit?)`，均仅读取已经归档的本项目论文 PDF 和经 Docling 提取的文本块。数据返回包含原始 PDF SHA、页号、块号、可得坐标及 `awaiting_original_pdf_review` 标记。PDF 获取及解析通过有许可审批的本地 CLI 执行；MCP 没有任意路径读写或无授权网络抓取权限。完整接口、权限、许可证、可恢复索引见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+## 全文批次状态查询（2026-11-19）
+
+新增 MCP 工具 patent_literature_fulltext_batch_status(case_id,batch_id,limit=100)，返回当前项目批次的完成/失败/待处理数量及文献级重试记录，不触发任何网络、付费 API 或文件处理。本地 CLI fulltext-batch 从拥有明确授权的文献清单执行，详见 FULLTEXT_PIPELINE.md。
