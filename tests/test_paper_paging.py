@@ -8,7 +8,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from mechanical_patent.core import PatentWorkflowError
 from mechanical_patent.paper_sources import (
-    ArxivProvider, EuropePMCProvider, PubMedProvider, SemanticScholarProvider,
+    ArxivProvider, EuropePMCProvider, PubMedProvider,
+    SemanticScholarProvider, SemanticScholarBulkProvider,
 )
 from mechanical_patent.papers import OpenAlexProvider
 from mechanical_patent.literature_harvest import HarvestBudget, LiteratureHarvester
@@ -115,6 +116,33 @@ class PagingTests(unittest.TestCase):
             self.assertEqual(one["status"], "partial")
             self.assertEqual(two["status"], "complete")
             self.assertEqual(store.stats()["by_kind"]["paper"]["documents"], 2)
+
+    def test_semantic_bulk_continuation_token_and_full_page_budget(self):
+        calls = []
+        def get(url, *, headers):
+            params = parse_qs(urlsplit(url).query)
+            token = params.get("token", ["*"])[0]
+            calls.append(token)
+            record = {
+                "paperId": token + "-paper", "title": "Hydraulics bulk evidence",
+                "url": "https://www.semanticscholar.org/paper/" + token + "-paper",
+                "externalIds": {"DOI": "10.7777/" + token.lower().replace("*", "first")},
+            }
+            return {"data": [record], "token": "PAGE2" if token == "*" else None}
+        provider = SemanticScholarBulkProvider(api_key="test", fetch_json=get)
+        with self.assertRaises(PatentWorkflowError):
+            provider.search_page("pump", limit=100)
+        with tempfile.TemporaryDirectory() as root:
+            memory = LiteratureMemoryStore(Path(root) / "bulk-case")
+            runner = LiteratureHarvester(memory)
+            with self.assertRaises(PatentWorkflowError):
+                runner.harvest(provider, "pump", budget=HarvestBudget(
+                    max_documents=100, page_size=100, max_pages=2))
+            result = runner.harvest(provider, "pump", budget=HarvestBudget(
+                max_documents=1000, page_size=1000, max_pages=2))
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["new"], 2)
+            self.assertEqual(calls, ["*", "PAGE2"])
 
     def test_openalex_second_cursor_requires_free_api_key(self):
         provider = OpenAlexProvider(api_key="", fetch_json=lambda *_a, **_k: {})
