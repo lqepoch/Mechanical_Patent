@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -139,12 +140,15 @@ class PatentResearch:
         return result
 
     def run(self, direction: str, patent_queries: list[str] | None = None,
-            paper_queries: list[str] | None = None, *, limit: int = 10) -> dict[str, Any]:
+            paper_queries: list[str] | None = None, *, limit: int = 10,
+            case_id: str | None = None) -> dict[str, Any]:
         if not direction or not direction.strip():
             raise PatentWorkflowError("Technical direction is required.")
         pq = _bounded_terms(patent_queries)
         lq = _bounded_terms(paper_queries)
-        case_id = uuid4().hex
+        case_id = case_id or uuid4().hex
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,119}", case_id):
+            raise PatentWorkflowError("案卷编号须由字母、数字、下划线和连字符组成。")
         self.save("00_intake.json", {
             "case_id": case_id, "direction": direction, "created_at": utc_now(),
             "workflow": "agent_native", "llm_api_required": False,
