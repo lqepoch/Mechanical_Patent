@@ -31,3 +31,9 @@ user-invocable: true
 
 ## 供应商无关检索证据导入
 若当前宿主已有授权检索 MCP，可先执行 patent_run_create，随后通过 patent_source_import 接入专利、论文记录；导入时主动标注未核验，必须打开原始公布专利和权利要求逐字核查，方可作为正式反证。
+
+## 跨技术轴交叉与失败记忆（2026-11-19）
+
+当不同技术轴的候选已分别通过研发评分时，调用 `patent_idea_crossovers` 获取交叉任务。AI 必须解释两种机理真正耦合的原因，填写 `parent_ids`（2–3个父构思），`inventive_method=组合创新`、`synergy`、`interface_definition`、结构/控制实施步骤和证伪试验，再调用 `patent_idea_register`。仅有并列功能或更改常规参数的组合仍需继续反证。不要让文本相似度参与法律创造性判断。
+
+当已知文献或物理分析否定一条研究路线，调用 `patent_idea_reject` 保存 reason、learned_constraints、来源编号（可选）；下一轮 `patent_idea_plan` 必须读取 `avoid_failed_constraints` 并避免重复踩坑。失败路线保留且不能直接重评、晋级或参与交叉，必须新建有完整实施细节的修复子案。案例和契约见 docs/IDEA_FISSION.md、docs/MCP_INTERFACE.md。
