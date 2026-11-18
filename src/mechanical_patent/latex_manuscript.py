@@ -145,7 +145,8 @@ class ManuscriptWorkspace:
         if section_key not in SECTIONS and section_key!="references":
             raise PatentWorkflowError("章节编号不在受控清单。")
         if section_key=="references":
-            if not isinstance(content,str) or len(content)>150000 or _BAD.search(content) or _REMOTE.search(content):
+            if (not isinstance(content,str) or len(content)>150000 or _BAD.search(content)
+                    or "file://" in content.casefold() or "../" in content or "..\\" in content):
                 raise PatentWorkflowError("BibTeX 含危险宏、远程资源或文本超限。")
             if not content.strip().startswith(("@","%")):
                 raise PatentWorkflowError("参考文献必须为 BibTeX 条目或注释。")
