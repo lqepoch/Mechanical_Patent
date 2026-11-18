@@ -143,12 +143,12 @@ class LiteratureMemoryStore:
                   created_at TEXT NOT NULL
                 );
             """)
-            # Additive migration: keep existing private project DBs and research notes.
-            existing = {row["name"] for row in db.execute("PRAGMA table_info(documents)")}
-            if "pdf_url" not in existing:
+            # 原有案卷数据的幂等增量迁移，保留人工研究批注和历史检索状态。
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)")}
+            if "pdf_url" not in columns:
                 db.execute("ALTER TABLE documents ADD COLUMN pdf_url TEXT NOT NULL DEFAULT ''")
-            if "paper_metadata_json" not in existing:
-                db.execute("ALTER TABLE documents ADD COLUMN paper_metadata_json TEXT NOT NULL DEFAULT '{}'")
+            if "metadata_json" not in columns:
+                db.execute("ALTER TABLE documents ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'")
             try:
                 db.execute(
                     "CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5("
@@ -185,8 +185,9 @@ class LiteratureMemoryStore:
             "source_url": record.url, "publication_date": record.publication_date,
             "fetched_at": record.retrieved_at, "metadata_from_provider": record.verified,
             "full_text_verified": False,
-            "pdf_url": record.pdf_url,
-            "paper_metadata": record.paper_metadata if record.kind == "paper" else {},
+            "pdf_candidate_url": record.pdf_url,
+            "oa_license": record.paper_metadata.get("license") or "",
+            "access_status": "metadata_only",
         }
         head = "\n".join(
             key + ": " + json.dumps(value, ensure_ascii=False) for key, value in fields.items()
@@ -199,6 +200,8 @@ class LiteratureMemoryStore:
             "来源链接：" + _safe_markdown(record.url, 2000) + "\n\n"
             "公开日期：" + _safe_markdown(record.publication_date, 80) + "\n\n"
             "来源：" + _safe_markdown(record.source, 100) + "\n\n"
+            "PDF 线索：" + _safe_markdown(record.pdf_url, 2000) + "\n\n"
+            "公开许可：" + _safe_markdown(record.paper_metadata.get("license", ""), 160) + "\n\n"
             "## 来源摘要（未视为全文）\n\n"
             + (_safe_markdown(record.abstract, 12000) or "未检索到摘要。") + "\n\n"
             "## 权利要求摘录（如来源提供）\n\n"
@@ -242,26 +245,47 @@ class LiteratureMemoryStore:
                     "SELECT * FROM documents WHERE doc_id=?",
                     (doc_id,),
                 ).fetchone()
-                if (
-                    old is not None and record.kind == "paper"
-                    and (record.paper_metadata or record.pdf_url or old["pdf_url"]
-                         or old["paper_metadata_json"] not in ("", "{}"))
-                ):
-                    # Preserve multi-provider provenance even across separate harvest batches.
-                    from .paper_sources import merge_paper_records
-                    previous = Evidence(
-                        publication=old["publication"], title=old["title"],
-                        url=old["source_url"], source=old["source"],
-                        retrieved_at=record.retrieved_at, kind="paper",
-                        abstract=old["abstract"], publication_date=old["published_at"],
-                        verified=bool(old["metadata_verified"]), pdf_url=old["pdf_url"],
-                        paper_metadata=json.loads(old["paper_metadata_json"] or "{}"),
-                    )
-                    record = merge_paper_records([previous, record])[0]
-                    fingerprint = _digest({
-                        key: value for key, value in record.to_dict().items()
-                        if key != "retrieved_at"
-                    })
+                if old is not None and record.kind == "paper":
+                    old_meta = json.loads(old["metadata_json"] or "{}")
+                    fresh_meta = dict(record.paper_metadata)
+                    if old_meta or fresh_meta or old["pdf_url"] or record.pdf_url:
+                        from dataclasses import replace
+                        from .paper_sources import merge_paper_records
+                        previous = Evidence(
+                            publication=old["publication"], title=old["title"],
+                            url=old["source_url"], source=old["source"],
+                            retrieved_at=record.retrieved_at, kind="paper",
+                            abstract=old["abstract"], publication_date=old["published_at"],
+                            verified=bool(old["metadata_verified"]),
+                            pdf_url=old["pdf_url"], paper_metadata=old_meta,
+                        )
+                        combined = merge_paper_records([previous, record])[0]
+                        merged_meta = dict(combined.paper_metadata)
+                        # License/OA disagreement fails closed. Stale provider rights
+                        # cannot make a previously withdrawn PDF safe to download.
+                        old_license = str(old_meta.get("license") or "")
+                        new_license = str(fresh_meta.get("license") or "")
+                        if old_license and new_license and old_license != new_license:
+                            merged_meta["license"] = ""
+                            merged_meta["is_open_access"] = False
+                        if old_meta.get("is_open_access") is False or fresh_meta.get("is_open_access") is False:
+                            merged_meta["is_open_access"] = False
+                        if record.source == old["source"]:
+                            for attr in ("license", "is_open_access", "oa_status"):
+                                if attr in fresh_meta:
+                                    merged_meta[attr] = fresh_meta[attr]
+                        if old_license and new_license and old_license != new_license:
+                            merged_meta["license"] = ""
+                            merged_meta["is_open_access"] = False
+                        pdf = record.pdf_url if record.source == old["source"] else combined.pdf_url
+                        record = replace(
+                            combined, pdf_url=pdf,
+                            paper_metadata=merged_meta,
+                        )
+                        fingerprint = _digest({
+                            key: value for key, value in record.to_dict().items()
+                            if key != "retrieved_at"
+                        })
                 file = self._note_path(doc_id, record.kind)
                 if file.is_symlink():
                     raise PatentWorkflowError("检测到文献文件符号链接，拒绝写入。")
@@ -290,13 +314,12 @@ class LiteratureMemoryStore:
                 db.execute(
                     "INSERT INTO documents(doc_id,kind,publication,title,source,source_url,"
                     "published_at,metadata_verified,abstract,claims,content_hash,note_path,"
-                    "first_seen,last_seen,pdf_url,paper_metadata_json)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                    "first_seen,last_seen,pdf_url,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                     " ON CONFLICT(doc_id) DO UPDATE SET "
                     "title=excluded.title,source=excluded.source,source_url=excluded.source_url,"
                     "published_at=excluded.published_at,metadata_verified=excluded.metadata_verified,"
                     "abstract=excluded.abstract,claims=excluded.claims,content_hash=excluded.content_hash,"
-                    "pdf_url=excluded.pdf_url,paper_metadata_json=excluded.paper_metadata_json,"
+                    "pdf_url=excluded.pdf_url,metadata_json=excluded.metadata_json,"
                     "last_seen=excluded.last_seen",
                     (doc_id, record.kind, record.publication, record.title, record.source,
                      record.url, record.publication_date, int(record.verified),
@@ -377,27 +400,6 @@ class LiteratureMemoryStore:
                 } for r in hits
             ]
 
-    def paper_source(self, doc_id: str) -> dict[str, Any]:
-        """Return local paper source metadata only; no arbitrary file paths or remote queries."""
-        if not re.fullmatch(r"EV-[A-F0-9]{12}", doc_id):
-            raise PatentWorkflowError("文献编号不合法。")
-        with self.connect() as db:
-            row = db.execute(
-                "SELECT doc_id,kind,publication,title,source,source_url,pdf_url,"
-                "paper_metadata_json,abstract,published_at,metadata_verified "
-                "FROM documents WHERE doc_id=?", (doc_id,),
-            ).fetchone()
-        if row is None or row["kind"] != "paper":
-            raise PatentWorkflowError("项目知识库中找不到指定论文。")
-        return {
-            "doc_id": row["doc_id"], "publication": row["publication"],
-            "title": row["title"], "source": row["source"],
-            "source_url": row["source_url"], "pdf_url": row["pdf_url"],
-            "abstract": row["abstract"], "publication_date": row["published_at"],
-            "metadata_verified": bool(row["metadata_verified"]),
-            "paper_metadata": json.loads(row["paper_metadata_json"] or "{}"),
-        }
-
     def read(self, doc_id: str) -> dict[str, Any]:
         with self.connect() as db:
             row = db.execute(
@@ -415,52 +417,6 @@ class LiteratureMemoryStore:
         return {"doc_id": row["doc_id"], "markdown": content,
                 "path": str(path), "content_hash": row["content_hash"],
                 "analysis_count": row["analysis_count"]}
-
-    def write_machine_extraction(
-        self, doc_id: str, *, pdf_sha256: str,
-        parsed_json_path: str, blocks: int, source_url: str,
-    ) -> dict[str, Any]:
-        """机器 PDF 提取索引存入文献 MD，保留用户此前所有研究批注。"""
-        if not re.fullmatch(r"[0-9a-f]{64}", pdf_sha256):
-            raise PatentWorkflowError("解析结果缺少有效 PDF 内容哈希。")
-        if not 1 <= int(blocks) <= 30000:
-            raise PatentWorkflowError("解析段落统计不合法。")
-        path = Path(parsed_json_path)
-        if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(
-            (self.root / "pdf_extracted").resolve()
-        ):
-            raise PatentWorkflowError("解析结果位于项目范围以外。")
-        paper = self.paper_source(doc_id)
-        current = self.read(doc_id)["markdown"]
-        start = "<!-- BEGIN MACHINE PDF EXTRACTION -->"
-        end = "<!-- END MACHINE PDF EXTRACTION -->"
-        if AUTO_END not in current:
-            raise PatentWorkflowError("文献 Markdown 模板缺少机器区标记。")
-        # Metadata is a machine hint. No claim that the paper was scientifically verified.
-        section = (
-            start + "\n\n## 已归档全文与页码索引（机器提取，待原文核验）\n\n"
-            + "- PDF SHA256：" + pdf_sha256 + "\n"
-            + "- 来源：" + _safe_markdown(source_url, 1600) + "\n"
-            + "- 解析结果：" + _safe_markdown(str(path.relative_to(self.root)), 240) + "\n"
-            + "- 可检索段落：" + str(blocks) + "\n"
-            + "- 全文结论核验：未完成；需人工对照原始 PDF、页码、公式及表格。\n\n"
-            + end
-        )
-        pre, tail = current.split(AUTO_END, 1)
-        if start in tail:
-            left, right = tail.split(start, 1)
-            if end not in right:
-                raise PatentWorkflowError("机器全文区域标记损坏，拒绝覆盖。")
-            tail = left + right.split(end, 1)[1]
-        updated = pre + AUTO_END + "\n\n" + section + "\n" + tail.lstrip("\n")
-        if len(updated) > MAX_NOTES:
-            raise PatentWorkflowError("文献记忆超过长度上限。")
-        note = self._note_path(doc_id, "paper")
-        _atomic_text(note, updated)
-        with self.connect(write=True) as db:
-            self._index_fts(db, doc_id, body=updated)
-        return {"doc_id": doc_id, "pdf_sha256": pdf_sha256, "blocks": blocks,
-                "reviewed": False, "note_path": str(note)}
 
     def write_analysis(
         self, doc_id: str, *, analyst: str, basis: str,
