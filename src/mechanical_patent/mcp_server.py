@@ -264,6 +264,15 @@ class PatentMCPService:
                           document_id=document_id, max_nodes=max_nodes,
                           min_score=min_score)
 
+    def knowledge_record_fact(self, case_id: str, run_id: str, document_id: str,
+                              subject: str, predicate: str, object: str,
+                              quote: str, location: str = "") -> dict[str, Any]:
+        """AI 从已存文字中提出可定位候选关系，记录待人工复核状态。"""
+        from .knowledge_atlas import record_document_fact
+        return record_document_fact(self._folder(case_id, run_id), document_id,
+                                    subject=subject, predicate=predicate, object=object,
+                                    quote=quote, location=location)
+
     def knowledge_global_public(self, max_nodes: int = 250) -> dict[str, Any]:
         """仅汇总已正式标记为公开的项目；保密案卷一律不输出。"""
         from .knowledge_atlas import global_public_atlas
@@ -338,6 +347,14 @@ def create_server(service: PatentMCPService):
         """提取有证据属性的项目星图或单文献邻域，兼容 Cytoscape.js。"""
         return service.knowledge_graph(case_id, run_id, scope, document_id,
                                        max_nodes, min_score)
+
+    @server.tool()
+    def patent_knowledge_record_fact(case_id: str, run_id: str, document_id: str,
+                                     subject: str, predicate: str, object: str,
+                                     quote: str, location: str = "") -> dict[str, Any]:
+        """为单文档登记带已存原文引句的机械技术三元组，状态固定为AI待复核。"""
+        return service.knowledge_record_fact(case_id, run_id, document_id,
+                                             subject, predicate, object, quote, location)
 
     @server.tool()
     def patent_knowledge_global_public(max_nodes: int = 250) -> dict[str, Any]:
