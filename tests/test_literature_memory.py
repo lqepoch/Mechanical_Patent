@@ -189,6 +189,48 @@ class LiteratureMemoryTests(unittest.TestCase):
         self.assertEqual(self.store.ingest_many([item])["updated"], 1)
         self.assertTrue(path.exists())
 
+    def test_pending_queue_and_conflict_protected_resume(self):
+        self.store.ingest_many([paper(1), paper(2), paper(3)])
+        pending = self.store.pending_analysis(limit=2)
+        self.assertEqual(len(pending), 2)
+        self.assertIn("doc_id", pending[0])
+        self.store.write_analysis(
+            evidence_id(paper(3)), analyst="论文研究者",
+            basis="abstract", analysis={"plain_summary": "从摘要分析相关工程问题。"},
+        )
+        self.assertEqual(len(self.store.pending_analysis(limit=10)), 2)
+
+        before = self.store.read_resume()
+        self.assertIn("研究恢复", before["markdown"])
+        saved = self.store.update_resume(
+            "# 下一轮研究计划\n\n已阅读3篇数据，其中1篇有摘要分析；需继续核验专利原文。",
+            analyst="研究 Agent", expected_sha256=before["sha256"],
+        )
+        self.assertNotEqual(saved["sha256"], before["sha256"])
+        self.assertIn("继续核验", self.store.read_resume()["markdown"])
+        previous = self.store.root / "resume_history" / (before["sha256"] + ".md")
+        self.assertTrue(previous.is_file())
+        self.assertEqual(previous.read_text(encoding="utf-8"), before["markdown"])
+        with self.assertRaises(PatentWorkflowError):
+            self.store.update_resume(
+                "# 覆盖研究状态\n\n旧版本写入者试图以过期的 SHA256 覆盖最新总结。",
+                analyst="另一个 Agent", expected_sha256=before["sha256"],
+            )
+
+    def test_project_resume_mcp_tools(self):
+        from mechanical_patent.mcp_server import PatentMCPService
+        service = PatentMCPService(self.root / "mcp-root")
+        service.create_case("X1", "泵入口")
+        old = service.literature_resume("X1")
+        saved = service.literature_resume_save(
+            "X1", "总控智能体",
+            "# 项目技术知识\n\n研究阶段：补检专利同族与液气分离论文。下一步逐篇核验。",
+            expected_sha256=old["sha256"],
+        )
+        self.assertNotEqual(saved["sha256"], old["sha256"])
+        self.assertIn("研究阶段", service.literature_resume("X1")["markdown"])
+        self.assertEqual(service.literature_pending("X1")["pending"], [])
+
     def test_per_project_mcp_service_tools(self):
         from mechanical_patent.mcp_server import PatentMCPService
         service = PatentMCPService(self.root / "service")
