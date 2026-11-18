@@ -94,7 +94,9 @@ class PDFArchiveTests(unittest.TestCase):
         with self.assertRaises(PatentWorkflowError):
             download_pdf(
                 PDF_URL, self.root / "d4", allowed_hosts={"pdf.example.org"},
-                resolve=fake_dns, opener=fake_open, max_bytes=1000
+                resolve=fake_dns,
+                opener=lambda req, timeout: FakePDFResponse(PDF_DATA + b"X" * 2000),
+                max_bytes=1000
             )
 
     def test_archive_requires_permission_and_preserves_online_source(self):
