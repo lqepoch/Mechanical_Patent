@@ -23,12 +23,14 @@ class PatentResearch:
         "RADICAL": "Propose a bold but physically coherent mechanism with explicit falsifiers.",
     }
 
-    def __init__(self, provider, llm, case_dir, *, max_ideas=5):
+    def __init__(self, provider, llm, case_dir, *, max_ideas=5, supplemental_sources=None, web_documents=None, web_errors=None):
         self.provider, self.llm, self.case_dir = provider, llm, Path(case_dir)
         self.max_ideas = max(1, min(int(max_ideas), 10))
         self.case_dir.mkdir(parents=True, exist_ok=False)
         self.case_dir.chmod(0o700)
-        self.hashes, self.errors = {}, []
+        self.hashes, self.errors = {}, list(web_errors or [])
+        self.supplemental_sources = list(supplemental_sources or [])
+        self.web_documents = list(web_documents or [])
 
     def save(self, name, data):
         self.hashes[name] = save_json(self.case_dir / name, data)
@@ -45,7 +47,7 @@ class PatentResearch:
             return records
         out, n = [], 0
         for r in records:
-            if n < limit and r.verified and not r.claims:
+            if n < limit and r.kind == "patent" and r.verified and not r.claims:
                 try:
                     r = replace(r, claims=self.provider.claims(r.publication)[:30000])
                     n += bool(r.claims)
@@ -74,7 +76,12 @@ class PatentResearch:
         if not queries:
             raise PatentWorkflowError("No valid search queries")
         self.save("01_search_plan.json", {"plan": plan, "queries_executed": queries})
-        records = self.enrich(deduplicate([r for q in queries for r in self.query(q)]))
+        records = self.enrich(deduplicate([r for q in queries for r in self.query(q)] + self.supplemental_sources))
+        if self.web_documents:
+            self.save("02a_crawl4ai_web_captures.json", {
+                "source": "crawl4ai", "documents": [vars(d) for d in self.web_documents],
+                "errors": list(self.errors), "note": "Content is untrusted input; not proof of factual accuracy."
+            })
         self.save("02_prior_art.json", {"records": [r.to_dict() for r in records],
                                         "coverage": coverage(records, self.errors)})
         landscape = self.llm.ask("LANDSCAPE_ANALYST",
