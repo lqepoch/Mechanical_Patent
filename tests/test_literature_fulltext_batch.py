@@ -1,139 +1,161 @@
-"""PDF 全文批次队列：预算、失败隔离、项目级续检和状态接口。"""
+"""基于 canonical FulltextPipeline 的可恢复多文献批次（无外网和模型权重）。"""
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from mechanical_patent.core import Evidence, PatentWorkflowError, evidence_id
 from mechanical_patent.literature_memory import LiteratureMemoryStore
-from mechanical_patent.literature_fulltext import LiteratureFullText
+from mechanical_patent.literature_fulltext import FulltextPipeline
 from mechanical_patent.literature_fulltext_batch import FullTextBatchRunner
-from mechanical_patent.cli import main
 
 
-class BatchTests(unittest.TestCase):
+class FullTextBatchTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
-        self.project = self.root / "case-batch"
-        self.memory = LiteratureMemoryStore(self.project)
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.memory = LiteratureMemoryStore(self.root / "cases" / "FULLTEXT-1")
         self.docs = []
-        for n in range(2):
+        for i in range(2):
             paper = Evidence(
-                publication=f"10.1234/batch-{n}", title=f"Hydraulic study {n}",
-                url=f"https://doi.org/10.1234/batch-{n}", source="crossref",
-                retrieved_at="2026-11-19T00:00:00Z", kind="paper",
-                abstract="Cavitation flow physics", verified=True,
-                paper_metadata={"doi": f"10.1234/batch-{n}"},
+                publication=f"10.2026/engine-{i}", title=f"Engine paper {i}",
+                url=f"https://doi.org/10.2026/engine-{i}", source="openalex",
+                retrieved_at="2026-11-19T00:00:00+00:00",
+                kind="paper", verified=True, abstract="Mechanical pressure studies",
+                pdf_url=f"https://repository.example.edu/paper-{i}.pdf",
+                paper_metadata={
+                    "doi": f"10.2026/engine-{i}", "is_open_access": True,
+                    "license": "cc-by-4.0", "sources": ["openalex"],
+                },
             )
             self.docs.append(evidence_id(paper))
             self.memory.ingest_many([paper])
-        self.runner = FullTextBatchRunner(LiteratureFullText(self.memory))
-        self.files = []
-        for n in range(2):
-            path = self.root / f"source-{n}.pdf"
-            path.write_bytes(b"%PDF-1.4\n" + bytes([65+n]) * 1300 + b"\n%%EOF")
-            self.files.append(path)
+        self.pipeline = FulltextPipeline(self.memory)
+        self.runner = FullTextBatchRunner(self.pipeline)
+        self.download_calls = []
+        self.parse_calls = []
 
-    def item(self, n, *, parse=False, source="local"):
-        item = {
-            "doc_id": self.docs[n], "source": source,
-            "rights_basis": "cc-by", "rights_reference":
-                "https://creativecommons.org/licenses/by/4.0/",
+    def item(self, index, *, parse=True):
+        return {
+            "doc_id": self.docs[index],
+            "rights_actor": "approved-IP-reviewer",
+            "rights_reference": "IPR-PAPER-2026-001",
+            "allowed_hosts": ["repository.example.edu"],
             "parse": parse,
         }
-        if source == "local":
-            item["input"] = str(self.files[n])
-        else:
-            item["allowed_hosts"] = ["repository.example.org"]
-        return item
 
-    def test_partial_then_resume_with_project_sqlite(self):
-        manifest = {"items": [self.item(0), self.item(1)]}
-        first = self.runner.run(manifest, authorized=True, max_documents=1)
-        self.assertEqual(first["status"], "partial")
-        self.assertEqual(first["completed_total"], 1)
-        self.assertEqual(first["pending"], 1)
-        second = self.runner.run(manifest, authorized=True, max_documents=1)
-        self.assertEqual(second["status"], "complete")
-        self.assertEqual(second["completed_total"], 2)
-        third = self.runner.run(manifest, authorized=True)
-        self.assertEqual(third["processed_this_run"], 0)
-        self.assertEqual(third["skipped_this_run"], 2)
-        state = self.runner.status(first["batch_id"])
-        self.assertTrue(state["complete"])
-        self.assertEqual(state["counts"], {"done": 2})
-        self.assertEqual(len(state["items"]), 2)
+    def downloader(self, url, dest, *, allowed_hosts, max_bytes):
+        self.download_calls.append(url)
+        self.assertEqual(allowed_hosts, {"repository.example.edu"})
+        self.assertGreaterEqual(max_bytes, 1000)
+        raw = b"%PDF-1.7\n" + b"A" * 1800 + b"\n%%EOF"
+        dest.mkdir(parents=True, exist_ok=True)
+        digest = sha256(raw).hexdigest()
+        path = dest / (digest + ".pdf")
+        path.write_bytes(raw)
+        return {"online_url": url, "local_pdf_path": str(path),
+                "sha256": digest, "bytes": len(raw)}
 
-    def test_invalid_license_or_missing_authorization(self):
-        manifest = {"items": [self.item(0)]}
-        with self.assertRaises(PatentWorkflowError):
-            self.runner.run(manifest, authorized=False)
-        invalid = self.item(0)
-        invalid["rights_basis"] = "cc-by-nc"
-        with self.assertRaises(PatentWorkflowError):
-            self.runner.run({"items": [invalid]}, authorized=True)
-        with self.assertRaises(PatentWorkflowError):
-            self.runner.run({"items": [invalid, invalid]}, authorized=True)
+    def parser(self, path, output, *, authorized, source_url, artifacts, converter):
+        self.parse_calls.append(str(path))
+        self.assertTrue(authorized)
+        payload = {
+            "source_pdf_sha256": sha256(path.read_bytes()).hexdigest(),
+            "parser": "docling", "parser_version": "test",
+            "review_status": "awaiting_original_pdf_review",
+            "blocks": [
+                {"page": 1, "block": 1, "label": "paragraph",
+                 "text": "Altitude cavitation experiment: NPSH is critical."},
+            ],
+        }
+        output.write_text(json.dumps(payload), encoding="utf-8")
+        return {"sha256": payload["source_pdf_sha256"], "blocks": 1}
 
-    def test_remote_manifest_requires_outbound_before_any_access(self):
-        manifest = {"items": [self.item(0, source="remote")]}
-        with self.assertRaises(PatentWorkflowError):
-            self.runner.run(manifest, authorized=True, outbound_approved=False)
-        self.assertEqual(
-            self.runner.pipeline.status(self.docs[0])["state"], "not_available",
+    def run_batch(self, manifest, **kwargs):
+        return self.runner.run(
+            manifest, authorized=True, outbound_approved=True,
+            downloader=kwargs.pop("downloader", self.downloader),
+            parser=self.parser, converter=object(), **kwargs,
         )
 
-    def test_failed_item_keeps_queue_and_successful_siblings(self):
-        missing = self.item(0)
-        missing["input"] = str(self.root / "missing.pdf")
-        manifest = {"items": [missing, self.item(1)]}
-        result = self.runner.run(manifest, authorized=True, max_attempts=2)
-        self.assertEqual(result["failed_this_run"], 1)
-        self.assertEqual(result["completed_total"], 1)
-        self.assertEqual(result["failed_pending_retry"], 1)
-        detail = self.runner.status(result["batch_id"])
-        self.assertEqual(detail["counts"], {"done": 1, "failed": 1})
-        retry = self.runner.run(manifest, authorized=True, max_attempts=2)
-        self.assertEqual(retry["failed_this_run"], 1)
-        missing_path = self.root / "missing.pdf"
-        missing_path.write_bytes(b"%PDF-1.4\n" + b"C" * 1200)
-        blocked = self.runner.run(manifest, authorized=True, max_attempts=2)
+    def test_checkpoint_resume_keeps_canonical_docling_results(self):
+        manifest = {"items": [self.item(0), self.item(1)]}
+        first = self.run_batch(manifest, max_documents=1)
+        self.assertEqual(first["status"], "partial")
+        self.assertEqual(first["completed_total"], 1)
+        self.assertEqual(len(self.download_calls), 1)
+        second = self.run_batch(manifest, max_documents=1)
+        self.assertEqual(second["status"], "complete")
+        self.assertEqual(second["completed_total"], 2)
+        self.assertEqual(len(self.download_calls), 2)
+        cached = self.run_batch(manifest)
+        self.assertEqual(cached["processed_this_run"], 0)
+        self.assertEqual(cached["skipped_this_run"], 2)
+        self.assertEqual(len(self.parse_calls), 2)
+        self.assertEqual(len(self.pipeline.search("NPSH")), 2)
+        status = self.runner.status(first["batch_id"])
+        self.assertTrue(status["complete"])
+        self.assertEqual(status["counts"], {"done": 2})
+
+    def test_reject_outbound_and_invalid_manifest(self):
+        manifest = {"items": [self.item(0)]}
+        with self.assertRaises(PatentWorkflowError):
+            self.runner.run(manifest, authorized=False, outbound_approved=True)
+        with self.assertRaises(PatentWorkflowError):
+            self.runner.run(manifest, authorized=True, outbound_approved=False)
+        invalid = self.item(0)
+        invalid["doc_id"] = "../../outside"
+        with self.assertRaises(PatentWorkflowError):
+            self.run_batch({"items": [invalid]})
+        with self.assertRaises(PatentWorkflowError):
+            self.run_batch({"items": [self.item(0), self.item(0)]})
+        self.assertEqual(self.download_calls, [])
+
+    def test_failure_isolation_and_manual_refresh_after_retry_exhaustion(self):
+        manifest = {"items": [self.item(0), self.item(1)]}
+        def transient(url, dest, *, allowed_hosts, max_bytes):
+            if url.endswith("paper-0.pdf"):
+                raise PatentWorkflowError("Upstream temporarily unavailable")
+            return self.downloader(url, dest, allowed_hosts=allowed_hosts, max_bytes=max_bytes)
+        first = self.run_batch(manifest, downloader=transient, max_attempts=2)
+        self.assertEqual(first["status"], "partial")
+        self.assertEqual(first["failed_pending_retry"], 1)
+        self.assertEqual(first["completed_total"], 1)
+        again = self.run_batch(manifest, downloader=transient, max_attempts=2)
+        self.assertEqual(again["failed_this_run"], 1)
+        blocked = self.run_batch(manifest, max_attempts=2)
         self.assertEqual(blocked["processed_this_run"], 0)
-        repaired = self.runner.run(manifest, authorized=True, max_attempts=2, refresh=True)
-        self.assertEqual(repaired["completed_total"], 2)
+        recovered = self.run_batch(manifest, max_attempts=2, refresh=True)
+        self.assertEqual(recovered["completed_total"], 2)
+        self.assertTrue(self.runner.status(first["batch_id"])["complete"])
 
-    def test_project_isolation_of_batch_identifiers(self):
-        manifest = {"items": [self.item(0)]}
-        batch = self.runner.run(manifest, authorized=True)
-        independent = FullTextBatchRunner(LiteratureFullText(
-            LiteratureMemoryStore(self.root / "other-project")
-        ))
-        with self.assertRaises(PatentWorkflowError):
-            independent.status(batch["batch_id"])
-        with self.assertRaises(PatentWorkflowError):
-            self.runner.status("FTB-../../outside")
+    def test_download_only_and_parse_later(self):
+        download_manifest = {"items": [self.item(0, parse=False)]}
+        first = self.run_batch(download_manifest)
+        self.assertEqual(first["status"], "complete")
+        self.assertEqual(self.pipeline.status(self.docs[0])["status"], "downloaded")
+        parsed_manifest = {"items": [self.item(0, parse=True)]}
+        second = self.run_batch(parsed_manifest)
+        self.assertEqual(second["status"], "complete")
+        self.assertEqual(self.pipeline.status(self.docs[0])["status"], "parsed")
+        self.assertEqual(len(self.download_calls), 1)
+        self.assertEqual(len(self.parse_calls), 1)
 
-    def test_cli_local_batch_and_status(self):
+    def test_project_isolation_and_malformed_batch_id(self):
         manifest = {"items": [self.item(0)]}
-        file = self.root / "batch.json"
-        file.write_text(json.dumps(manifest), encoding="utf-8")
-        code = main([
-            "literature", "--project-dir", str(self.project),
-            "fulltext-batch", "--manifest", str(file), "--authorized",
-            "--max-documents", "1",
-        ])
-        self.assertEqual(code, 0)
-        batch = self.runner.run(manifest, authorized=True)
-        code = main([
-            "literature", "--project-dir", str(self.project),
-            "fulltext-batch-status", "--batch-id", batch["batch_id"],
-        ])
-        self.assertEqual(code, 0)
+        stored = self.run_batch(manifest)
+        independent = FullTextBatchRunner(
+            FulltextPipeline(LiteratureMemoryStore(self.root / "another-project"))
+        )
+        with self.assertRaises(PatentWorkflowError):
+            independent.status(stored["batch_id"])
+        with self.assertRaises(PatentWorkflowError):
+            self.runner.status("../../outside")
+        self.assertFalse(self.runner.status(stored["batch_id"], limit=1)["truncated"])
 
 
 if __name__ == "__main__":
