@@ -71,7 +71,7 @@ class LiteratureHarvester:
                     "records_seen": checkpoint["records"], "new": 0,
                     "updated": 0, "unchanged": 0, "resumed": False,
                 }
-            if checkpoint["state"] == "partial" and age < 240:
+            if checkpoint["state"] in {"partial", "failed"} and age < 604800:
                 cursor = checkpoint["cursor"] or "*"
                 pages, records = checkpoint["pages"], checkpoint["records"]
                 resumed = True

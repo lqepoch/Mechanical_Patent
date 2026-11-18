@@ -72,7 +72,8 @@ def add_literature_parser(subparsers: Any) -> None:
 
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
-                         choices=["openalex", "crossref", "epo-ops"])
+                         choices=["openalex", "crossref", "semantic-scholar",
+                                  "arxiv", "europe-pmc", "pubmed", "epo-ops"])
     harvest.add_argument("--query", action="append", required=True)
     harvest.add_argument("--workflow-case-id", required=True)
     harvest.add_argument("--workspace-db", required=True, type=Path)
@@ -149,8 +150,8 @@ def handle_literature(args: argparse.Namespace) -> int:
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
-        if len(args.query) > 8 or len(args.provider) > 3:
-            raise PatentWorkflowError("单次最多8条查询词和3个数据源。")
+        if len(args.query) > 8 or len(args.provider) > 6:
+            raise PatentWorkflowError("单次最多8条查询词和6个分页检索来源。")
         if args.project_dir.name != args.workflow_case_id:
             raise PatentWorkflowError("项目目录名称必须与工作流案卷编号一致。")
         from .local_workspace import LocalPatentWorkspace
@@ -158,6 +159,7 @@ def handle_literature(args: argparse.Namespace) -> int:
         if not workspace.can_egress(args.workflow_case_id):
             raise PatentWorkflowError("工作流未批准当前案卷外部查询。")
         from .papers import CrossrefProvider, OpenAlexProvider
+        from .paper_sources import SemanticScholarProvider, ArxivProvider, EuropePMCProvider, PubMedProvider
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         budgets = HarvestBudget(
@@ -166,6 +168,8 @@ def handle_literature(args: argparse.Namespace) -> int:
         )
         types = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
+            "semantic-scholar": SemanticScholarProvider, "arxiv": ArxivProvider,
+            "europe-pmc": EuropePMCProvider, "pubmed": PubMedProvider,
             "epo-ops": EPOOPSProvider,
         }
         harvester = LiteratureHarvester(memory)

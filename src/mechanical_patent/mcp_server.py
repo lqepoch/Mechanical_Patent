@@ -155,10 +155,13 @@ class PatentMCPService:
         if not allow_search_exposure or not self.workspace.can_egress(case_id):
             raise PatentWorkflowError("未同时取得显式外发授权和案卷保密批准。")
         from .papers import CrossrefProvider, OpenAlexProvider
+        from .paper_sources import SemanticScholarProvider, ArxivProvider, EuropePMCProvider, PubMedProvider
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         options = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
+            "semantic-scholar": SemanticScholarProvider, "arxiv": ArxivProvider,
+            "europe-pmc": EuropePMCProvider, "pubmed": PubMedProvider,
             "epo-ops": EPOOPSProvider,
         }
         if provider not in options:
