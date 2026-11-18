@@ -78,6 +78,7 @@ class LiteratureMemoryStore:
     def connect(self, *, write: bool = False) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.db_path, timeout=30.0, isolation_level=None)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=30000")
         try:
             if write:
