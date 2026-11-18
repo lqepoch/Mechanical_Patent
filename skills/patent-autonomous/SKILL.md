@@ -37,3 +37,8 @@ user-invocable: true
 ## 论文数据源选择与研究记忆（2026-11-18）
 
 多轮研究时调用 `paper-sources` 或 MCP capabilities，按任务配置 OpenAlex/Crossref/Semantic Scholar/arXiv/Europe PMC/PubMed/CORE/Lens；通过 Unpaywall 补 DOI 合法 OA PDF。所有检索仍受审批、许可和预算约束；输出跨平台 DOI 归并记录和逐篇 `03_paper_memory/EV-*.md`。每一轮需要加载上轮 Markdown 与来源索引，防止上下文裁剪造成重复检索。存档本地并经哈希检查，全文核验与专利实质对照单独推进。详见 docs/PAPER_SOURCES.md。
+
+
+## 原文证据锚点与知识发散
+
+在 patent-literature-memory 的文献逐篇解读阶段，检测是否存在合法原文 PDF：如果有，则读取 patent-pdf-evidence 与 docs/FULLTEXT_EVIDENCE.md，用 patent_literature_passages 查找关键结构/方程/实验方法的真实段落，调用 patent_literature_quote 核对精确原文；每条事实按 p2:b7 保存。将原文技术机理转化为跨学科创新线索后，每项新发明都需回查已存专利和论文反证。任何 full_text 批注的证据锚点必须存在于案卷当前解析版本，未经核验的摘要或来源失效的段落只能记录为未核实假设。
