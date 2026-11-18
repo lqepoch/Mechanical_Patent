@@ -17,6 +17,7 @@ from uuid import uuid4
 from .core import Evidence, PatentWorkflowError, evidence_id, save_json, validate_draft
 from .ideation_fission import FissionBoard, AXES, METHODS, SCORE_FIELDS
 from .technical_brief import render_brief
+from .technical_review import inspect_brief
 from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
 from .quality import inspect_research_case, audit_research_case
@@ -260,6 +261,11 @@ class PatentMCPService:
             "conversion_authorized": False, "filing_authorized": False,
         }
 
+    def brief_audit(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """独立审查工程技术方案，可双人签核归档，无须生成权利要求书。"""
+        return inspect_brief(self._folder(case_id, run_id), case_id=case_id,
+                             run_id=run_id, candidate_id=candidate_id)
+
     def conversion_status(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         return conversion_status(self._folder(case_id, run_id), case_id, run_id, candidate_id)
 
@@ -304,7 +310,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "contract_version": "1.2",
+        return {"service": "Mechanical_Patent", "contract_version": "1.3",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -398,6 +404,11 @@ def create_server(service: PatentMCPService):
         return service.brief_save(case_id, run_id, candidate_id, brief)
 
     @server.tool()
+    def patent_brief_audit(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
+        """阶段A工程技术方案独立质检、双人评审验签和结案状态。"""
+        return service.brief_audit(case_id, run_id, candidate_id)
+
+    @server.tool()
     def patent_conversion_status(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """只读检查真实企业审批签名是否允许由技术方案转换为专利申请底稿。"""
         return service.conversion_status(case_id, run_id, candidate_id)
@@ -423,7 +434,7 @@ def create_server(service: PatentMCPService):
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "默认用 patent_brief_save 输出工程技术方案，使用专用模板选择结构、时序、流程、对比图表；"
-            + "执行 patent_quality_audit，输出创新点、机理、结构、试验及证据缺口；仅在用户明确申请且外部企业审批验签后才可使用 patent_draft_save 生成权要与摘要。"
+            + "执行 patent_brief_audit 审阅工程方案，双人签核后可直接结案；仅在用户明确申请且外部企业审批验签后才可使用 patent_draft_save 生成权要与摘要。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )
     return server
