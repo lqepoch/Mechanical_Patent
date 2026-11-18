@@ -79,7 +79,6 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 
 **评审边界**：无法证实“尚未发明”；必须保存检索覆盖、竞争权利要求与可能未公开申请的风险。发现候选只生成通俗技术说明和试验计划，申请专利由发明人选择，企业法务/代理人员评审。
 
-
 ## 论文检索多来源标准接口（2026-11-18）
 
 统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
