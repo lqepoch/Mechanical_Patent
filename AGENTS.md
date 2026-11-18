@@ -138,6 +138,17 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 
 任何未明确申请的任务，先执行 skills/patent-technical-brief/SKILL.md 和 docs/TECHNICAL_BRIEF_STANDARD.md；研发报告通过即可结束，正式权要需专门的签名转换许可。旧申请文稿阶段是可选路线，不再自动触发。签名密钥只能由企业审批系统保管，MCP 只读验签，不能伪造人员授权。
 
+## 强制启用：项目级千篇文献长期记忆（2026-11-18）
+
+凡涉及项目专利检索、论文、科学原理、想法裂变、反证或长周期研究，优先读取 skills/patent-literature-memory/SKILL.md。每次先用 patent_literature_resume 恢复研究快照和最新证据；从已入库文献搜索起步，外部检索必须通过保密审批；新检索的每篇专利/论文用稳定 evidence_id 生成独立 Markdown，项目内 knowledge/literature.sqlite3 保存索引/游标/审计；逐篇通过 pending/read/note 补真实技术机理、结构、作用效果、参数、实验边界、已知缺点和新创新线索。项目快照使用 SHA256 乐观锁保存，避免任何模型会话压缩、Agent 交接或并发写入造成研究记忆丢失。
+
+论文元数据、专利权要摘录、完整原文阅读及专业技术核查分别登记；一千篇著录信息不等于一千篇经过细读。补搜必须遵守供应方官方速率与配额。EPO OPS/论文文献分页运行失败保留已存 MD 和检查点；重新运行需追加检索并保留批注。用户仍决定何时由白话发明交底转入正式代理申请格式，默认交付简洁可理解的机械结构、控制逻辑、创新差异和验证计划。
+
+
+## 容器部署和发行规范（2026-11-18）
+
+容器化、磁盘、GHCR 和灾备任务必须读取 skills/patent-deployment/SKILL.md 与 docs/DEPLOYMENT_UBUNTU26.md。Ubuntu 26.04 使用宿主机独立磁盘挂载 /data，并配置 PATENT_MCP_PROJECT_ID；每项目 SQLite 位于 projects/<project-id>/patents.sqlite3。服务仅允许本机 127.0.0.1:8765 访问；公开镜像不包含私有案卷和密钥。PR 完成测试后由 main / 版本标签发布，远程接入须先落实 OIDC 和项目 ABAC。
+
 ## 论文平台选择及长期文献记忆（2026-11-18）
 
 论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。

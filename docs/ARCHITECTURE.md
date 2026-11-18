@@ -86,6 +86,35 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 
 按 docs/TECHNICAL_BRIEF_STANDARD.md 构建两个独立审查关口：默认一项发明的一份可读技术方案；仅另行获得签名授权才可进入申报材料。模块化 CTeX 模板和安全图源引用见 src/mechanical_patent/technical_brief.py，转换审批门禁见 src/mechanical_patent/filing_gate.py。该改动不改变现有 EPO/论文来源审批方式；真实组织身份仍需与 #25 集成。
 
+## 项目级长期文献记忆与官方分页（2026-11-18）
+
+原有运行案卷 JSON 保留。新增每项目独立的知识文件：
+    private_workspace/projects/{project_id}/cases/{case_id}/
+      knowledge/literature.sqlite3            # 单项目独立 FTS5/游标/审计索引
+      knowledge/RESEARCH_RESUME.md             # 跨会话研究状态
+      knowledge/INDEX.md                       # 文献目录
+      knowledge/resume_history/{sha256}.md     # 研究状态历史
+      knowledge/documents/patents/EV-*.md      # 一件专利一篇
+      knowledge/documents/papers/EV-*.md       # 一篇论文一篇
+      runs/RUN-*/                               # 每轮真实检索及工程数据
+
+数据流：保密审批→官方检索多源分页→逐页入库/去重/检查点→每篇生成 Markdown→FTS5 trigram 中英文检索（不支持时降级 LIKE）→当前客户端 AI 逐篇阅读并记录来源层级/技术机理/作用效果/创新线索→有版本保护的项目研究快照→下次会话按需恢复。
+
+- ID 与 kind、DOI/公开号绑定；同文献的机器著录信息可刷新，批注部分持久保留；Markdown 用临时文件原子替换，避免部分写入。
+- SQLite 的 documents、documents_fts、harvest_checkpoints、note_audit、resume_audit 承担索引和溯源；原文法律/工程核查仍通过原先的独立审核流程。
+- 官方 OpenAlex/Crossref cursor 深分页与 EPO OPS X-OPS-Range 严格受预算、许可、频率和超时控制；出现中断保存游标、已发现文献及错误。
+- 恢复文件以 SHA256 乐观锁更新并留存旧版本；pending_analysis 每批取10–30篇，防止千篇文档一次进入模型上下文。
+- 来源元数据、摘要、权利要求与完整原文的核查程度严格分离；不能把供应商著录 verified 认定为真正读过全文。
+
+生产演进：地域/语种/同族/IPC/CPC/论文引证与相似专利覆盖；Docling/TEI/GROBID 有许可全文解析与页码；向量 ANN + 词法融合重排；真正可量化的 Recall@k/MRR；重试限流、统一租户 RBAC/ABAC、备份/恢复、审计追踪、KMS 和数据保留。当前 MCP HTTP 服务仍要求安全网关，不能直接作为多租户公网服务。
+
+
+## GHCR + Ubuntu 26.04 Docker 架构（2026-11-18）
+
+GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 使用 Linux host network 保留 127.0.0.1 回环限制，通过 bind mount 将指定数据磁盘映射到容器 /data。每个进程绑定 PATENT_MCP_PROJECT_ID，存储目录 /data/projects/<project-id>/ 包含独立 SQLite、案卷、科研资料、论文及事件链；容器更新不改变这些持久化内容。支持一致性备份、SHA256 和镜像 digest 回滚。详见 docs/DEPLOYMENT_UBUNTU26.md。
+
+目前缺少公网身份鉴权 OIDC、真实用户/项目 ABAC；需要另行完成认证网关、限流、审计及异地恢复，才能开放远程项目访问。
+
 ## 论文检索多来源标准接口（2026-11-18）
 
 统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
