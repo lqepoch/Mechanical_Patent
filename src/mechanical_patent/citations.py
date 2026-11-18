@@ -121,8 +121,12 @@ class OpenCitationsClient:
             if direction == "citations" and key not in cited:
                 skipped += 1
                 continue
-            for from_doi in citing[:2]:
-                for to_doi in cited[:2]:
+            # PID 字段可能含同一实体的多个标识；已查询的一侧
+            # 使用精确种子 DOI，避免意外创建两篇不相关论文之间的边。
+            from_dois = [key] if direction == "references" else citing[:1]
+            to_dois = [key] if direction == "citations" else cited[:1]
+            for from_doi in from_dois:
+                for to_doi in to_dois:
                     pair = (from_doi, to_doi)
                     if pair in duplicates or len(edges) >= limit:
                         continue
