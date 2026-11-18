@@ -247,6 +247,8 @@ class FissionAndMCPTests(unittest.TestCase):
                              "patent_idea_register", "patent_idea_evaluate", "patent_idea_frontier",
                              "patent_countersearch_record", "patent_engineering_record",
                              "patent_draft_save", "patent_brief_save", "patent_brief_audit", "patent_conversion_status",
+                             "patent_figure_prepare", "patent_figure_source",
+                             "patent_figure_status", "patent_figure_sync",
                              "patent_quality_audit", "patent_run_create",
                              "patent_source_import"):
                     self.assertIn(name, names)
