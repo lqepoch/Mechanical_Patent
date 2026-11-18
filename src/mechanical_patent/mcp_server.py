@@ -53,7 +53,7 @@ class PatentMCPService:
             raise PatentWorkflowError("研究运行编号无效。")
         expected = self.root / "cases" / case_id / "runs" / run_id
         # 解析后仍须留在工作空间内；阻断恶意符号链接造成的跨租户读取。
-        if not expected.resolve().is_relative_to(self.root):
+        if not expected.resolve().is_relative_to(self.root / "cases" / case_id / "runs"):
             raise PatentWorkflowError("路径越界。")
         if not expected.is_dir() or not (expected / "00_intake.json").is_file():
             raise PatentWorkflowError("此案卷中不存在该研究运行。")
@@ -75,7 +75,21 @@ class PatentMCPService:
         return {"case_id": record["case_id"], "revision": record["revision"],
                 "status": record["status"], "confidentiality": record["confidentiality"],
                 "outbound_approved": self.workspace.can_egress(case_id),
-                "tasks": record.get("tasks", []), "document_totals": record.get("document_totals", [])}
+                "tasks": record.get("tasks", []), "document_totals": record.get("source_reviews", [])}
+
+
+    def create_run(self, case_id: str) -> dict[str, Any]:
+        """离线创建研究运行；供其他已授权搜索 MCP 导入结果。"""
+        from .external_sources import create_offline_run
+        return create_offline_run(self, case_id)
+
+    def import_sources(self, case_id: str, run_id: str,
+                       records: list[dict[str, Any]],
+                       patent_queries: list[str] | None = None,
+                       paper_queries: list[str] | None = None) -> dict[str, Any]:
+        """接收供应商结果，强制标记待原文核验。"""
+        from .external_sources import import_external_sources
+        return import_external_sources(self, case_id, run_id, records, patent_queries, paper_queries)
 
     def research(self, case_id: str, patent_queries: list[str], paper_queries: list[str],
                  limit: int = 10) -> dict[str, Any]:
@@ -249,7 +263,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "contract_version": "1.0",
+        return {"service": "Mechanical_Patent", "contract_version": "1.1",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -270,6 +284,19 @@ def create_server(service: PatentMCPService):
                         paper_queries: list[str], limit: int = 10) -> dict[str, Any]:
         """使用已获许可的 EPO/论文数据源执行真实检索并创建研究运行。"""
         return service.research(case_id, patent_queries, paper_queries, limit)
+
+
+    @server.tool()
+    def patent_run_create(case_id: str) -> dict[str, Any]:
+        """本地离线新建一次研究运行，随后可导入其他授权检索服务的证据。"""
+        return service.create_run(case_id)
+
+    @server.tool()
+    def patent_source_import(case_id: str, run_id: str, records: list[dict[str, Any]],
+                             patent_queries: list[str] | None = None,
+                             paper_queries: list[str] | None = None) -> dict[str, Any]:
+        """导入第三方专利或论文元数据及权利要求，来源一律标记待核验。"""
+        return service.import_sources(case_id, run_id, records, patent_queries, paper_queries)
 
     @server.tool()
     def patent_case_artifact(case_id: str, run_id: str, artifact: str) -> dict[str, Any]:
@@ -340,7 +367,7 @@ def create_server(service: PatentMCPService):
         return (
             "请以企业级机械发明专利研发智能体身份处理以下技术任务：" + direction
             + "\n操作：先调用 patent_capabilities / patent_case_create；遵守保密审核。"
-            + "利用 patent_research 获取实际专利及论文记录，必要时补充宿主工具授权检索。"
+            + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "只有通过证据移交门槛的候选方可写申请；使用 patent_draft_save，"

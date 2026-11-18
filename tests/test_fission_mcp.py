@@ -187,6 +187,30 @@ class FissionAndMCPTests(unittest.TestCase):
                 verification_status="simulated",
             )
 
+
+    def test_external_mcp_import_never_claims_verified(self):
+        run_id = self.service.create_run(self.case_id)["run_id"]
+        sample = {
+            "publication": "CN123456789A", "title": "一种液气分离装置",
+            "url": "https://example.org/CN123456789A", "source": "external-patsnap-mcp",
+            "kind": "patent", "abstract": "高海拔消防泵进水系统",
+            "claims": "1. 液气分离结构。", "verified": True,
+        }
+        result = self.service.import_sources(
+            self.case_id, run_id, [sample, sample],
+            patent_queries=["pump priming"], paper_queries=[]
+        )
+        self.assertEqual(result["status"], "unverified_imported")
+        records = self.service.read_artifact(self.case_id, run_id,
+                                             "02_patents.json")["content"]["records"]
+        self.assertEqual(len(records), 1)
+        self.assertFalse(records[0]["verified"])
+        self.assertTrue(self.service.read_artifact(
+            self.case_id, run_id, "04b_technology_graph.json")["content"]["nodes"])
+        with self.assertRaises(PatentWorkflowError):
+            self.service.import_sources(self.case_id, run_id,
+                [dict(sample, url="http://untrusted.example")], patent_queries=["pump"])
+
     def test_official_mcp_protocol_contract_when_installed(self):
         try:
             from mcp import Client
@@ -201,7 +225,8 @@ class FissionAndMCPTests(unittest.TestCase):
                 for name in ("patent_case_create", "patent_research", "patent_idea_plan",
                              "patent_idea_register", "patent_idea_evaluate", "patent_idea_frontier",
                              "patent_countersearch_record", "patent_engineering_record",
-                             "patent_draft_save", "patent_quality_audit"):
+                             "patent_draft_save", "patent_quality_audit", "patent_run_create",
+                             "patent_source_import"):
                     self.assertIn(name, names)
                 result = await client.call_tool("patent_capabilities", {})
                 self.assertFalse(result.is_error if hasattr(result, "is_error") else result.isError)

@@ -47,6 +47,8 @@ HTTP 端点为 http://127.0.0.1:8765/mcp。公网、组织网络访问必须经�
 | patent_case_create | case_id, direction, confidentiality | 新建案卷；默认保密 |
 | patent_case_status | case_id | 工作流状态及是否获外发批准 |
 | patent_research | case_id, patent_queries, paper_queries, limit | 真实数据源检索；无当前轮保密批准即拒绝 |
+| patent_run_create | case_id | 离线创建运行，供外部合规 MCP 数据导入 |
+| patent_source_import | case_id, run_id, records, patent_queries, paper_queries | 导入外部专利/论文证据，真实性强制标记待核验 |
 | patent_case_artifact | case_id, run_id, artifact | 只读取14种白名单案卷文件；限制读取大小 |
 | patent_idea_plan | case_id, run_id, parent_id, limit | 多方向裂变任务及物理/验证要求 |
 | patent_idea_register | case_id, run_id, candidate | 保存机理、实施路径、父子关系、证据 |
@@ -94,3 +96,7 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 - https://github.com/modelcontextprotocol/python-sdk
 - https://py.sdk.modelcontextprotocol.io/
 - https://modelcontextprotocol.io/specification/2026-07-28/basic/transports
+
+### 其他数据供应商接入
+
+已有 Patsnap、Patent Client Agents 等授权检索能力的客户端，调用 patent_run_create 生成本地 RUN，再用 patent_source_import 导入结构化文献（publication/title/url/source/kind/abstract/claims 等）。所有输入一律标记为未核验，自动记入本地来源索引、检索词记录及技术证据图谱；随后须打开真实公开 PDF、核验权利要求与公开日期，再进入正式反证。此工具适用于 Factrix 的供应商无关集成，生产级高并发事务需转 PostgreSQL。

@@ -28,3 +28,6 @@ user-invocable: true
 
 ## 输出
 05a_idea_fission.json、候选的父子关系、独立验证问题、质量—多样性候选前沿、移交至05_inventions.json的待审核发明，及完整人工复核清单。
+
+## 供应商无关检索证据导入
+若当前宿主已有授权检索 MCP，可先执行 patent_run_create，随后通过 patent_source_import 接入专利、论文记录；导入时主动标注未核验，必须打开原始公布专利和权利要求逐字核查，方可作为正式反证。

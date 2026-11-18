@@ -234,3 +234,5 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 详细接口、示例配置、安全边界见 docs/MCP_INTERFACE.md，创新裂变方法见 docs/IDEA_FISSION.md，Codex 自发现入口为 .agents/skills/patent-idea-fission/SKILL.md。HTTP 默认只接受本机连接，正式远程使用仍必须配备 OAuth2/OIDC、项目访问控制和网络隔离，不可直接对公网暴露。
 
 备注：GitHub 上包含服务端与离线测试，但并不意味着全球数据检索渠道已经全部开通、生产认证已经部署或机械仿真已经执行。专业专利申请前须复核权利要求、公开充分性、工程实现和权属。
+
+跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
