@@ -66,3 +66,26 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 - 任何申请提交由真实发明人、企业 IP 管理与专利代理专业人员确认。
 
 详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
+
+
+## 项目级长期文献记忆与官方分页（2026-11-18）
+
+原有运行案卷 JSON 保留。新增每项目独立的知识文件：
+    private_workspace/cases/{case_id}/
+      knowledge/literature.sqlite3            # 单项目独立 FTS5/游标/审计索引
+      knowledge/RESEARCH_RESUME.md             # 跨会话研究状态
+      knowledge/INDEX.md                       # 文献目录
+      knowledge/resume_history/{sha256}.md     # 研究状态历史
+      knowledge/documents/patents/EV-*.md      # 一件专利一篇
+      knowledge/documents/papers/EV-*.md       # 一篇论文一篇
+      runs/RUN-*/                               # 每轮真实检索及工程数据
+
+数据流：保密审批→官方检索多源分页→逐页入库/去重/检查点→每篇生成 Markdown→FTS5 trigram 中英文检索（不支持时降级 LIKE）→当前客户端 AI 逐篇阅读并记录来源层级/技术机理/作用效果/创新线索→有版本保护的项目研究快照→下次会话按需恢复。
+
+- ID 与 kind、DOI/公开号绑定；同文献的机器著录信息可刷新，批注部分持久保留；Markdown 用临时文件原子替换，避免部分写入。
+- SQLite 的 documents、documents_fts、harvest_checkpoints、note_audit、resume_audit 承担索引和溯源；原文法律/工程核查仍通过原先的独立审核流程。
+- 官方 OpenAlex/Crossref cursor 深分页与 EPO OPS X-OPS-Range 严格受预算、许可、频率和超时控制；出现中断保存游标、已发现文献及错误。
+- 恢复文件以 SHA256 乐观锁更新并留存旧版本；pending_analysis 每批取10–30篇，防止千篇文档一次进入模型上下文。
+- 来源元数据、摘要、权利要求与完整原文的核查程度严格分离；不能把供应商著录 verified 认定为真正读过全文。
+
+生产演进：地域/语种/同族/IPC/CPC/论文引证与相似专利覆盖；Docling/TEI/GROBID 有许可全文解析与页码；向量 ANN + 词法融合重排；真正可量化的 Recall@k/MRR；重试限流、统一租户 RBAC/ABAC、备份/恢复、审计追踪、KMS 和数据保留。当前 MCP HTTP 服务仍要求安全网关，不能直接作为多租户公网服务。
