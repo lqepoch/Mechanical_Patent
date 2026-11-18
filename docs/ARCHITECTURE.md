@@ -1,57 +1,68 @@
-# Mechanical_Patent — target architecture
+# Mechanical_Patent：AI 客户端原生专利研发架构
 
-## Goal and acceptance statement
+2026-11-18。设计目标：用户发一句技术要求，当前 ChatGPT、Codex 或兼容 Agent 自动开展双源检索、跨学科创新、反证检索、工程论证和中国发明专利撰写。**仓库不维护语言模型推理服务，也不要求任何 LLM API Key。**
 
-One instruction triggers: requirements understanding, CN and global patent/NPL search, prior art expansion, mechanical innovation by diverse methods, adversarial reverse search, physical/engineering assessment, Chinese invention disclosure and application draft, systematic QA and reviewer signoff.
+## 分层
 
-A typical request is: "Propose novel self-priming solutions for high-altitude firefighting pumps; search worldwide; verify physically, draft Chinese claims, embodiments and figure plans."
+用户会话（ChatGPT / Codex / 可授权的 Dot 或其他 Agent）
+    ↓ 读取 AGENTS.md + skills/patent-autonomous/SKILL.md
+当前 AI 的工具调用与多角色推理
+    ├─ 全球专利检索（官方/授权数据源）
+    ├─ 学术论文检索（OpenAlex、Crossref、未来 arXiv）
+    ├─ Crawl4AI 公开网页/科研文章合规正文获取
+    ├─ TRIZ / SCAMPER / FMEA / Design Thinking / 跨领域创新
+    ├─ 专利 + 论文独立反证
+    ├─ 工程理论计算、可行性与验证计划
+    ├─ 中国发明专利交底、申请与独立审核
+    └─ 必要人工门禁
+    ↓
+统一证据与案卷（JSON、Markdown、DOCX / CAD 输出待接入）
 
-## Trust boundaries
+## 数据源职责
 
-PRIVATE: user instructions, SolidWorks models, bills of materials, unpublished designs, internal simulation reports.
-PUBLIC/LICENCED: patent publication metadata/full text, published paper metadata, standards subject to license.
-LLM EGRESS: local/private-model gateway by default; external call only with explicit approval and data-classification check.
-SEARCH EGRESS: only sanitized nonsecret keywords, with explicit approval and provider audit. No scraping WIPO public PATENTSCOPE.
-DELIVERY: draft artifact; legal review, inventor confirmation, application approval, CN overseas confidentiality examination when applicable.
+### 专利
 
-## Target service modules
+- EPO OPS：已存在凭证可选的 REST 数据适配器；每条结果标记来源、公布号和可用权利要求。仅代表实际检索范围。
+- CNIPA / USPTO / WIPO / Patsnap / Google Patents：作为官方/授权 API、数据服务或当前 Agent 可用工具接入；缺席必须在覆盖报告中显式列出，不得声称已覆盖全球。
+- 同族归并、反向/前向引证、IPC/CPC 检索及权利要求完整对照将在 #3、#5 完善。
 
-- Patent Orchestrator: task graph with immutable evidence IDs, checkpoints, budget caps, retries, idempotency, case revision graph.
-- Search Planner: Mandarin/English synonyms, IPC/CPC families, patent and NPL query variants, citation expansion and iterative recall.
-- Search Gateway: EPO OPS, CNIPA licensed/open data, WIPO licensed products, USPTO open data, Google Patents BigQuery, Patsnap licensed connector and OpenAlex/Crossref NPL. Each connector yields a normalized source with publication date, URLs and provider completeness.
-- Corpus: PostgreSQL row-level tenant security, JSONB facts; object storage for licensed originals; pgvector + BM25 for hybrid search. If FalkorDB is introduced, it is a derived explainable concept graph and not the evidence source of truth.
-- Specialist Ideation: independent TRIZ, SCAMPER, cross-domain analogical reasoning, FMEA and physically radical concepts, plus multidisciplinary peer review.
-- Prior Art Challenger: claim-element decomposition, evidence anchors, combination motivation and secondary non-patent sources. FTO separate from novelty/inventiveness.
-- Mechanical Verifier: dimensions, tolerances, mechanism degrees of freedom, heat transfer, fluid performance, force/strength, energy conservation; analytical estimates and explicit simulation/bench test plans.
-- CAD Tool Gateway: SolidWorks API (Windows-local licensed execution), STEP export, optional geometric 2D/3D figures via isolated PisenAILab service. Model revisions referenced by SHA-256 and controlled PLM revision IDs.
-- CN Drafting: handoff to pinned handsomestWei patent-disclosure-skill for disclosure, independent/dependent claims, description, summary and figure legend; upstream must not silently expand claims beyond disclosed embodiments.
-- QA/Legal: independent reviewers, claim-to-description support, figure symbol consistency, sufficient disclosure, uncertainty register, confidentiality and ownership checks.
-- Observability: trace IDs, token and data API budgets, provider error rates, retrieval coverage, model versions, decisions, signoffs and immutable audit records.
+### 论文
 
-## State machine
+- OpenAlex：官方 works API，DOI、标题、发表日期、abstract_inverted_index 还原；普通匿名用量支持，额外数据服务 Key 可选。
+- Crossref：官方 DOI 元数据 API，JATS 摘要清洗、出版日期抽取；匿名或可选 polite-contact 模式。
+- Crawl4AI：允许访问的 HTML 正文，独立来源记录与 SHA256；科研全文的版权许可需逐站审查。
+- 同一 DOI 跨 OpenAlex/Crossref 去重；无 DOI 的 OpenAlex ID 保留。源元数据检索成功不代表全文已读或学术结论经独立复现。
 
-CREATED -> CONFIDENTIALITY_REVIEWED -> SEARCH_PLANNED -> SEARCHED_PARTIAL
-  -> LANDSCAPE -> MULTI_IDEATION -> COUNTERSEARCH -> PHYSICS_FEASIBILITY
-  -> CLAIM_STRATEGY -> CN_DRAFT -> QUALITY_REVIEW -> ENGINEER_APPROVED
-  -> PATENT_PROFESSIONAL_APPROVED -> READY_FOR_MANUAL_FILING
+## 案卷状态
 
-Any missing genuine source, unsupported claim, physically inconsistent mechanism, invalid data-rights assumption or confidentiality concern returns to a previous stage with issue tracking. Every stage creates a content hash and source provenance. No automated filing.
+CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE_LANDSCAPE
+→ PARALLEL_INNOVATIONS → PATENT/PAPER_COUNTERSEARCH → PHYSICS_REVIEW
+→ CLAIM_SUPPORT → CN_DRAFT → STATIC_QA → ENGINEERING_REVIEW
+→ PATENT_PROFESSIONAL_REVIEW → MANUAL_FILING_DECISION
 
-## Current executable slice
+每个步骤有文档和来源，失败需报告并保留部分结果。缺少真实数据库、正文或关键实验时，可继续创建理论构想与标记缺口的申请草稿，但不能把审核门禁设为通过。
 
-Included today: structured evidence, EPO OPS OAuth/bibliographic/claims client, imported corpus with unverified marker, independent five-method ideation, adversarial query generation, independent engineering LLM review, Chinese application drafting JSON/Markdown, privacy gates, test suite and stage digests.
+## 当前真正可运行的范围
 
-Not yet implemented: CNIPA bulk feed, WIPO licensed feed, Patsnap account connector, full global family/citation normalization, dedicated hybrid retrieval, actual physics solver, CAD viewer/STEP geometry, DOCX/PDF examiner-quality export, database tenancy, queue/orchestrator HA, production SLAs, monitoring, 2-person filing approvals. Build these before treating the platform as enterprise production-ready.
+- CLI 可无任何模型凭证创建案卷，保留检索策略与任务交接文本。
+- 正式授权的 EPO OPS 数据接口保持；OpenAlex/Crossref 可检索学术元数据，全部 Python 标准库实现（Crawl4AI 为可选依赖）。
+- 已创建 00_intake、01_search_plan、02_patents、03_papers、04_evidence、05_inventions、06_countersearch、07_engineering、08_application、09_quality_gate 和 manifest。
+- 05-08 的创意、评估和撰写由当前 ChatGPT/Codex 直接完成，Python 不调用 LLM。validate 会检查已有证据、权利要求支持与缺口。
+- 初期静态 QA 不能替代法律审查、全文查新、真实 CAD/仿真测试、可专利性或 FTO 法律分析。
 
-## Vendor-neutral cloud deployment
+## 上游依赖和许可证
 
-Domain services communicate through OpenAPI/event contracts and use Postgres/object storage/queue abstractions. Functions use Python handler adapters that are separate for AWS Lambda and Alibaba Cloud FC; code logic is shared without packaging in Docker. Deployment manifests map a single semantic specification to AWS CloudFormation/SAM and Alibaba ROS/FC3; platform-specific IAM and event wiring cannot be identical. Long processes use checkpointed job workers; Lambda/FC should only enqueue/resume, not hold a multi-hour invention task open. Secrets are stored in managed provider-native stores or approved corporate secret systems and never in Git.
+完整源码已作为固定 git submodule 暴露：handsomestWei/patent-disclosure-skill、PisenAILab/china-patent-figure-skill、lianghugjil/patent-template、joyboseroy/ideaforge、open1s/trinno。按许可证及源码级审查后可转入 vendor/ 直接二开。AutoPatent 目前仅借鉴设计，未获得明确复制许可。
 
-## Engineering acceptance metrics
+## 企业级演进
 
-- Search source coverage recorded by database, time interval, jurisdiction, claims/text availability and partial errors.
-- Evidence documents have identifiers, linkable original source and exact excerpts when present; no invented patent IDs.
-- Expert-reviewed recall@K and claim-chart precision over a frozen 100-case Chinese mechanical patent benchmark.
-- Engineering reviewers can reproduce all equations, units, design boundary assumptions and test plans.
-- Safety gates block filing when evidence/claim support is missing, and audits are immutable.
-- Data confidentiality, user/tenant authorization, rollback, quotas, provider outages and deterministic test fixtures are tested under CI.
+- 多租户 PostgreSQL + pgvector/全文检索 + 行/项级权限与项目 ABAC；
+- 分层缓存与对象存储、专利/论文一致索引、增量数据同步、审计来源；
+- AWS Lambda / Alibaba FC 适配入口共享同一业务代码，环境差异由 IaC 映射管理，不强制 Docker；
+- 防止未申请技术外发的独立授权网关、密钥托管、审签分离和数据保留策略；
+- 真实技术评审 Benchmark、召回率、Claim Chart 精确度、来源完整度、费用、延迟和可靠性；
+- SolidWorks Windows-local API、STEP 转附图、ANSYS 真实求解器执行与结果复核；
+- GitHub CI、依赖 SBOM、许可证扫描、审计日志、恢复机制、质量门禁、回滚；
+- 任何申请提交由真实发明人、企业 IP 管理与专利代理专业人员确认。
+
+详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
