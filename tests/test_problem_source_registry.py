@@ -140,5 +140,24 @@ class ProblemCatalogTests(unittest.TestCase):
             _feed_entries(b'<html><body>No feed</body></html>')
 
 
+    def test_cli_and_worker_safety_contract(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from mechanical_patent.cli import main as cli_main
+        from mechanical_patent.source_catalog_worker import main as worker_main
+        output=StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(cli_main(["source-catalog","topics",
+                                      "--storage-root",str(self.root)]),0)
+        self.assertEqual(len(json.loads(output.getvalue())["topics"]),20)
+        with self.assertRaises(SystemExit) as secret:
+            worker_main(["--once","--storage-root",str(self.root)])
+        self.assertEqual(secret.exception.code,2)
+        with self.assertRaises(SystemExit) as short:
+            worker_main(["--once","--allow-public-network",
+                         "--interval-minutes","1","--storage-root",str(self.root)])
+        self.assertEqual(short.exception.code,2)
+
+
 if __name__=="__main__":
     unittest.main()
