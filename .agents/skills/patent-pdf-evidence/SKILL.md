@@ -28,3 +28,10 @@ user-invocable: true
 ## 输出
 
 PDF 文件哈希、原始在线链接、解析器版本、页码、原文段落、可得文字坐标和待核对状态。若 PDF 加密、无可读文本、使用权限不足、模型依赖缺失或解析失败，立即标记为人工核对；不得把空白文字当成不存在技术。
+
+
+## 可核查全文证据链（2026-11-19）
+
+用户研究中若已获取授权的 PDF，先读取 docs/FULLTEXT_EVIDENCE.md。只有实际落在当前案卷 knowledge/inbox 下的 PDF/Docling JSON 才能被引入原文全文索引。绑定时系统验证两个文件和 PDF 实际 SHA256 相等，保存每个段落的页码、block、段落内容 SHA256 和来源 PDF SHA256；版本更新单独归档，并标注需要重新核查旧引用。
+
+MCP 调用 patent_literature_fulltext_ingest(case_id,doc_id,pdf_filename,parsed_filename,authorized=true) 后，用 patent_literature_passages 查询真实原文段落，使用 patent_literature_quote 按 p2:b7 精确比对短引。AI 只有在 source_positions 对应目前解析版本真实存在时，才可使用 patent_literature_note 的 full_text 等级；该等级代表 AI 基于已解析全文开展分析，仍未获得人类原始 PDF 核验。遇扫描 PDF 无文本、跨页表格失真、无页码或来源哈希变化，标记未核实并转人工/实体原文核查。
