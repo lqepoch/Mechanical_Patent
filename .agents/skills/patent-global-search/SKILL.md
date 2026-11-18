@@ -30,3 +30,11 @@ user-invocable: true
 官方/许可数据接口与 Crawl4AI 网页采集严格分离；WIPO 公共网页不得自动抓取；不得根据前十条结果判断全球无相关专利。
 
 检索或工具调用失败时保存错误、实际检查范围和后续动作，记录到案卷的质量门禁；未经证实的假设不得当作事实。输出应使用简体中文，保留 DOI、专利公开号、IPC/CPC、技术公式和标准名称的原始准确写法。
+
+
+
+## 千篇资料检索与记忆协作
+
+本技能启动时同时读取 patent-literature-memory/SKILL.md 与该项目的 RESEARCH_RESUME.md。用户允许检索且工作流保密审批通过后，按技术功能/机械结构/替代工质/物理机理/控制策略/具体工况组合中英检索词，使用 patent_literature_harvest 或 literature harvest 逐页查找并增量写入项目内的知识索引。对 EPO OPS 遵守官方频率和配额，查询尚未完整时登记 partial、来源缺口和重试游标。返回文献数量与真正取得权利要求全文、核查原始 PDF 的数量分开统计。
+
+使用 patent_literature_pending/read/note 将新专利按批次写成可理解的白话机械方案，记录元数据、实际权要、附图序号、作用效果、公开技术特征、反证问题、创新可能性；将 D1/D2 的证据编号写进研究恢复快照。每批结束读取 SHA256 并保存最新版 RESEARCH_RESUME.md。

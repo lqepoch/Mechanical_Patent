@@ -17,7 +17,9 @@ def create_offline_run(service: Any, case_id: str) -> dict[str, Any]:
     run_id = "RUN-" + uuid4().hex[:16].upper()
     path = service.root / "cases" / case_id / "runs" / run_id
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    PatentResearch(None, [], path).run(case["direction"], case_id=case_id)
+    PatentResearch(
+        None, [], path, memory_root=service.root / "cases" / case_id
+    ).run(case["direction"], case_id=case_id)
     return {"case_id": case_id, "run_id": run_id,
             "external_requests_sent": 0, "status": "awaiting_authorized_source_import",
             "filing_authorized": False}
@@ -82,6 +84,7 @@ def import_external_sources(service: Any, case_id: str, run_id: str,
         save_json(paths[name], data[name])
     build_case_graph(folder)
     indexed = service.workspace.import_case(folder)
+    memory_indexed = service._memory(case_id).ingest_many(incoming)
     append_audit_event(
         folder, stage="专利检索", action="导入第三方待核验文献",
         actor="MCP导入工具", role="系统", payload={
@@ -100,5 +103,6 @@ def import_external_sources(service: Any, case_id: str, run_id: str,
         "note": "导入文件不自动确认真实性，需人工或独立原文核验。",
     })
     return {"run_id": run_id, "received": len(incoming),
-            "indexed": indexed.get("indexed", {}), "status": "unverified_imported",
+            "indexed": indexed.get("indexed", {}),
+            "memory_indexed": memory_indexed, "status": "unverified_imported",
             "source_review_pending": True, "filing_authorized": False}
