@@ -145,3 +145,20 @@ J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出�
 输出应包含真实的用户使用示例：一句任务触发保密审批后的专利/论文检索→多代构思→逐特征反证→理论验证→权要/说明书撰写→审查待办。明确 AI 仅负责生成受验证的研究草稿，最终是否申请交由专利专业人员和企业授权人员决定。
 
 追加数据接入验收：核验 patent_run_create、patent_source_import 可导入第三方授权 MCP 真实结果，同时输入 verified=true 也必须入库标记未核验，重复导入去重、记录检索式与原始来源；无法通过源文件核对时不得出具创造性审核通过结论。
+
+
+## 追加 CODEX 执行任务（2026-11-18）：项目数据库隔离、论文 LaTeX、实时前沿专利
+
+当前仓库 main 的核心目标已经扩展至：
+1. 每个研发 project_id 独占 SQLite 与 evidence/manuscript 目录；同项目不同案卷可共用项目 DB，跨项目零共享。默认 MCP 启动需显式 --project-id。旧版单库仅为历史过渡。
+2. 实时检索最新公开专利时，每次访问授权 EPO OPS 并保存检索式、来源、检查时间、结果、新增与变更历史，失败保留旧快照且明确 stale。不得推定全球完整覆盖；继续建设 CNIPA/USPTO/WIPO/商业数据库授权适配和合法全量增量索引。
+3. 使用 LaTeX 作为研究论文及理论论证的唯一规范主源；分章节/版本/BibTeX，利用 Pandoc 导出 Word、HTML、Markdown。生成 PDF 必须在不挂载秘密文件的离线隔离容器内执行 Tectonic/TeX Live，禁止无沙箱运行任意 TeX。
+4. 当前前沿主动发现通过 OpenAlex 查询近期真实元数据，明确发表日期与数据库更新时间的区别；补充 arXiv、当前合法专利出版公告、相关标准、工业公开技术。
+5. 用户仅给最新专利名称或公开号时，先检索确认真实原件，再触发 patent_variant_plan，沿多种机械/控制/材料/工艺及跨学科技术路径独立构思。
+6. 将 AutoPatent/IdeaForge/Trinno 和 Apache-2.0 的 Co-Scientist 公开方法吸收到 AI Host 的生成—反思—竞争排名—进化—去重—总评；要记录真实来源、父子关系、反证意见、失效验证和淘汰原因。
+7. 每个分支技术候选都独立二轮反证检索，工程计算包含量纲、约束和制造可行性，才进入中文发明权利要求/说明书/摘要/附图生成。
+8. 生产远程 MCP 继续建设 OIDC/Keycloak、逐项目权限、事务/队列/审计、备份及异常回滚；现有文件式项目隔离不能代替真实多用户认证。
+
+代码入口：src/mechanical_patent/project_storage.py、patent_index.py、latex_manuscript.py、frontier_radar.py、mcp_extensions.py。MCP 工具协议由 tests/test_project_latex_frontier.py 及 tests/test_fission_mcp.py 验收。CI 必须同时跑离线模拟场景、真实 Pandoc 转换、MCP SDK v2 发现/调用；任何红灯先修复再合并。
+
+未解决工作开 Issue，保留明确验收、数据许可、跨云部署、回滚与真实生产测试。任何新颖性、创造性、FTO 结论仍须独立人工专业审查。
