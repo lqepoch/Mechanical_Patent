@@ -174,6 +174,10 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 
 `patent_idea_promote` 现在额外要求案卷真实存在一份 `verified=true` 且带原文权利要求的专利来源，同时该来源必须出现在构思的 `evidence_ids` 与评审 `countersearch_refs` 中。导入的第三方检索结果默认 `verified=false`，无法通过这一安全门禁。此状态只证明来源被核验，并不代表权利要求反证已通过法律审查。
 
+## 正文页码搜索的 MCP 接口（2026-11-19）
+
+提供 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,limit=20)`、`patent_literature_fulltext_pending(case_id,limit=30)`；直接使用项目级全文 SQLite，提供可追溯 PDF SHA256、页码及解析状态，不返回文件系统任意读取能力。原文获取、许可审批和本地离线 Docling 由受控 CLI 运行；当前缺少请求级真实企业身份和签名的 MCP 外部写入不提供此能力。见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
 
 ## 工程图示生产流水线 / v1.4 (2026-11-19)
 

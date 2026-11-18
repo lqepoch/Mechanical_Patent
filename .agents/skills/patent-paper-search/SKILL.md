@@ -53,3 +53,7 @@ user-invocable: true
 5. 供应商异常、缺摘要、失效 PDF/非开放许可、限额及 429 时记录缺口并保留可用来源；仅在许可和审批后再下载原文，通过 Docling/PDF 审核核查页码、方程、实验结论，再联动专利权利要求反证。
 
 接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
+
+## 论文原始全文与页码证据（2026-11-19）
+
+不同来源统一 DOI 后，只在纸面许可已确认、OA PDF 来源真实、企业外发审批通过时安排 `patent-fulltext-processing` 任务。Unpaywall 和 OpenAlex 的 PDF URL 先视为候选，未知许可/NC/ND 等不进入自动下载。通过受控 CLI 调用 `fulltext-plan`、`fulltext-process`，失败留存任务与 PDF SHA，利用 `patent_literature_fulltext_search` 获取页码证据。技术综述、创造性反证须以原始文献核验结果为据，切勿将 Docling 解析等同于论文结论核实。

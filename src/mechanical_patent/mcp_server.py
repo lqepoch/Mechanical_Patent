@@ -127,6 +127,32 @@ class PatentMCPService:
     def literature_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
         return {"case_id": case_id, "pending": self._memory(case_id).pending_analysis(limit=limit)}
 
+    def literature_fulltext_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        """只读查询原文下载/解析进度，不授予使用许可证。"""
+        from .literature_fulltext import FulltextPipeline
+        row = FulltextPipeline(self._memory(case_id)).status(doc_id)
+        safe = {key: value for key, value in row.items()
+                if key in {"doc_id", "status", "attempts", "last_updated",
+                           "pdf_sha256", "parse_sha256", "extracted_blocks",
+                           "full_text_verified", "error"}}
+        return {"case_id": case_id, **safe}
+
+    def literature_fulltext_search(self, case_id: str, query: str,
+                                   limit: int = 20) -> dict[str, Any]:
+        """全文逐段索引；返回页码、SHA 和机器解析未核验说明。"""
+        from .literature_fulltext import FulltextPipeline
+        rows = FulltextPipeline(self._memory(case_id)).search(query, limit=limit)
+        for row in rows:
+            row["content"] = row["content"][:1800]
+        return {"case_id": case_id, "query": query[:160], "matches": rows,
+                "count": len(rows), "full_text_verified": False}
+
+    def literature_fulltext_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
+        """列出当前项目尚未完成的 PDF 任务，供授权 CLI 执行。"""
+        from .literature_fulltext import FulltextPipeline
+        return {"case_id": case_id,
+                "jobs": FulltextPipeline(self._memory(case_id)).pending(limit=limit)}
+
     def literature_resume(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).read_resume()
 
@@ -527,6 +553,22 @@ def create_server(service: PatentMCPService):
         return service.literature_pending(case_id, limit)
 
     @server.tool()
+    def patent_literature_fulltext_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """查询指定论文合法 PDF 下载及离线 Docling 解析状态。"""
+        return service.literature_fulltext_status(case_id, doc_id)
+
+    @server.tool()
+    def patent_literature_fulltext_search(case_id: str, query: str,
+                                          limit: int = 20) -> dict[str, Any]:
+        """按 PDF 原文页码/段落检索可追溯的机器解析证据。"""
+        return service.literature_fulltext_search(case_id, query, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
+        """查询等待许可、下载、重试及解析的论文任务。"""
+        return service.literature_fulltext_pending(case_id, limit)
+
+    @server.tool()
     def patent_literature_resume(case_id: str) -> dict[str, Any]:
         """恢复项目最新研究任务、假设、证据与后续方向。"""
         return service.literature_resume(case_id)
@@ -689,7 +731,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "默认用 patent_brief_save 输出工程技术方案，再调用 patent_figure_prepare 生成可编辑图源并由隔离工作器导出后使用 patent_figure_sync；只有用户申请决定及企业验签通过才可写专利申请文本；"
+            + "默认用 patent_brief_save 输出工程技术方案，允许 patent_figure_prepare 生成可编辑图源，隔离worker导出后用 patent_figure_sync 校验；只有用户申请决定及企业验签通过才可写专利申请文本；"
             + "执行 patent_brief_audit 审阅工程方案，双人签核可直接结案；独立批准后才可运行 patent_draft_save 与 patent_quality_audit。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )

@@ -157,6 +157,10 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 
 一条技术任务需经过全球专利与论文检索、至少三条独立物理机理路径、反证与工程边界验证，再进入工程技术方案。若存在不同技术轴的已评价候选，优先调用 `patent_idea_crossovers`，构建可实施的多亲本组合创新；必须描述构件接口、控制时序和协同效果假说。对无法自洽、被在先技术挑战或试验否定的方案调用 `patent_idea_reject`，保留失败条件给下一代使用。任何评分、文本近似、构思交叉均不代替来源逐项核验或法律创造性判断。工作流见 `docs/IDEA_FISSION.md` 和 `skills/patent-idea-fission/SKILL.md`。
 
+## 学术 PDF 合法获取与可恢复证据（2026-11-19）
+
+在已完成的论文元数据检索与长期记忆基础上，按 `skills/patent-pdf-evidence/SKILL.md`、`skills/patent-literature-memory/SKILL.md`、`docs/FULLTEXT_PIPELINE.md` 执行：每篇开放许可证核查、当前案卷外发审批、真实授权人及许可依据记录、正式远端 PDF URL 精确域名白名单与固定 IP/TLS 安全下载、内容哈希、离线 Docling、页码原文索引、机器未核验状态、人工技术事实复核。禁止推定 PDF 链接有效、忽略法律许可、把摘要或解析输出标记已校验全文。下载/解析只通过受控 CLI 执行；MCP 提供状态、队列和页码级只读检索。迁移不得删除原有文献与人工批注，失败后保存状态等待人工判断，正式生产执行前仍需要可信企业身份及签名审批。
+
 
 ## 按需可编辑图示流水线（2026-11-19）
 工程阶段默认先保存明确的部件连接 diagram_relations、顺序工作步骤 process_steps 和主体交互 sequence_messages；根据实际内容挑选 draw.io 原理关系、Mermaid 流程或时序图。读取 skills/patent-figure-cad/SKILL.md 与 docs/TECHNICAL_BRIEF_STANDARD.md 第10节，调用 patent_figure_prepare 创建内容哈希图源，交给独立无网络、非特权的图示渲染 worker 生成 PDF，再调用 patent_figure_sync 校核产物并更新 LaTeX。MCP 不得直接执行浏览器/Electron/TeX；图源和 PDF 均须记录 SHA256。技术方案修改导致签核哈希失效；任何图不能冒充真实 CAD 尺寸/结构。
