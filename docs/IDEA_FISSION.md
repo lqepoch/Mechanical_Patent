@@ -63,3 +63,9 @@ AI 以 `patent_idea_register` 保存交叉构思时，需显式提供 `inventive
 3. `patent_idea_crossovers` 选取不同技术轴的亲本，AI 描述实际耦合路径、构件接口、边界工况后，以 `parent_ids` 注册新的组合方案。
 4. 对失败路线调用 `patent_idea_reject`，保存约束和原始证据。下轮 `plan` 应显式避开已知失败条件。
 5. 重复 `evaluate` → `frontier` → `promote`，并进行独立的权利要求对照、公开充分性和工程验证。不得自动声明获授权或者全球检索完备。
+
+### 失败子案修复与可信检索门禁
+
+已归档为 `rejected_research_route` 的候选可以作为单亲本“修复来源”，但新构思必须使用新的 ID，并显式提交 `parent_id`、`repair_of_failed_route=true` 和 `repair_rationale`，描述如何具体消除原来的失败约束。原失败假说持续留档，不允许直接重评或晋级；失败路线也不能参加多亲本交叉。
+
+`patent_idea_promote` 现在额外要求案卷真实存在一份 `verified=true` 且带原文权利要求的专利来源，同时该来源必须出现在构思的 `evidence_ids` 与评审 `countersearch_refs` 中。导入的第三方检索结果默认 `verified=false`，无法通过这一安全门禁。此状态只证明来源被核验，并不代表权利要求反证已通过法律审查。
