@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from mechanical_patent.core import PatentWorkflowError
+from mechanical_patent.core import Evidence, PatentWorkflowError, evidence_id, utc_now
 from mechanical_patent.ideation_fission import FissionBoard, SCORE_FIELDS
 
 
@@ -118,6 +118,40 @@ class IdeaEvolutionTests(unittest.TestCase):
         self.assertFalse(variant["legal_patentability_verified"])
         with self.assertRaisesRegex(PatentWorkflowError, "完全重复"):
             self.board.register(proposal(mechanism, "材料"))
+
+    def test_failure_repair_is_new_child_with_explicit_correction(self):
+        original = self.board.register(proposal("高海拔泵入口使用无源细孔排气", "机械结构"))
+        self.board.reject(original["id"], "细孔在结冰后堵塞",
+                          ["需具备失电与低温结冰下的旁路保通能力"])
+        unapproved = proposal("更换为主动热防冻排气", "流体与热")
+        unapproved["parent_id"] = original["id"]
+        with self.assertRaisesRegex(PatentWorkflowError, "显式修复"):
+            self.board.register(unapproved)
+        unapproved["repair_of_failed_route"] = True
+        unapproved["repair_rationale"] = "设置热虹吸旁路并提供机械压差回退路径，应对结冰堵塞"
+        child = self.board.register(unapproved)
+        self.assertEqual(child["parent_ids"], [original["id"]])
+        self.assertTrue(child["repairs_failed_route"])
+        self.assertEqual(child["generation"], 1)
+
+    def test_unverified_patent_claims_block_promotion(self):
+        doc = Evidence(
+            publication="CN123456789A", title="测试排气阀（仅模拟外部导入）",
+            url="https://example.org/CN123456789A", source="unverified_fixture",
+            retrieved_at=utc_now(), kind="patent", jurisdiction="CN",
+            claims="一种进口排气阀，包括控制腔。", verified=False,
+        )
+        (self.folder / "04_evidence.json").write_text(
+            json.dumps({"records": [doc.to_dict()]}), encoding="utf-8"
+        )
+        source = evidence_id(doc)
+        candidate = proposal("低压主动排气方案", "机械结构")
+        candidate["evidence_ids"] = [source]
+        saved = self.board.register(candidate)
+        self.board.evaluate(saved["id"], scores(), "基于导入文献的初评",
+                            [source], "能量守恒关系", ["气塞和结冰"])
+        with self.assertRaisesRegex(PatentWorkflowError, "经原始来源核验"):
+            self.board.promote(saved["id"])
 
     def test_cross_parent_must_use_combinatorial_method(self):
         a = self.board.register(proposal("分级机械泵入口排气", "机械结构"))
