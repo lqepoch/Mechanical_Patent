@@ -306,8 +306,21 @@ class LocalPatentWorkspace:
                 ).fetchone()[0]
                 if pending:
                     raise PatentWorkflowError(f"仍有 {pending} 篇文献未独立核验，不能完成证据核验阶段。")
+                sources = {
+                    row["kind"]: row["total"]
+                    for row in db.execute(
+                        "SELECT kind,COUNT(*) AS total FROM documents WHERE case_id=? "
+                        "AND verification_status='已核验' GROUP BY kind", (case_id,)
+                    ).fetchall()
+                }
+                if (not sources.get("patent") or not sources.get("paper")) and not result.get("gap_waiver"):
+                    raise PatentWorkflowError(
+                        "专利与论文双源核验证据不足；必须补齐数据或记录具体缺口例外。"
+                    )
                 if not result.get("coverage_report"):
                     raise PatentWorkflowError("缺少检索覆盖范围、失败数据源与文献缺口说明。")
+                if result.get("gap_waiver") and not str(result.get("gap_rationale", "")).strip():
+                    raise PatentWorkflowError("双源检索缺口例外必须有明确理由。")
             if step == "方向评审":
                 self._direction_gate(db, case_id, revision, actor, result)
             if step == "工程审核" and not result.get("engineering_review"):
@@ -427,7 +440,9 @@ class LocalPatentWorkspace:
                 continue
             rows = json.loads(file.read_text(encoding="utf-8")).get("records", [])
             for raw in rows:
-                record = Evidence.from_dict(raw)
+                # Case artifacts can be edited externally and are not an
+                # authenticated database response; import as unverified data.
+                record = Evidence.from_dict(raw, imported=True)
                 if record.kind == kind:
                     self.upsert_document(case_id, record)
                     counts[kind] += 1
