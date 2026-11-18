@@ -2,13 +2,27 @@ name: Mechanical Patent CI
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
 permissions:
   contents: read
 jobs:
   unit:
+    name: 测试-${{ matrix.suite }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        suite:
+          - test_core.py
+          - test_cli.py
+          - test_papers.py
+          - test_workflow.py
+          - test_web_crawler.py
+          - test_local_workspace.py
+          - test_pdf_archive.py
+          - test_quality_lineage.py
+          - test_workspace_cli.py
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,4 +35,4 @@ jobs:
       - name: Compile
         run: python -m compileall -q src
       - name: Unit tests
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -p '${{ matrix.suite }}' -v
