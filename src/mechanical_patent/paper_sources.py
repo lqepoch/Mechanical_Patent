@@ -197,10 +197,20 @@ class SemanticScholarProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 5):
+            raise PatentWorkflowError("Semantic Scholar 搜索页偏移量无效。")
+        offset = int(cursor) if cursor not in (None, "*") else 0
+        if offset >= 1000:
+            return {"records": [], "next_cursor": None, "total_results": 1000}
+        size = max(1, min(int(limit), 100, 1000-offset))
         params = {
-            "query": query.strip()[:MAX_QUERY], "limit": max(1, min(limit, 25)),
+            "query": query.strip()[:MAX_QUERY], "limit": size, "offset": offset,
             "fields": "title,abstract,year,publicationDate,authors,url,externalIds,citationCount,isOpenAccess,openAccessPdf",
         }
         _pace(self.name, 1.05)
@@ -228,7 +238,14 @@ class SemanticScholarProvider:
                        cited=row.get("citationCount"), is_oa=row.get("isOpenAccess"))
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        total = payload.get("total")
+        end = offset + len(rows)
+        next_cursor = str(end) if (
+            len(rows) == size and end < 1000
+            and (not isinstance(total, int) or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
 
 
 class ArxivProvider:
@@ -238,11 +255,18 @@ class ArxivProvider:
         self.fetch_xml = fetch_xml or _fetch_xml
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
-        # arXiv Atom API, search_query uses explicit all: prefix.
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 9):
+            raise PatentWorkflowError("arXiv 分页起点无效。")
+        start = int(cursor) if cursor not in (None, "*") else 0
+        size = max(1, min(int(limit), 100))
         params = {"search_query": "all:" + query.strip()[:MAX_QUERY],
-                  "start": 0, "max_results": max(1, min(limit, 25))}
+                  "start": start, "max_results": size}
         _pace(self.name, 3.1)
         raw = self.fetch_xml("https://export.arxiv.org/api/query?" + parse.urlencode(params))
         try:
@@ -270,7 +294,15 @@ class ArxivProvider:
                        pdf=pdf, authors=authors, is_oa=True)
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        namespace = "{http://a9.com/-/spec/opensearch/1.1/}"
+        total_raw = _text(root.find(namespace + "totalResults"))
+        total = int(total_raw) if total_raw.isdecimal() else None
+        end = start + len(root.findall(atom + "entry"))
+        next_cursor = str(end) if (
+            len(out) == size and (total is None or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
 
 
 class EuropePMCProvider:
@@ -280,10 +312,16 @@ class EuropePMCProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        size = max(1, min(int(limit), 100))
         params = {"query": query.strip()[:MAX_QUERY], "format": "json",
-                  "resultType": "core", "pageSize": max(1, min(limit, 25))}
+                  "resultType": "core", "pageSize": size,
+                  "cursorMark": cursor if cursor not in (None, "") else "*"}
         payload = self.fetch_json("https://www.ebi.ac.uk/europepmc/webservices/rest/search?"
                                   + parse.urlencode(params))
         rows = (payload.get("resultList") or {}).get("result", [])
@@ -309,7 +347,13 @@ class EuropePMCProvider:
                        license=row.get("license"))
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        next_cursor = payload.get("nextCursorMark")
+        if not isinstance(next_cursor, str) or len(next_cursor) > 4096:
+            next_cursor = None
+        if len(rows) < size or next_cursor == params["cursorMark"]:
+            next_cursor = None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": payload.get("hitCount")}
 
 
 class PubMedProvider:
