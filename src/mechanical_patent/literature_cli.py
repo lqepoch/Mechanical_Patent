@@ -45,6 +45,31 @@ def add_literature_parser(subparsers: Any) -> None:
     ])
     note.add_argument("--source-position", action="append", default=[])
 
+    ingest_pdf = subs.add_parser(
+        "ingest-pdf", help="本地已授权 PDF：Docling 解析或导入解析 JSON，再建立段落证据索引"
+    )
+    ingest_pdf.add_argument("--doc-id", required=True)
+    ingest_pdf.add_argument("--pdf", required=True, type=Path)
+    ingest_pdf.add_argument("--parsed-json", type=Path,
+                            help="已有 Docling 解析 JSON；未指定时离线解析 PDF")
+    ingest_pdf.add_argument("--docling-artifacts", type=Path,
+                            help="离线 Docling 模型目录；已有解析 JSON 时不用")
+    ingest_pdf.add_argument("--source-url", default="")
+    ingest_pdf.add_argument("--authorized", action="store_true")
+
+    passages = subs.add_parser("passages", help="在真实 PDF 解析段落中检索并返回页码锚点")
+    passages.add_argument("--query", required=True)
+    passages.add_argument("--doc-id", default=None)
+    passages.add_argument("--limit", type=int, default=20)
+
+    quote = subs.add_parser("quote", help="逐字校验引用是否存在于相应 PDF 页码段落")
+    quote.add_argument("--doc-id", required=True)
+    quote.add_argument("--anchor", required=True, help="例如 p2:b7")
+    quote.add_argument("--verbatim", required=True)
+
+    status = subs.add_parser("fulltext-status", help="显示当前文献原文解析哈希、版本和核验层级")
+    status.add_argument("--doc-id", required=True)
+
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
                          choices=["openalex", "crossref", "epo-ops"])
@@ -95,6 +120,37 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
+    elif command == "ingest-pdf":
+        from .literature_evidence import FullTextEvidence
+        if not args.authorized:
+            raise PatentWorkflowError("未获得明确的文献使用与本地归档授权。")
+        pdf = args.pdf
+        if pdf.is_symlink() or not pdf.resolve().is_relative_to(memory.project_root):
+            raise PatentWorkflowError("PDF 必须位于当前项目案卷私有目录内。")
+        parsed = args.parsed_json
+        if parsed is None:
+            from .pdf_extraction import parse_local_pdf
+            parsed = memory.root / "fulltext" / "inbox" / (args.doc_id + ".json")
+            parse_local_pdf(
+                pdf, parsed, authorized=True, source_url=args.source_url,
+                artifacts=args.docling_artifacts,
+            )
+        result = FullTextEvidence(memory).attach(
+            args.doc_id, parsed, pdf, authorized=args.authorized,
+        )
+    elif command == "passages":
+        from .literature_evidence import FullTextEvidence
+        result = {"records": FullTextEvidence(memory).search(
+            args.query, doc_id=args.doc_id, limit=args.limit,
+        )}
+    elif command == "quote":
+        from .literature_evidence import FullTextEvidence
+        result = FullTextEvidence(memory).quote(
+            args.doc_id, args.anchor, args.verbatim,
+        )
+    elif command == "fulltext-status":
+        from .literature_evidence import FullTextEvidence
+        result = FullTextEvidence(memory).status(args.doc_id)
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
