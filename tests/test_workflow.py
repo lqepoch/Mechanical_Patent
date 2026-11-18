@@ -1,91 +1,79 @@
 import json
+from pathlib import Path
 import tempfile
 import unittest
-from pathlib import Path
 
 from mechanical_patent.core import Evidence
-from mechanical_patent.workflow import PatentResearch
+from mechanical_patent.workflow import PatentResearch, validate_case
 
 
 class FakeProvider:
-    name = "mock-provider"
-
-    def __init__(self, verified=True):
-        self.verified = verified
+    def __init__(self, name, kind, verified=True):
+        self.name, self.kind, self.verified = name, kind, verified
         self.queries = []
 
-    def search(self, term, *, limit=10):
-        self.queries.append(term)
+    def search(self, query, *, limit=10):
+        self.queries.append(query)
+        if self.kind == "patent":
+            return [Evidence(
+                publication="CN123456789A", title="Inlet valve control",
+                url="https://example.org/CN123456789A", source=self.name,
+                retrieved_at="2026-11-18T00:00:00+00:00", kind="patent",
+                verified=self.verified, jurisdiction="CN",
+                abstract="Mechanical inlet valve and pressure control",
+                claims="1. A pump valve." if self.verified else "",
+            )]
         return [Evidence(
-            publication="CN123456789A", title="Prior art control system",
-            source="mock-evidence", url="https://example.org/CN123456789A",
-            retrieved_at="2026-11-18T00:00:00+00:00", jurisdiction="CN",
-            claims="1. A flow regulating valve" if self.verified else "",
-            abstract="Valve mechanism", verified=self.verified,
+            publication="10.1234/experimental-flow", title="Engineering journal paper",
+            url="https://doi.org/10.1234/experimental-flow", source=self.name,
+            retrieved_at="2026-11-18T00:00:00+00:00", kind="paper",
+            verified=self.verified, abstract="Measured inlet flow in published study",
         )]
 
 
-class FakeModel:
-    model = "deterministic-model"
-
-    def ask(self, role, instructions, payload):
-        if role == "SEARCH_STRATEGIST":
-            return {"queries": ["pump inlet", "pump valve", "吸水控制"]}
-        if role == "LANDSCAPE_ANALYST":
-            return {"routes": ["valves"], "known_problems": ["cavitation"], "gaps": ["response time"]}
-        if role.startswith("INVENTOR_"):
-            return {"ideas": [{"title": "Adaptive dual valve",
-                               "mechanism": "Two valves are actuated in order",
-                               "enabling_details": "A sensor commands valve B after valve A",
-                               "technical_problem": "Reduce inlet transients",
-                               "expected_effect": "Lower pressure spikes"}]}
-        if role == "INDEPENDENT_PRIOR_ART_CHALLENGER":
-            return {"adversarial_queries": ["dual valve"], "claim_chart": [], "obviousness_risks": []}
-        if role == "INDEPENDENT_ENGINEERING_VERIFIER":
-            return {"theoretical_feasibility": "plausible",
-                    "physical_principle": "Valve sequencing", "validation_tests": ["Transient flow test"]}
-        if role == "CN_INVENTION_PATENT_DRAFTER":
-            return {
-                "title": "A dual-valve pump inlet", "abstract": "A sequenced pair of inlet valves.",
-                "claims": ["1. A pump inlet with valves A and B."],
-                "claim_support": [{"claim": 1, "specification_passage": "Engineering description"}],
-                "description": {key: "Engineering description" for key in (
-                    "technical_field", "background", "technical_problem", "technical_solution",
-                    "beneficial_effects", "embodiments", "drawings")},
-                "figure_plan": ["Valve arrangement"],
-            }
-        raise AssertionError("Unexpected role " + role)
-
-
 class ResearchTests(unittest.TestCase):
-    def test_evidence_driven_research_to_review(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "case"
-            p = FakeProvider()
-            result = PatentResearch(p, FakeModel(), path, max_ideas=3).run("Improve pump inlet")
-            self.assertEqual(result["status"], "needs_human_review")
+    def test_dual_source_research_with_no_model(self):
+        with tempfile.TemporaryDirectory() as root:
+            pat = FakeProvider("epo-mock", "patent")
+            paper = FakeProvider("openalex-mock", "paper")
+            case = Path(root) / "case"
+            result = PatentResearch(pat, [paper], case).run(
+                "Improve water pump", ["water inlet control"], ["pump hydraulic cavitation"])
             self.assertFalse(result["filing_authorized"])
-            self.assertTrue((path / "DOSSIER.md").is_file())
-            self.assertTrue((path / "09_quality_gate.json").is_file())
-            self.assertTrue((path / "manifest.json").is_file())
-            self.assertGreater(len(p.queries), 3)
-            self.assertEqual(len(json.loads((path / "04_inventions.json").read_text())["candidates"]), 3)
+            self.assertEqual(result["patent_claims_available"], 1)
+            self.assertEqual(result["papers_discovered"], 1)
+            self.assertEqual(pat.queries, ["water inlet control"])
+            self.assertEqual(paper.queries, ["pump hydraulic cavitation"])
+            self.assertTrue((case / "AGENT_NEXT_STEPS.md").exists())
+            self.assertFalse((case / "08_application.json").read_text().find('"draft": null') == -1)
+            self.assertEqual(len(json.loads((case / "04_evidence.json").read_text())["records"]), 2)
 
-    def test_unverified_corpus_remains_research_only(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "case"
-            result = PatentResearch(FakeProvider(verified=False), FakeModel(), path,
-                                    max_ideas=1).run("Improve pump inlet")
-            self.assertEqual(result["status"], "research_only")
-            self.assertTrue(any("verified" in issue for issue in result["issues"]))
-            self.assertFalse(result["filing_authorized"])
+    def test_static_validation_blocks_empty_agent_output(self):
+        with tempfile.TemporaryDirectory() as root:
+            case = Path(root) / "case"
+            PatentResearch(FakeProvider("mock", "patent"), [
+                FakeProvider("mock-paper", "paper")
+            ], case).run("Pump", ["inlet"], ["turbulence"])
+            gate = validate_case(case)
+            self.assertEqual(gate["status"], "research_incomplete")
+            self.assertTrue(gate["issues"])
+            self.assertFalse(gate["filing_authorized"])
 
-    def test_no_silent_reuse_of_dossier(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "case"
-            PatentResearch(FakeProvider(), FakeModel(), path, max_ideas=1).run("Pump")
+    def test_imported_sources_do_not_forge_verified_claims(self):
+        with tempfile.TemporaryDirectory() as root:
+            case = Path(root) / "case"
+            report = PatentResearch(FakeProvider("fixture", "patent", verified=False), [
+                FakeProvider("fixture-paper", "paper", verified=False)
+            ], case).run("Pump", ["inlet"], ["turbulence"])
+            self.assertEqual(report["patent_claims_available"], 0)
+            self.assertFalse(report["filing_authorized"])
+
+    def test_no_overwrite(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "case"
+            PatentResearch(None, [], path).run("Pump")
             with self.assertRaises(FileExistsError):
-                PatentResearch(FakeProvider(), FakeModel(), path)
+                PatentResearch(None, [], path)
 
 
 if __name__ == "__main__":
