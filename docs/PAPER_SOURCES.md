@@ -81,29 +81,21 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 - Lens https://docs.api.lens.org/request-scholar.html
 - Unpaywall https://unpaywall.org/products/api
 
+## OA 全文处理流水线（2026-11-19）
 
-## 论文 PDF 权利门禁与机器页码证据（2026-11-19）
-
-项目级 `LiteratureMemoryStore` 现在可以记录原生 `pdf_url`、`paper_metadata_json` 和跨检索批次来源谱系；原有分析笔记保持独立且不被新元数据覆盖。新增 `PaperFullTextService` 将论文 PDF 分为 `not_downloaded → downloading → downloaded → parsing → parsed_unverified`，失败为 `download_failed` 或 `parse_failed` 并允许重试。仅在检索词外发获批、合法全文使用依据可查、域名白名单和明确操作授权同时满足时触发下载。
-
-下载调用已有 DNS 钉扎 HTTPS/PDF 头/大小上限/不跟随重定向的 `download_pdf`；按 SHA256 内容寻址，留在项目私有 `knowledge/pdf_objects`。离线解析重用 Docling `parse_local_pdf`，模型须预装本地 artifacts，输出 `knowledge/pdf_extracted` 的逐页 JSON。自动状态写入论文 MD 的机器区，研究人员/AI 批注区长期保存，全文结论标记待原始 PDF 复核。
-
-本次 MCP 增加只读 `patent_paper_pdf_status` 和 `patent_paper_pdf_page`；写入操作通过具有企业权限审计的本地 CLI `literature pdf-fetch` 和 `literature pdf-parse` 执行。任何 AI 不得自行猜测版权许可，不得从未核实的机器提取中产生已验证的实验结论。操作和状态见 [PAPER_FULLTEXT.md](PAPER_FULLTEXT.md)。
+论文平台返回的 `pdf_url`、`paper_metadata.is_open_access`、`license` 将归入同项目 `knowledge/literature.sqlite3` 的 pdf_url / metadata_json；原文须满足许可白名单、保密外发批准与逐篇审批后，才由受控 CLI 下载、通过 Docling 离线解析并生成页码证据索引。上千篇元数据已有 OpenAlex/Crossref 的游标分页断点，新增 PDF 处理使用单文献队列、租约、错误与完整性校验，绝不自动采集缺乏授权的内容。详见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
 
 
-## 深分页与跨平台长期积累（2026-11-19）
+## 批量论文分页与 DOI 公共全文候选（2026-11-19）
 
-项目级批量采集入口 literature harvest 现在支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed，以及 EPO OPS 专利。每个来源采用自身分页机制（OpenAlex/Crossref cursor、Europe PMC cursorMark、Semantic Scholar 相关性 offset、arXiv start、PubMed retstart），批次逐页落地 SQLite、单篇 Markdown 和原有进度 checkpoint。失败/中断会在允许的恢复窗口内复用已保存的游标。详情见 docs/PAPER_SOURCES.md。
+此扩展为项目内现有的 OpenAlex/Crossref 深分页增加 Semantic Scholar 普通偏移分页（每检索词最多1000条）、Semantic Scholar Bulk token 深分页（每页1000条）、arXiv Atom start、Europe PMC cursorMark、PubMed retstart。现有 literature harvest 的 SQLite 游标、错误状态和单篇 Markdown 记忆继续复用。OpenAlex 第二页需要 API Key。Bulk 模式要求 page_size=1000 且 max_documents 是1000整数倍；更小的页要使用普通来源。
 
-**平台边界**：Semantic Scholar 标准相关性检索上限为 1,000 条，超过此规模需独立接入 Bulk Search/Datasets；OpenAlex 深分页第二页开始需要 API Key。受版权或商业订阅约束的 CORE/Lens 现阶段保留受控单轮搜索，未放入无穷分页采集。免费来源也受速率/账单上限控制；某条来源失败不会被系统伪装为全球查全。
+Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开许可和原始提供方谱系，严格检查案卷审批并保存到文献库。它不自动下载论文。真正获取 PDF、离线 Docling 解析、机器段落 FTS、权限签核、哈希与审计沿用主干唯一 FulltextPipeline，CLI 命令 fulltext-plan 和 fulltext-process。任何许可证冲突都进入人工复核并阻断旧许可继续授权。
 
+示例（需真实独立项目和工作流许可）：
 
-## Semantic Scholar Bulk 深分页（2026-11-19）
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 harvest --provider semantic-scholar-bulk --query "centrifugal pump" --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --page-size 1000 --max-documents 3000 --max-pages 3
 
-Semantic Scholar 单检索词超过 1,000 条相关性排序上限时，可调用独立的 literature harvest 提供方 semantic-scholar-bulk。此适配器使用官方 Academic Graph /paper/search/bulk 和 token 游标，每页最大 1,000 条。为严格防止分页记录截断，执行时要求 --page-size 1000 与 --max-documents 为 1000 的整数倍；全文与作者信息后续由 DOI/论文详情补齐，Bulk 返回基础书目元数据，不包含完整引文网络。用到 API 的真实访问率和配额仍须按授权账号独立核验。
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 oa-enrich --doc-id EV-XXXXXXXXXXXX --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --authorized
 
-示例：
-
-    python -m mechanical_patent literature --project-dir /private/cases/CASE-001 harvest       --provider semantic-scholar-bulk --query "centrifugal pump"       --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3       --allow-search-exposure --page-size 1000 --max-documents 5000 --max-pages 5
-
-MCP patent_literature_harvest 增加可选 page_size 参数，需通过本项目既有保密门禁。
+检索到的论文只代表该平台当前查询结果，不能证明全球无现有技术。PDF 候选位置及自动抽取文本不得擅自标记为已核实科学结论。

@@ -123,11 +123,26 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
 
+## 论文 PDF 证据流水线（2026-11-19）
 
-## 论文 PDF 权利门禁与机器页码证据（2026-11-19）
+已有 `literature_memory.py` 的项目独立 SQLite + Markdown 与论文 API 归一化继续保留。新增 `literature_fulltext.py` 管理全文任务的 license/oa/url/rights、downloaded/parsed 状态、内容 SHA256、租约和页码索引，复用 `pdf_archive.py` 的固定公网 IP TLS PDF 下载与 `pdf_extraction.py` 的 Docling 离线解析。MCP 只读暴露 fulltext status/search/pending；CLI 对外网文件获取继续调用项目身份与案卷出站审批。所有全文结论需要人工针对真实 PDF 独立复核。详细设计见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
 
-项目级 `LiteratureMemoryStore` 现在可以记录原生 `pdf_url`、`paper_metadata_json` 和跨检索批次来源谱系；原有分析笔记保持独立且不被新元数据覆盖。新增 `PaperFullTextService` 将论文 PDF 分为 `not_downloaded → downloading → downloaded → parsing → parsed_unverified`，失败为 `download_failed` 或 `parse_failed` 并允许重试。仅在检索词外发获批、合法全文使用依据可查、域名白名单和明确操作授权同时满足时触发下载。
 
-下载调用已有 DNS 钉扎 HTTPS/PDF 头/大小上限/不跟随重定向的 `download_pdf`；按 SHA256 内容寻址，留在项目私有 `knowledge/pdf_objects`。离线解析重用 Docling `parse_local_pdf`，模型须预装本地 artifacts，输出 `knowledge/pdf_extracted` 的逐页 JSON。自动状态写入论文 MD 的机器区，研究人员/AI 批注区长期保存，全文结论标记待原始 PDF 复核。
+## 2026-11-19 图示工厂扩展
+技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
+真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。
 
-本次 MCP 增加只读 `patent_paper_pdf_status` 和 `patent_paper_pdf_page`；写入操作通过具有企业权限审计的本地 CLI `literature pdf-fetch` 和 `literature pdf-parse` 执行。任何 AI 不得自行猜测版权许可，不得从未核实的机器提取中产生已验证的实验结论。操作和状态见 [PAPER_FULLTEXT.md](PAPER_FULLTEXT.md)。
+
+## 批量论文分页与 DOI 公共全文候选（2026-11-19）
+
+此扩展为项目内现有的 OpenAlex/Crossref 深分页增加 Semantic Scholar 普通偏移分页（每检索词最多1000条）、Semantic Scholar Bulk token 深分页（每页1000条）、arXiv Atom start、Europe PMC cursorMark、PubMed retstart。现有 literature harvest 的 SQLite 游标、错误状态和单篇 Markdown 记忆继续复用。OpenAlex 第二页需要 API Key。Bulk 模式要求 page_size=1000 且 max_documents 是1000整数倍；更小的页要使用普通来源。
+
+Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开许可和原始提供方谱系，严格检查案卷审批并保存到文献库。它不自动下载论文。真正获取 PDF、离线 Docling 解析、机器段落 FTS、权限签核、哈希与审计沿用主干唯一 FulltextPipeline，CLI 命令 fulltext-plan 和 fulltext-process。任何许可证冲突都进入人工复核并阻断旧许可继续授权。
+
+示例（需真实独立项目和工作流许可）：
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 harvest --provider semantic-scholar-bulk --query "centrifugal pump" --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --page-size 1000 --max-documents 3000 --max-pages 3
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 oa-enrich --doc-id EV-XXXXXXXXXXXX --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --authorized
+
+检索到的论文只代表该平台当前查询结果，不能证明全球无现有技术。PDF 候选位置及自动抽取文本不得擅自标记为已核实科学结论。

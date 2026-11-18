@@ -317,31 +317,19 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 
 参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
 
-## 论文 PDF 取证与逐篇记忆（2026-11-19）
+### 2026-11-19：跨技术轴的真实双亲构思与负面记忆
 
-学术 DOI 摘要库已具备可追溯的 PDF 候选链接。新增显式权限的两段式流程：
+在已有四代构思裂变上增添 `patent_idea_crossovers` 与 `patent_idea_reject`。两位已评价的不同技术轴父构思可以组合生成新方案，必须提供可制造的接口定义和机理耦合说明；技术上被否定的方向仍保存在 JSON 谱系中，其失败条件成为下一轮明确的设计约束。近似文字重复只预警，来源、反证、工程和人工批准的独立门禁继续生效。详见 `docs/IDEA_FISSION.md`。
 
-```bash
-python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-status --doc-id EV-XXXXXXXXXXXX
-python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-fetch --doc-id EV-XXXXXXXXXXXX --allowed-host repository.example.org --rights-basis open_license --rights-reference "已审查的原文许可证明及位置" --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3 --allow-search-exposure --authorized
-python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-parse --doc-id EV-XXXXXXXXXXXX --docling-artifacts /private/models/docling --authorized
-python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf-pages --doc-id EV-XXXXXXXXXXXX --page 2
-```
+## 论文合法 PDF 全文流水线（2026-11-19）
 
-原文 URL 必须来自已登记的论文元数据；无法证明合法使用权或 PDF 原文不符则阻断。下载与本地 Docling 解析可分别重试，结果按 SHA256、页码、来源和审核状态持久化。远端 MCP 提供项目内只读状态和页码工具。完整说明：[docs/PAPER_FULLTEXT.md](docs/PAPER_FULLTEXT.md)。
+针对每个项目独立的 `knowledge/literature.sqlite3`，新增逐篇开放许可确认、受控 HTTPS/TLS 固定公网 IP 下载、Docling 离线全文解析、页码证据 FTS5 索引、SHA256 哈希、任务租约与错误恢复。可通过 `mechanical-patent literature --project-dir ... fulltext-plan/fulltext-process/fulltext-status/fulltext-search/fulltext-pending` 操作。MCP 提供 `patent_literature_fulltext_status`、`patent_literature_fulltext_search`、`patent_literature_fulltext_pending` 三个只读工具。相关论文的机器解析产物始终标记待原文核验，开放许可与保密审批必须先行；受控 CLI 执行下载/解析。运行参数、安全要求、模型准备和容灾见 [docs/FULLTEXT_PIPELINE.md](docs/FULLTEXT_PIPELINE.md)。
 
-## 分页检索多个公开学术来源
 
-`literature harvest` 已支持 6 个论文来源与 EPO OPS。通过已批准的私有案卷执行带断点的增量批量检索，例如：
+## 工程方案自动配图流水线（2026-11-19）
 
-```bash
-python -m mechanical_patent literature --project-dir /private/cases/CASE-001 harvest \
-  --provider openalex --provider semantic-scholar --provider arxiv \
-  --query "centrifugal pump cavitation" \
-  --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3 \
-  --allow-search-exposure --max-documents 800 --page-size 100
-```
+研发案卷已保存 `08a_technical_brief.json` 后，调用 MCP `patent_figure_prepare` 生成可编辑 draw.io/Mermaid 原理图、流程图和时序图源；结构关系需明确的部件连线，避免用 AI 猜测机械几何。隔离工作器把图源转换为 PDF，`patent_figure_sync` 核对完整输出哈希并更新 LaTeX；可再用同一隔离工作器编译 PDF 方案书。真实 CAD 仍须通过 STEP/SolidWorks 专用模块取得。参见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节及 skills/patent-figure-cad/SKILL.md。
 
-OpenAlex 第二页需要 API Key；Semantic Scholar 相关性分页最多 1,000 条/检索词，更大规模可将论文来源组合并进行关键词扩展，避免把当前单源 1,000 条上限包装成已查全。详见 docs/PAPER_SOURCES.md。
+## 论文深分页与 OA 合法地址补全（2026-11-19）
 
-Semantic Scholar 的大规模 Basic Metadata 搜索可通过 `literature harvest --provider semantic-scholar-bulk --page-size 1000 --max-documents 5000` 使用 token 分页；需搭配案卷保密审批和明确来源预算。相关来源能力可在 `paper-sources` 查看。
+现有项目文献库可通过 literature harvest 从六个开放论文平台按原生分页机制积累元数据，也可使用 Semantic Scholar Bulk token 深分页。受审批的 literature oa-enrich 用于按 DOI 查询 Unpaywall 的 OA URL；PDF 下载与 Docling 解析继续交由 FulltextPipeline 全文权限工作流处理。详情见 docs/PAPER_SOURCES.md。
