@@ -118,3 +118,8 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 新增标准 MCP 服务端 src/mechanical_patent/mcp_server.py，采用官方 MCP Python SDK v2，支持 stdio / Streamable HTTP；服务端本身不绑定外部 LLM API。涉及第三方查询词外发时，执行当前轮企业案卷保密审批；无授权时工具直接拒绝。MCP 提供专利检索、发明树、反证、工程假设、中文申请文件、QA 的统一业务工具与中文总控 Prompt。接口见 docs/MCP_INTERFACE.md。
 
 外部系统接入时，必须将 MCP 放在已实现 OAuth2/OIDC + TLS 的受控网关后，限制回环服务访问和真实组织/项目授权，避免未经授权读取未公开专利内容。当前服务未自带生产身份服务，不具备直接公网部署条件。任何真实试验、仿真、专业签核及正式递交都需要独立证据或真实人员操作。
+
+
+## 所有专利项目必执行知识星图
+
+检索或导入新专利/论文后读取 skills/patent-knowledge-atlas/SKILL.md，运行 atlas-index / patent_knowledge_index，维护文档、项目、公开全局三级图谱。每篇文献自动生成独立 generated MD 记忆，技术人员注释保存在 manual MD。AI 从原文中提取的机械结构、作用效果、控制关系必须附存在于本地存档的 quote，且一律待人工复核；词频相似度只用于召回补充检索，绝不可用作创造性证明。跨项目检索严格按 confidentiality 区分，只有“公开”项目可进入 global_public 投影；未实现真实 OIDC+ABAC 之前，禁止以共享知识图谱展示秘密项目间联系。详见 docs/KNOWLEDGE_ATLAS.md。
