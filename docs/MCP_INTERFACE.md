@@ -109,3 +109,9 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 - patent_draft_save：新增强制可信审批验签门禁。必须由独立审批服务生成 08b_conversion_approval.json 并通过 PATENT_CONVERSION_APPROVAL_KEY 验签；AI/MCP 无签名端点。方案一旦修改，旧审批自然失效；正式向专利局提交仍需要独立的审批和授权人员。
 
 旧版客户端直接调用 patent_draft_save 将收到明确拒绝；改走 patent_brief_save 并由企业审批系统完成转换决定。签名与真实人身绑定的生产化由 #25 完成，当前本地签名控制只适合受控私有工作空间。
+
+
+### 阶段 A 独立质量接口
+
+- `patent_brief_audit(case_id, run_id, candidate_id)`：独立审阅 `08a_technical_brief.json`，逐创新点核对真实已验证权利要求、D1/D2 对照、工程反证、可证伪试验和图纸完整性，结果为 `revision_required`、`awaiting_dual_human_review` 或 `technical_complete`。
+- `technical_complete` 需要企业可信签名的工程人员和 IP 管理人员分别签署 `08c_technical_review.json`（`PATENT_TECHNICAL_REVIEW_KEY` 单独管理），绑定技术方案 SHA、案卷、候选、结论与时间。该状态可直接结案，与独立的申请转换授权无关。单纯结构化校验不等于司法/专利法律上的确定新颖性。
