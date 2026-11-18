@@ -64,3 +64,8 @@ user-invocable: true
 5. 对于重新获取或换版本的 PDF，校验 SHA256；技术人员复核后再进入证据/发明审核阶段。文件不明、许可证无效、模型缺失、来源重定向或文件损坏时明确阻断。
 
 具体接口见 docs/PAPER_FULLTEXT.md。网页链接或自动结构化转换均不能代替人工核验原始公开 PDF。
+
+
+## 论文分页检索与中断恢复（2026-11-19）
+
+对于数百至上千篇论文的需求，使用已有 literature harvest 而非仅调用单页 research。支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed。按各提供方原生 cursor / offset 查询，并逐页保存 checkpoint、项目私有 SQLite 与单篇 MD；失败允许在时限内从游标恢复。需明确留存每个来源的条数、API 异常和实际检索日期。OpenAlex 深分页第二页需要 API Key，Semantic Scholar 相关性搜索最多 1,000 条，其他平台的全文获取与版权仍单独核对。详细操作见 docs/PAPER_SOURCES.md。

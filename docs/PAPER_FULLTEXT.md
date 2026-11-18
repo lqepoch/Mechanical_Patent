@@ -79,3 +79,10 @@ parsed_unverified 表示机器识别并建索引。论文实际实验数据、�
 - OpenAlex：https://help.openalex.org/api/paging/
 - Unpaywall DOI API：https://unpaywall.org/api
 - Semantic Scholar：https://api.semanticscholar.org/api-docs
+
+
+## 深分页与跨平台长期积累（2026-11-19）
+
+项目级批量采集入口 literature harvest 现在支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed，以及 EPO OPS 专利。每个来源采用自身分页机制（OpenAlex/Crossref cursor、Europe PMC cursorMark、Semantic Scholar 相关性 offset、arXiv start、PubMed retstart），批次逐页落地 SQLite、单篇 Markdown 和原有进度 checkpoint。失败/中断会在允许的恢复窗口内复用已保存的游标。详情见 docs/PAPER_SOURCES.md。
+
+**平台边界**：Semantic Scholar 标准相关性检索上限为 1,000 条，超过此规模需独立接入 Bulk Search/Datasets；OpenAlex 深分页第二页开始需要 API Key。受版权或商业订阅约束的 CORE/Lens 现阶段保留受控单轮搜索，未放入无穷分页采集。免费来源也受速率/账单上限控制；某条来源失败不会被系统伪装为全球查全。

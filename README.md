@@ -329,3 +329,17 @@ python -m mechanical_patent literature --project-dir /private/cases/CASE-001 pdf
 ```
 
 原文 URL 必须来自已登记的论文元数据；无法证明合法使用权或 PDF 原文不符则阻断。下载与本地 Docling 解析可分别重试，结果按 SHA256、页码、来源和审核状态持久化。远端 MCP 提供项目内只读状态和页码工具。完整说明：[docs/PAPER_FULLTEXT.md](docs/PAPER_FULLTEXT.md)。
+
+## 分页检索多个公开学术来源
+
+`literature harvest` 已支持 6 个论文来源与 EPO OPS。通过已批准的私有案卷执行带断点的增量批量检索，例如：
+
+```bash
+python -m mechanical_patent literature --project-dir /private/cases/CASE-001 harvest \
+  --provider openalex --provider semantic-scholar --provider arxiv \
+  --query "centrifugal pump cavitation" \
+  --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3 \
+  --allow-search-exposure --max-documents 800 --page-size 100
+```
+
+OpenAlex 第二页需要 API Key；Semantic Scholar 相关性分页最多 1,000 条/检索词，更大规模可将论文来源组合并进行关键词扩展，避免把当前单源 1,000 条上限包装成已查全。详见 docs/PAPER_SOURCES.md。
