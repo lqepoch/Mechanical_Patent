@@ -11,6 +11,8 @@ dependencies = []
 
 [project.optional-dependencies]
 web = ["crawl4ai==0.9.5"]
+pdf = ["docling==2.150.0"]
+patent-mcp = ["patent-client-agents[mcp]==0.32.0"]
 
 [project.scripts]
 mechanical-patent = "mechanical_patent.cli:main"
