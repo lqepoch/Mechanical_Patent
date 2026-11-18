@@ -156,3 +156,14 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 `patent_research` 新增可选 `paper_sources: list[str]`、`enrich_unpaywall: bool` 和 `allow_paid_paper_apis: bool`。未提供平台时默认 OpenAlex、Crossref、Semantic Scholar。已登记的保密外发批准对所有外部渠道生效；Lens、CORE 除此以外还需 Token 与商业许可明确批准。
 
 `patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+
+## 工程图示生产流水线 / v1.4 (2026-11-19)
+
+- patent_figure_prepare(case_id,run_id,candidate_id,wanted?): 生成不超过三类内容证据驱动的可编辑 .drawio/.mmd 图源，记录源哈希、图类型和建议落点；不运行外部二进制。
+- patent_figure_source(case_id,run_id,figure_id): 只读取该案卷白名单中图源内容与 SHA256，可交由人工编辑器接收。
+- patent_figure_status(case_id,run_id): 读取已登记计划及隔离渲染结果的概要。
+- patent_figure_sync(case_id,run_id,candidate_id): 校验外部工作器完整 PDF 及 SHA256，再把图加入工程技术方案 JSON/TEX，失效之前的签名审批。
+- 独立工作器 `python -m mechanical_patent.figure_worker render-figures|compile-brief-pdf --case-dir <案例>`；MCP 不提供执行系统进程的接口。draw.io/Mermaid 的生成源是功能关系示意，真实 CAD 必须另经专用工具确认。
+
+独立工作器必须运行在已配置的企业安全隔离容器中，真实渲染版本需验收；本仓库 CI 对生成、源数据约束、失败关闭、伪造输出和 MCP 合同做离线验证。具体合同见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
