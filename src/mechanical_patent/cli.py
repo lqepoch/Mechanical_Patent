@@ -18,6 +18,8 @@ from .workspace_cli import add_workspace_parser, handle_workspace
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument("--direction", required=True, help="User's engineering problem; kept in private dossier")
     command.add_argument("--case-dir", type=Path, help="New output folder; existing folders cannot be overwritten")
+    command.add_argument("--workspace-db", type=Path, default=None,
+                         help="索引数据库路径；缺省为案卷父目录/index.sqlite3")
     command.add_argument("--patent-provider", choices=["auto", "epo-ops", "import", "none"], default="auto")
     command.add_argument("--import-json", type=Path, help="Imported records for offline research; always unverified")
     command.add_argument("--paper-provider", action="append", choices=["openalex", "crossref", "import", "none"],
@@ -103,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
             supplemental_sources=[doc.to_evidence() for doc in web_docs],
             web_documents=web_docs, web_errors=web_errors,
         ).run(args.direction, args.patent_query, args.paper_query, limit=max(1, min(args.limit, 25)))
+        from .local_workspace import LocalPatentWorkspace
+        database = args.workspace_db or (folder.parent / "index.sqlite3")
+        indexed = LocalPatentWorkspace(database).import_case(folder)
+        print("本地文献索引:", database.resolve())
+        print("已登记索引:", indexed["indexed"])
         print("AI research handoff:", (folder / "AGENT_NEXT_STEPS.md").resolve())
         print("Patents with retrieved claims:", result["patent_claims_available"])
         print("Scholarly papers:", result["papers_discovered"])
