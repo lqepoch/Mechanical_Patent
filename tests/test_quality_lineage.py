@@ -59,7 +59,7 @@ class QualityAndGraphTests(unittest.TestCase):
                 {
                     "candidate_id": "INV-001",
                     "feature": "两阀的控制顺序",
-                    "evidence": [{"evidence_id": pat_id, "quote": "1. A flow regulating valve"}],
+                    "evidence": [{"evidence_id": pat_id, "quote": "1. A pump valve."}],
                 }
             ],
         })
