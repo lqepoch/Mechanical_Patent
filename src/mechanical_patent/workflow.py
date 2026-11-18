@@ -82,9 +82,9 @@ def _feasibility_template() -> dict[str, Any]:
 
 def _application_template() -> dict[str, Any]:
     return {
-        "status": "awaiting_agent",
+        "status": "not_requested",
         "draft": None,
-        "source_instructions": "Follow pinned Chinese patent-disclosure-skill and claim-to-description rules.",
+        "source_instructions": "Patent application conversion requires a signed independent corporate approval; engineering brief 08a is default.",
         "submission_authorized": False,
     }
 
@@ -262,9 +262,9 @@ class PatentResearch:
             "4. Generate independent TRIZ, SCAMPER, FMEA, cross-domain and radical concepts.",
             "5. For EACH candidate, reverse-search patent claims AND non-patent scientific literature.",
             "6. Form a concrete mechanically reproducible design, assumptions, safety and falsification tests.",
-            "7. Write the candidate, countersearch, engineering and China application JSON files.",
-            "8. Call 'mechanical-patent validate --case-dir <this directory>' and resolve blockers.",
-            "9. Have a real engineer and patent professional approve before any filing.",
+            "7. Write candidate, countersearch, engineering and human-readable 08a technical brief JSON/LaTeX.",
+            "8. Obtain independent engineering review; archive the reviewed scheme if no filing requested.",
+            "9. Only upon user's filing decision and signed conversion approval may draft 08_application.json.",
             "", "## Limitations", "", json.dumps(quality, ensure_ascii=False, indent=2),
         ])
         (self.case_dir / "AGENT_NEXT_STEPS.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
