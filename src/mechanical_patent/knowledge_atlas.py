@@ -7,13 +7,14 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from contextlib import contextmanager, closing
 from hashlib import sha256
 import json
 import math
 from pathlib import Path
 import re
 import sqlite3
-from typing import Any
+from typing import Any, Iterator
 
 from .citations import normalize_doi
 from .core import Evidence, PatentWorkflowError, evidence_id, save_json, utc_now
@@ -144,7 +145,8 @@ def _similarity(tokens: dict[str, Counter[str]], *, top_k: int,
     return [(a, b, round(scores[(a, b)], 5)) for a, b in sorted(allowed)]
 
 
-def _connection(path: Path) -> sqlite3.Connection:
+@contextmanager
+def _connection(path: Path) -> Iterator[sqlite3.Connection]:
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(path), timeout=15.0)
     db.row_factory = sqlite3.Row
@@ -178,7 +180,10 @@ def _connection(path: Path) -> sqlite3.Connection:
       CREATE INDEX IF NOT EXISTS ix_edges_source ON edges(source);
       CREATE INDEX IF NOT EXISTS ix_edges_target ON edges(target);
     """)
-    return db
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def _node(nodes: dict[str, dict[str, Any]], id_: str, kind: str,
@@ -474,51 +479,113 @@ def case_atlas(case_dir: Path, *, scope: str = "project",
                     digest=digest_row["value"] if digest_row else "")
 
 
+def _eligible_public_case_roots(workspace: Path) -> list[tuple[str, str, Path]]:
+    """兼容旧案卷与新 projects/<id>/patents.sqlite3，数据库只读且失败关闭。"""
+    root = Path(workspace)
+    locations: list[tuple[str, Path, Path]] = []
+    projects = root / "projects"
+    if projects.is_dir() and not projects.is_symlink():
+        for project in sorted(projects.iterdir()):
+            if project.is_symlink() or not project.is_dir() or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", project.name
+            ):
+                continue
+            db = project / "patents.sqlite3"
+            if db.is_file() and not db.is_symlink():
+                locations.append((project.name, project, db))
+    legacy = root / "index.sqlite3"
+    if legacy.is_file() and not legacy.is_symlink():
+        locations.append(("legacy", root, legacy))
+    if not locations:
+        raise PatentWorkflowError("尚无合法项目索引，无法生成公开知识星图。")
+    cases: list[tuple[str, str, Path]] = []
+    for project_id, project_root, dbfile in locations:
+        try:
+            with closing(sqlite3.connect(f"file:{dbfile.resolve().as_posix()}?mode=ro", uri=True)) as db:
+                if project_id != "legacy":
+                    identity = db.execute(
+                        "SELECT project_id FROM project_identity WHERE singleton=1"
+                    ).fetchone()
+                    if identity is None or identity[0] != project_id:
+                        continue
+                rows = db.execute(
+                    "SELECT case_id FROM cases WHERE confidentiality='公开'"
+                ).fetchall()
+        except sqlite3.Error:
+            # 对身份不一致、数据库损坏或无法读取的项目不生成任何全局图。
+            continue
+        base = project_root / "cases"
+        if base.is_symlink() or not base.is_dir():
+            continue
+        for (case_id,) in rows:
+            if not isinstance(case_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9_-]{0,119}", case_id
+            ):
+                continue
+            case = base / case_id
+            if case.is_symlink() or not case.is_dir():
+                continue
+            cases.append((project_id, case_id, case))
+    return cases
+
+
 def global_public_atlas(workspace_dir: Path, *, max_nodes: int = 250) -> dict[str, Any]:
-    """公开发布投影，绝不扫描秘密/内部案卷；企业共享需另接真实身份 ABAC。"""
+    """仅公开已审核为“公开”的最小文献著录投影，尊重新旧项目物理隔离。"""
     if not 1 <= max_nodes <= MAX_NODES:
         raise PatentWorkflowError("全局星图节点预算无效。")
-    root = Path(workspace_dir).resolve()
-    database = root / "index.sqlite3"
-    if not database.is_file():
-        raise PatentWorkflowError("工作区尚不存在授权索引。")
-    with sqlite3.connect(str(database)) as conn:
-        public = {row[0] for row in conn.execute(
-            "SELECT case_id FROM cases WHERE confidentiality='公开'")}
+    root = Path(workspace_dir).expanduser()
+    if root.is_symlink():
+        raise PatentWorkflowError("禁止通过符号链接共享工作区。")
+    root = root.resolve()
+    cases = _eligible_public_case_roots(root)
     nodes: dict[str, dict[str, Any]] = {}
     edges: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     seen: dict[str, list[str]] = defaultdict(list)
-    cases_root = root / "cases"
-    for case_id in sorted(public):
-        run_root = cases_root / case_id / "runs"
-        if not run_root.is_dir() or run_root.is_symlink():
+    for project_id, case_id, case in sorted(cases):
+        run_root = case / "runs"
+        if run_root.is_symlink() or not run_root.is_dir():
             continue
         for folder in sorted(run_root.glob("RUN-*")):
             if folder.is_symlink() or not folder.is_dir():
                 continue
+            graph_db = folder / "knowledge.sqlite3"
+            if graph_db.is_symlink() or not graph_db.is_file():
+                continue
             if not folder.resolve().is_relative_to(run_root.resolve()):
                 continue
-            if not (folder / "knowledge.sqlite3").is_file():
-                continue
-            run_id = folder.name
-            project_node = "CASE-" + sha256(case_id.encode()).hexdigest()[:16]
+            # 内部项目的身份只用于计算不可反解节点 ID；仅显示明确公开的案卷名称。
+            project_node = "CASE-" + sha256(
+                (project_id + "|" + case_id).encode("utf-8")
+            ).hexdigest()[:16]
             _node(nodes, project_node, "公开项目", case_id, visibility="public")
-            with _connection(folder / "knowledge.sqlite3") as conn:
-                for row in conn.execute(
-                    "SELECT id,kind,title,attributes_json FROM nodes WHERE kind IN ('专利文献','论文文献')"):
-                    item = json.loads(row["attributes_json"])
-                    # 公共图只保留公开文献的著录字段；不带任何摘要、发明构思或私密路径。
-                    global_id = project_node + ":" + row["id"]
-                    _node(nodes, global_id, row["kind"], row["title"],
-                          publication=item.get("publication", ""),
-                          url=item.get("url", ""), verified=item.get("verified", False),
-                          visibility="public", run_id=run_id)
-                    _edge(edges, project_node, global_id, "包含公开文献", "project_membership")
-                    key = (row["kind"] + "|" + str(item.get("publication", "")).upper())
-                    seen[key].append(global_id)
+            try:
+                with closing(sqlite3.connect(
+                    f"file:{graph_db.resolve().as_posix()}?mode=ro", uri=True
+                )) as db:
+                    rows = db.execute(
+                        "SELECT id,kind,title,attributes_json FROM nodes "
+                        "WHERE kind IN ('专利文献','论文文献')"
+                    ).fetchall()
+            except sqlite3.Error:
+                continue
+            for doc_id, kind, title, attributes_json in rows:
+                try:
+                    item = json.loads(attributes_json)
+                except (ValueError, TypeError):
+                    continue
+                if not IDENTIFIER.fullmatch(doc_id) or not isinstance(item, dict):
+                    continue
+                # 公共图只保留已公开文献的著录字段；不带摘要、创新、候选三元组或内部路径。
+                global_id = project_node + ":" + doc_id
+                _node(nodes, global_id, kind, title,
+                      publication=item.get("publication", ""),
+                      url=item.get("url", ""), verified=item.get("verified", False),
+                      visibility="public")
+                _edge(edges, project_node, global_id, "包含公开文献", "project_membership")
+                key = (kind + "|" + str(item.get("publication", "")).upper())
+                seen[key].append(global_id)
     for ids in seen.values():
         unique = sorted(set(ids))
-        # 共用文献属于“同一文献”关系，不代表项目之间的商业/技术授权。
         for a, b in zip(unique, unique[1:]):
             _edge(edges, a, b, "同一公开文献", "same_publication")
     all_nodes = sorted(nodes.values(), key=lambda x: (
