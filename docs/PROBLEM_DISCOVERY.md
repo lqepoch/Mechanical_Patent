@@ -64,7 +64,7 @@ F. 不得将企业内部故障、CAD 或未申请发明上传公开平台；保�
 - 新平台通过 propose 自动登记为 pending，等待管理员核实站点身份、采集条款与许可后通过 CLI approve。MCP 特意没有 approve 工具，AI 无权批准新来源。
 - RSS 巡检：批准来源限定同源 HTTPS、DNS 非私网校验、禁止重定向、限制1MB与请求超时；SQLite 存储 ETag、Last-Modified、下次扫描时间、租约、指数退避、变化版本和审计哈希。跨域链接只提候选且不访问，未经审核不得扩张抓取范围。
 - AI 可执行：MCP patent_source_catalog → patent_topic_catalog → patent_discovery_inbox → patent_public_observe → patent_topic_derive → patent_topic_plan → 现有专利论文检索与 TRIZ / 想法裂变 → patent_public_research_note。公开笔记仍是 unverified_ai_assessment；用户决定采用的课题通过 patent_topic_adopt 转入绑定的项目案卷，继续原有保密/专利申请审批。
-- 周期循环为一次有界命令，由已有持久化 Docker 或 cron/systemd/K8s CronJob 定时调用；还没有内建全天运行的调度服务或自动调用 LLM 的守护进程。CI 测试不会保存实际企业公共库。
+- 周期循环可以由 cron/systemd/K8s CronJob 定时调用，也可用 Compose 的 discovery profile 运行受控 source_catalog_worker 周期巡检。后台只访问已批准公共 RSS，不运行 LLM 推理、不接触专利项目私有数据；CI 不保存实际企业公共库。
 
 ### 使用命令
 
