@@ -403,11 +403,22 @@ class LocalPatentWorkspace:
             if not db.execute("SELECT 1 FROM cases WHERE case_id=?", (case_id,)).fetchone():
                 raise PatentWorkflowError("请先创建案卷。")
             existing = db.execute(
-                "SELECT verification_status, public_pdf_url FROM documents "
+                "SELECT verification_status,public_pdf_url,title,abstract,source,"
+                "source_url,publication_date,jurisdiction FROM documents "
                 "WHERE case_id=? AND doc_id=?", (case_id, doc_id),
             ).fetchone()
-            # 检索新版本不应隐式推翻已人工核验的结论或删除本地 PDF。
+            # 重复导入同一文献不会覆盖人工核验；变更原始来源或正文片段
+            # 则强制撤回已有核验状态，重新等待资料核对人确认。
             pdf = public_pdf_url or (existing["public_pdf_url"] if existing else "")
+            changed = bool(existing and any((
+                existing["title"] != document.title,
+                existing["abstract"] != document.abstract[:12000],
+                existing["source"] != document.source,
+                existing["source_url"] != document.url,
+                existing["publication_date"] != document.publication_date,
+                existing["jurisdiction"] != document.jurisdiction,
+                existing["public_pdf_url"] != pdf,
+            )))
             db.execute(
                 "INSERT INTO documents(case_id,doc_id,kind,publication,title,abstract,"
                 "source,source_url,public_pdf_url,publication_date,jurisdiction,metadata_verified,indexed_at) "
@@ -422,6 +433,23 @@ class LocalPatentWorkspace:
                  document.publication_date, document.jurisdiction,
                  int(document.verified), utc_now()),
             )
+            if changed:
+                db.execute(
+                    "UPDATE documents SET verification_status='待核验',"
+                    "verification_note='',verified_by='',verified_at=NULL,"
+                    "local_pdf_path='',pdf_sha256='' WHERE case_id=? AND doc_id=?",
+                    (case_id, doc_id),
+                )
+            if existing is None or changed:
+                case = db.execute(
+                    "SELECT revision FROM cases WHERE case_id=?", (case_id,)
+                ).fetchone()
+                self._log(
+                    db, case_id, int(case["revision"]), "证据核验",
+                    "系统", "更新来源索引并撤回旧文献核验" if changed else "登记文献索引",
+                    {"doc_id": doc_id, "source_url": document.url,
+                     "verification_reset": changed},
+                )
         return doc_id
 
     def import_case(self, case_dir: Path) -> dict[str, Any]:
