@@ -1,49 +1,78 @@
-# Mechanical_Patent — authoritative agent instructions
+# Mechanical_Patent 企业级智能体总控规范
 
-## Identity and execution environment
+## 系统使命
 
-YOU, the invoking ChatGPT / Codex / supported agent, are the reasoning engine. The repository ships prompts, Agent Skills, legal/engineering review rules, data adapters and deterministic Python tools. Do not request PATENT_LLM_BASE_URL, PATENT_LLM_MODEL, Ollama, Qwen model servers, OpenAI API keys or any external LLM inference API. Use the user's current AI client.
+当用户给出机械、消防车辆、应急装备、液压或控制系统的技术难题时，当前 ChatGPT、Codex 或兼容 AI 会话应在能力范围内完成以下完整闭环：
 
-A local repo can be read/executed by Codex and other coding agents with filesystem access. A ChatGPT web conversation needs the repository exposed through an accessible GitHub connector or supported Work workflow; a download on a separate computer is not automatically visible to ChatGPT. If the host cannot execute the CLI, use its available research tools and produce the same evidence-linked artifacts in conversation or via authorized GitHub actions. Dot automation and connectors depend on account capabilities and must not be presumed.
+保密分级 → 全球专利检索与论文检索 → 技术路线/知识关联 → 多方法发明构思 → 反证检索 → 工程理论验证 → 中国发明专利交底与申请草稿 → 独立质量审核 → 真人签核待办。
 
-## One-command default task
+**当前 AI 会话负责推理与撰写。** 工具代码负责检索数据、出处记录、案卷状态和确定性检查。用户无需配置 Ollama、Qwen 或模型 API。EPO OPS 等数据供应方可能需要自己的数据访问凭证，这与模型推理权限互相独立。
 
-When requested to research a technical direction and write an invention patent, execute the complete research, invention and drafting process without repeated user prompts, except disclosure authorization, inventor facts and unavoidable legal decisions.
+## 简体中文统一标准
 
-1. Classify confidentiality. Distinguish publicly shareable search terms from secret design parameters. Do not upload unpublished CAD/BOM or confidential invention details to external services without explicit permission. Remote search terms can disclose R&D direction.
-2. Build a DUAL literature search plan BEFORE drafting:
-   - Patent: Chinese and English synonyms; CNIPA authorized products, EPO OPS, USPTO ODP, Google Patents/BigQuery, WIPO licensed PCT data; IPC/CPC, full claims, citation expansion and patent family dedup.
-   - Papers and scientific technical literature: OpenAlex, Crossref, arXiv and scholarly publishers where permitted. Use DOI and publication date, abstract, full text with rights review; HTML extraction uses Crawl4AI.
-   - Search both literature types whenever tools permit; record queries, exact provider, source URLs, dates, partial errors, missing database coverage.
-3. Analyze and compare closest existing patent claim elements, available scientific methods, contradictions and unresolved engineering gaps. Papers can be prior art too.
-4. Generate independent invention candidates using TRIZ, SCAMPER, Design Thinking, FMEA, cross-domain physical analogy and ambitious mechanically coherent hypotheses. Record mechanism, components, interfaces, dimensional/physical constraints, alternatives, predicted effects and falsification tests.
-5. Reverse-search EACH candidate using BOTH patents and papers. Produce evidence-backed claim charts and obviousness challenges. Reject or narrow ideas with unsupported distinctions. Keep inventiveness separate from FTO.
-6. Physically assess mechanics, hydraulic flow/NPSH, strength, kinematics, heat/energy, manufacturability, tolerances and safety as applicable. Distinguish theoretical estimates, solver simulations and measured experiments. Do not manufacture evidence.
-7. Draft Chinese invention patent disclosure, independent and dependent claims, enabling embodiments, abstract and drawing plan. Read the pinned Chinese upstream subskills in external/patent-disclosure-skill when checked out. For STEP drawings use the isolated upstream china-patent-figure-skill only with actual model access.
-8. Review claim-to-specification support, numbered source evidence, sufficient disclosure, formal requirements, inventor identity, ownership, confidentiality, foreign filing security. No automatic filing or legal guarantee.
+1. 所有本项目自有的 AGENTS.md、agents/*.md、skills/*/SKILL.md 描述、执行步骤、异常处理和报告均采用简体中文。
+2. 为兼容 Agent Skills 规范，技能的 name 与目录名、文件路径和代码符号使用英文小写和连字符；description、章节标题和自然语言指令保持简体中文。
+3. 专利公开号、DOI、IPC/CPC、物理符号、标准原文、法律术语及 API 字段保留准确原始格式。
+4. 原始第三方许可证和上游代码文档保留其语言；自有适配说明及业务操作指南使用简体中文。
 
-## Tool execution
+## 核心职责与任务分派
 
-Requires Python 3.11+. No LLM provider credentials.
+读取 agents/README.md 定位 13 个专业角色；优先按下面次序分派并保存独立结论：
 
-    python -m pip install -e .
-    python -m mechanical_patent research --direction "机械技术问题" \
-      --patent-query "inlet pressure control" \
-      --paper-query "pump cavitation hydrodynamics" \
-      --allow-search-exposure --case-dir cases/example-unique
+1. 总控与保密：管理案卷、出站授权、费用上限、失败路径、审批依赖。
+2. 全球专利检索 + 论文检索：平行检索并记录真实访问源、检索范围、日期、原文状态。
+3. 技术路线：将论文科学原理与专利的受保护方案组合成可追踪的问题/机理/技术特征知识图谱。
+4. 多创新路径：TRIZ、SCAMPER、设计思维、FMEA、跨领域物理迁移并行提出候选。
+5. 独立反证：逐候选对比 D1/D2 与相关论文，搜寻显而易见性、已有公开和实施限制。
+6. 工程论证：做量纲一致的理论推导，检查结构、材料、运动、流体/热、控制、强度和安全；列出可证伪试验。
+7. 中国发明专利：复用固定版本中文交底、权利要求和说明书 Skill；真实 STEP 可走机械附图子模块。
+8. 质量与发布：保存问题清单、证据锚点、权项支持、工程/专利专业人员双重审批待办。
 
-After explicit authorization, scholarly metadata defaults to OpenAlex and Crossref. EPO OPS can run automatically only if EPO_OPS_CLIENT_ID and EPO_OPS_CLIENT_SECRET are configured. Otherwise, note missing patent source and use native ChatGPT/other agent web/connector search, preserving all citations. For no-network preparation omit the search queries and permission flag.
+单个 AI 客户端如果不具备并行智能体运行能力，按专业角色依次工作并将产物保存在独立阶段文件中，明确同一模型自审的独立性有限。每阶段使用完整案卷事实和来源编号。
 
-To validate AI-authored case files:
+## 标准案卷
 
-    python -m mechanical_patent validate --case-dir cases/example-unique
+案卷目录由 Python 模型无关工具创建，包含：
 
-Read skills/patent-autonomous/SKILL.md, skills/patent-paper-search/SKILL.md, docs/AI_CLIENTS.md, docs/DUAL_LITERATURE.md and CODEX_EXECUTION_PROMPT.md. Never label mocked or imported data as live patents or papers.
+- 00_intake.json：问题与保密级别
+- 01_search_plan.json：专利/论文检索式和语种
+- 02_patents.json：专利证据及权利要求可用性
+- 03_papers.json：论文 DOI/元数据/全文可用性
+- 04_evidence.json：多源证据归一化
+- 04b_technology_graph.json：问题、证据、创新和验证关系
+- 05_inventions.json：候选发明和区别特征
+- 06_countersearch.json：权利特征与原文反证
+- 07_engineering.json：理论论证、量纲、失败模式及验证计划
+- 08_application.json：中文交底和申请文件草稿
+- 09_quality_gate.json：质量与审批阻断
+- events/*.json：具备内容哈希的本地审计事件
+- manifest.json：文件哈希清单与案卷头事件
+- AGENT_NEXT_STEPS.md：当前 AI 后续工作指引
 
-## Engineering rules
+所有声称已查明的文献必须有来源；所有实验数据需要实际执行证据。AI 概念、理论估算、真实求解器结果、实测数据分别标注。
 
-- Vendor-neutral domain Python for AWS Lambda and Alibaba FC with distinct cloud entrypoints; no Docker requirement.
-- Crawl4AI only for permitted HTML content. Patent and academic official APIs remain dedicated data connectors. Never bypass CAPTCHA/paywalls/robots.
-- Preserve pinned MIT/Apache source, LICENSE/NOTICE and upstream SHAs; do not copy unlicensed AutoPatent code.
-- Keep offline mock-based CI, immutable case histories and source hashes, consistent schema, provider error handling and retrieval budgets.
-- Implement on PR branches, verify checks and review before merging.
+## 重要法律和安全门禁
+
+- 《专利法》第22条：新颖性、创造性、实用性；第26条：说明书充分公开与权利要求支持。
+- 发明人由真实作出创造性贡献的自然人确认；AI 不能虚构发明人。
+- 未公开发明、图纸、BOM、实验信息按公司保密要求分级处理，查询词也可能泄露发明方向；外部模型、云服务及搜索接口需要数据外发权限。
+- 专利新颖性和创造性、FTO/侵权风险、工程理论可行性、企业商业价值必须分别形成结论。
+- 人类工程负责人与专利专业人员独立审核后才能由授权人员作人工递交决策；任何 AI 工具不得自行完成法律申请动作。
+- EPO、CNIPA、WIPO、Patsnap、论文平台均须遵守官方/合同授权；网站 HTML 正文统一通过经许可的 Crawl4AI 采集；不得绕开登录、付费墙或禁止自动化的网页。
+
+## 工具与失败处理
+
+优先读取 skills/patent-autonomous/SKILL.md；需要细分技术任务时读取对应子 Skills。用户若没有命名某个 Skill，仍应按完整工作流自主调用相关职责。
+
+命令行支持：
+
+    python -m mechanical_patent research --direction "消防车吸水创新" --patent-query "pump priming system" --paper-query "cavitation NPSH" --allow-search-exposure --case-dir cases/example-001
+    python -m mechanical_patent validate --case-dir cases/example-001
+
+无 EPO 凭证、网络、论文全文、STEP 或 ANSYS 时，标记实际能力缺口，利用当前 AI 允许的原生工具继续完成研究并向用户披露未验证部分；不能用虚构结果填补缺口。
+
+运行者应检查 docs/ENTERPRISE_BLUEPRINT.md、docs/DUAL_LITERATURE.md、docs/AI_CLIENTS.md、docs/SECURITY.md 和 docs/UPSTREAM_AUDIT.md。所有自动化提交前运行 CI，保留可回滚的 Git 分支并检查第三方许可证。
+
+## 版本与企业交付
+
+研发案卷的阶段门禁 G0–G4、跨云部署、可观测性、SLO、企业权限、法务审查、源代码复用策略详见 docs/ENTERPRISE_BLUEPRINT.md。当前仅有部分核心工具达到可运行状态，不能把存在文档或 Git 子模块等同于具备生产能力。
