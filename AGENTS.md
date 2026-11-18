@@ -160,3 +160,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 学术 PDF 合法获取与可恢复证据（2026-11-19）
 
 在已完成的论文元数据检索与长期记忆基础上，按 `skills/patent-pdf-evidence/SKILL.md`、`skills/patent-literature-memory/SKILL.md`、`docs/FULLTEXT_PIPELINE.md` 执行：每篇开放许可证核查、当前案卷外发审批、真实授权人及许可依据记录、正式远端 PDF URL 精确域名白名单与固定 IP/TLS 安全下载、内容哈希、离线 Docling、页码原文索引、机器未核验状态、人工技术事实复核。禁止推定 PDF 链接有效、忽略法律许可、把摘要或解析输出标记已校验全文。下载/解析只通过受控 CLI 执行；MCP 提供状态、队列和页码级只读检索。迁移不得删除原有文献与人工批注，失败后保存状态等待人工判断，正式生产执行前仍需要可信企业身份及签名审批。
+
+## 必须核对全文引用位置（2026-11-19）
+
+对于已经合法归档并解析的论文/专利来源，使用 patent_literature_fulltext_search 定位当前案卷的页码/块，再由 patent_literature_fulltext_quote 检查原文短引真实出现在当前 PDF 解析版本内。只有具体的 p2:b1 等引用通过校验后，才提交 basis=full_text 的 patent_literature_note。批注永久记录源 PDF SHA256、解析版本 SHA256 和未独立核验等级；PDF 更版、未解析、错误文献、缺失页码须拒绝高可信全文分析。应用既有 FulltextPipeline，不创建重复的 PDF 索引表，继续遵守保密/版权/人工法律审查门禁。
