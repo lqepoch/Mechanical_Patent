@@ -316,3 +316,14 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ```
 
 参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
+
+
+## 自我发现课题来源平台库（2026-11-19）
+
+系统新增 **可增量复用的公开工程问题来源目录**。首批预置20个公开平台来源和20项消防车结构研究假说，包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+
+每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
+
+公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；当前无内建常驻 AI 调度、保密外发仍须审批。
+
+完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
