@@ -152,3 +152,9 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 论文平台选择及长期文献记忆（2026-11-18）
 
 论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。
+
+
+
+## 全文证据门禁（2026-11-19）
+
+长周期研究如果涉及原始专利/论文 PDF，必须读取 patent-pdf-evidence 与 patent-literature-memory，以及 docs/FULLTEXT_EVIDENCE.md。项目中的文献先按稳定 EV- ID 建立 Markdown；有授权的 PDF 只能在本案卷目录入库，并对 Docling 结果绑定源 PDF 实际 SHA256、页码、block 与文本哈希。研究 AI 通过 patent_literature_passages 搜索、patent_literature_quote 逐字核查、patent_literature_note 附有实际存在的 p2:b7 锚点，禁止以无效页码提交 full_text 级结论。不同项目/案卷 PDF 禁止交叉读写，原始 PDF/解析 JSON 按 SHA256 多版本归档。解析结果只表明机器可检索，未代表原文技术事实已由独立人员核验。
