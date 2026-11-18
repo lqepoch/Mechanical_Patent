@@ -238,17 +238,52 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
 
 
+## 2026-11-18：每项目独立 SQLite、最新索引、LaTeX 论文和前沿发明雷达
+
+所有新 MCP 运行实例都必须显式绑定项目。每项目独立 projects/<project-id>/patents.sqlite3（WAL、来源历史和案卷审计）；项目间无共享业务 SQLite：
+
+    python -m pip install -e ".[mcp]"
+    python -m mechanical_patent.mcp_server --workspace ./private_patent_workspace --project-id PM80 --transport stdio
+
+Codex MCP 客户端配置时应当为每个项目设置独立的 server 项与 --project-id；例如另一个项目使用 --project-id PM120。当前一个 MCP 实例管理一个项目内的多个案卷，底层 ProjectStorage 对项目 ID 与文件路径进行隔离验证。
+
+新增 MCP 工具：
+- patent_project_info：本项目数据库和案卷数量。
+- patent_index_refresh / patent_index_search / patent_index_history：每次真实供应商请求、项目索引及文献历史版本。
+- patent_frontier_scan：检索近期 OpenAlex 真实公开论文，保留 DOI、发表日期、时间和来源。
+- patent_variant_plan：针对已有真实公开专利名称或公开号生成八种创新变体研究任务；AI 继续具体设计和反证。
+- patent_manuscript_create/read/edit/revisions/export：按章节维护 LaTeX 主源稿、BibTeX 与修订历史，Pandoc 导出 DOCX/HTML/Markdown。
+- 旧 patent_idea_*：负责多代裂变、父子谱系、工程反证和申请候选优选。
+
+详细查看 docs/PROJECT_SQLITE.md、docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md；对应三个中文 Skills 已同步到 .agents/skills。单纯安装完成不代表已经获得 EPO 官方数据授权、企业身份认证、完整全球检索覆盖或真实机械仿真能力。
+
+
+## ✅ 默认工程技术方案书（2026-11-18）
+
+用户给出技术创新问题时，默认研发产物为自然语言工程技术方案，不强行撰写权利要求/说明书。结合结构、操作步骤和现有公开来源选择 CAD/STEP 结构线稿、draw.io 原理图、Mermaid 流程/时序图、技术比较表及验证计划；CTeX/XeLaTeX 排版，源文件可修改。
+
+- 规范：docs/TECHNICAL_BRIEF_STANDARD.md
+- 新 Skill：skills/patent-technical-brief/SKILL.md（Codex 自动发现镜像同步）
+- 模板：src/mechanical_patent/templates/engineering_brief.tex
+- 输入样例：examples/technical_brief_demo.json（示意输入，并非真实成果）
+- MCP：patent_brief_save、patent_conversion_status（原 patent_draft_save 现在强制验证独立审批签名）
+
+工程方案审核通过后可以归档结束。仅用户明确申请并通过企业可信签名审批，才允许使用申请转换工具。生产级身份与权限治理仍在 Issue #25 追踪。
+
+
+工程阶段审阅接口：`patent_brief_audit`，通过双人独立签名返回 `technical_complete`，项目 SQLite 仍用 `--project-id` 单独绑定。
+
 ## 项目独立的千篇文献检索和永久 Markdown 记忆（2026-11-18）
 
 已整合基于官方 OpenAlex/Crossref/EPO OPS 的分页检索，项目级 SQLite FTS5 trigram 检索，按 DOI/专利公开号去重，并为每篇文献生成一份 Markdown，保留跨会话白话解读/机理/结构/参数/局限/创新方向。研究恢复入口、待分析队列、文件索引、分页检查点与历史快照全部位于单项目知识目录中。
 
 CLI 示例：
 
-    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 stats
-    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 search --query "泵入口空化"
-    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 pending --limit 20
-    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 resume-read
-    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 harvest --provider openalex --provider crossref --query "pump cavitation NPSH" --workflow-case-id X01 --workspace-db private_workspace/index.sqlite3 --max-documents 1000 --allow-search-exposure
+    python -m mechanical_patent literature --project-dir private_workspace/projects/PROJECT1/cases/X01 stats
+    python -m mechanical_patent literature --project-dir private_workspace/projects/PROJECT1/cases/X01 search --query "泵入口空化"
+    python -m mechanical_patent literature --project-dir private_workspace/projects/PROJECT1/cases/X01 pending --limit 20
+    python -m mechanical_patent literature --project-dir private_workspace/projects/PROJECT1/cases/X01 resume-read
+    python -m mechanical_patent literature --project-dir private_workspace/projects/PROJECT1/cases/X01 harvest --provider openalex --provider crossref --query "pump cavitation NPSH" --workflow-case-id X01 --workspace-db private_workspace/projects/PROJECT1/patents.sqlite3 --max-documents 1000 --allow-search-exposure
 
 MCP 支持 patent_literature_search/read/note/stats/pending/resume/resume_save/harvest。必须先获工作流外发许可；OpenAlex 深分页超过第一页需要免费 API Key，Crossref/EPO OPS 均受官方配额限制。所有 MD 初次仅含真实源著录数据、摘要/权要摘录，技术深入理解由宿主 AI 按照 patent-literature-memory Skill 逐篇写入并明确原文依据。研究资料不能提交 GitHub。
 

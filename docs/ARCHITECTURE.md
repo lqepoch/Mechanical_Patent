@@ -13,7 +13,9 @@
     ├─ TRIZ / SCAMPER / FMEA / Design Thinking / 跨领域创新
     ├─ 专利 + 论文独立反证
     ├─ 工程理论计算、可行性与验证计划
-    ├─ 中国发明专利交底、申请与独立审核
+    ├─ 默认白话工程方案（CTeX/按需 CAD、draw.io、Mermaid）
+    ├─ 工程/IP 双人评审完成可归档
+    ├─ 仅可信申请转换验签后进行中国发明申请文件审核
     └─ 必要人工门禁
     ↓
 统一证据与案卷（JSON、Markdown、DOCX / CAD 输出待接入）
@@ -37,7 +39,8 @@
 
 CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE_LANDSCAPE
 → PARALLEL_INNOVATIONS → PATENT/PAPER_COUNTERSEARCH → PHYSICS_REVIEW
-→ CLAIM_SUPPORT → CN_DRAFT → STATIC_QA → ENGINEERING_REVIEW
+→ ENGINEERING_TECHNICAL_BRIEF → ENGINEERING_REVIEW → [ARCHIVE_COMPLETE 或 ITERATE]
+→ [USER_FILING_DECISION + TRUSTED_SIGNED_CONVERSION_APPROVAL] → CN_DRAFT
 → PATENT_PROFESSIONAL_REVIEW → MANUAL_FILING_DECISION
 
 每个步骤有文档和来源，失败需报告并保留部分结果。缺少真实数据库、正文或关键实验时，可继续创建理论构想与标记缺口的申请草稿，但不能把审核门禁设为通过。
@@ -67,11 +70,26 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 
 详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
 
+## 消防车与机械结构：公开问题驱动的课题发现层（2026-11-18增补）
+
+在既有专利/论文双源检索入口上游增加 **Problem Discovery（课题发现）** 概念层：
+
+公开问题来源/授权工况及故障 → 来源校验与时效识别 → 失效物理与可量化指标 → 跨行业机理映射 → 专利/论文证据检索 → TRIZ/Quality-Diversity 多路线构思 → 权利要求反证 → 工程验证 → 人工课题立项。
+
+**数据治理**：问题源、候选方案与原始证据均有不可变来源 ID、URL、公开日期、实际检索时间、许可状态、内容哈希与抓取范围；国外标准、政府征集任务、商业专利数据库分开记录授权。已过申报期限的数据可以保留技术情报价值，但不能标成可申请项目。公开问题与项目保密构想分别处理，项目各有独立 SQLite；企业化跨项目分析只能发布经授权脱敏的技术问题摘要。
+
+**交付边界**：当前阶段利用已存在的 patent-landscape、patent-ideation、patent-idea-fission、patent-countersearch 和 patent-engineering-review Skills 执行人工发起的发现研究。后续若开发自动增量采集、事件调度、趋势检测、问题库服务和 MCP 工具，需单独创建业务 Issue，编写合法数据源适配器、分源断路器与限流、断点续采、时间版本、幂等去重、集成测试和监控。现有代码未声称已经实现全自动问题挖掘。
+
+**评审边界**：无法证实“尚未发明”；必须保存检索覆盖、竞争权利要求与可能未公开申请的风险。发现候选只生成通俗技术说明和试验计划，申请专利由发明人选择，企业法务/代理人员评审。
+
+## 2026-11-18 架构升级：白话技术方案优先
+
+按 docs/TECHNICAL_BRIEF_STANDARD.md 构建两个独立审查关口：默认一项发明的一份可读技术方案；仅另行获得签名授权才可进入申报材料。模块化 CTeX 模板和安全图源引用见 src/mechanical_patent/technical_brief.py，转换审批门禁见 src/mechanical_patent/filing_gate.py。该改动不改变现有 EPO/论文来源审批方式；真实组织身份仍需与 #25 集成。
 
 ## 项目级长期文献记忆与官方分页（2026-11-18）
 
 原有运行案卷 JSON 保留。新增每项目独立的知识文件：
-    private_workspace/cases/{case_id}/
+    private_workspace/projects/{project_id}/cases/{case_id}/
       knowledge/literature.sqlite3            # 单项目独立 FTS5/游标/审计索引
       knowledge/RESEARCH_RESUME.md             # 跨会话研究状态
       knowledge/INDEX.md                       # 文献目录

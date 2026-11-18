@@ -33,3 +33,6 @@ user-invocable: true
 
 ## 多代裂变工具
 优先调用 patent-idea-fission 技能，建立 05a_idea_fission.json，注册父子创新假说，通过 Quality-Diversity 保留不同物理机理，再逐候选反证检索与工程论证。创新方法交叉时必须给出可实施的结构/控制耦合机理。代码位于 src/mechanical_patent/ideation_fission.py；MCP 工具详见 docs/MCP_INTERFACE.md。
+
+## 以最新公开资料驱动的发明树
+读取 patent-frontier-innovation：对当期 OpenAlex 公开论文和授权专利数据源开展前沿扫描，再按最新专利真实标题/公开号生成八种差异化任务；使用已有 Idea Fission 工具保存多代谱系和不同技术轴的证据。技术新颖性、FTO 和理论可实施性保持独立人工复核。

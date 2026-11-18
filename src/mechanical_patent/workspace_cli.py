@@ -17,10 +17,11 @@ from .pdf_archive import archive_patent
 
 def add_workspace_parser(subparsers: Any) -> None:
     parser = subparsers.add_parser("workspace", help="企业案卷工作流及本地专利资料库（简体中文）")
-    parser.add_argument(
-        "--db", type=Path, default=Path("data") / "mechanical_patent.sqlite3",
-        help="本地 SQLite 索引位置；正式多租户环境使用 PostgreSQL",
-    )
+    parser.add_argument("--db", type=Path, default=None,
+                        help="旧版显式单案卷 SQLite 路径；新项目使用 --project-id")
+    parser.add_argument("--project-id", help="绑定项目的隔离 SQLite")
+    parser.add_argument("--storage-root", type=Path, default=Path("private_patent_workspace"),
+                        help="每个 project_id 有自己的 SQLite 文件")
     subs = parser.add_subparsers(dest="workspace_command", required=True)
 
     create = subs.add_parser("create", help="创建包含任务依赖的发明研究案卷")
@@ -97,7 +98,16 @@ def handle_workspace(args: argparse.Namespace) -> int:
     if command == "audit":
         result = verify_audit_chain(args.case_dir)
     else:
-        workspace = LocalPatentWorkspace(args.db)
+        if args.project_id:
+            from .project_storage import ProjectStorage
+            project = ProjectStorage(args.storage_root,args.project_id)
+            if args.db is not None and args.db.resolve()!=project.db_path.resolve():
+                raise ValueError("项目模式禁止访问其他数据库。")
+            workspace = project.workspace
+        elif args.db:
+            workspace = LocalPatentWorkspace(args.db)
+        else:
+            raise ValueError("必须提供 --project-id（新项目）或显式 --db（旧库兼容模式）。")
         if command == "create":
             result = workspace.create_case(
                 args.case_id, args.direction, confidentiality=args.confidentiality
