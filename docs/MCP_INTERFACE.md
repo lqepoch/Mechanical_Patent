@@ -100,3 +100,23 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 ### 其他数据供应商接入
 
 已有 Patsnap、Patent Client Agents 等授权检索能力的客户端，调用 patent_run_create 生成本地 RUN，再用 patent_source_import 导入结构化文献（publication/title/url/source/kind/abstract/claims 等）。所有输入一律标记为未核验，自动记入本地来源索引、检索词记录及技术证据图谱；随后须打开真实公开 PDF、核验权利要求与公开日期，再进入正式反证。此工具适用于 Factrix 的供应商无关集成，生产级高并发事务需转 PostgreSQL。
+
+
+## 项目知识库扩展（契约版本 1.2）
+
+新增 MCP tool 名称和职责：
+
+| Tool | 作用 |
+|---|---|
+| patent_literature_search | 检索该项目的论文/专利及研究批注，返回稳定证据 ID 与 MD 路径 |
+| patent_literature_read | 读取指定单篇 MD，返回截断提示避免上下文膨胀 |
+| patent_literature_note | 标注可理解的作用效果、技术机理、工程特征、反例和新发明线索；记录研读层级和出处 |
+| patent_literature_stats | 项目数量、实际已分析数、未完成分页检索数 |
+| patent_literature_pending | 批次获取尚未详细解读的文献 |
+| patent_literature_resume | 取项目研究快照和 SHA256 以恢复会话 |
+| patent_literature_resume_save | 基于 SHA256 乐观锁保存新研究快照及旧历史 |
+| patent_literature_harvest | 保密审批和显式外发授权后用官方源有界分页检索和增量记忆落盘 |
+
+MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM 调用。新研究会话应依次调用 resume→search/read→pending→note→resume_save；遇乐观锁冲突先重新读取合并。现有专利检索/导入流程也写入项目记忆。项目路径为 cases/{case_id}/knowledge/，各项目独立 SQLite，任务队列暂仍用工作空间公共 index.sqlite3。
+
+企业正式上线还须增加 MCP 请求身份级授权、项目级 ABAC、集中服务配额、后台 worker、合规原文下载和页码锚定、备份恢复与可观测性。MCP 同步检索有时间/请求预算，不能标记为无配额的全量检索。
