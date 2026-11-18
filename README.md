@@ -236,3 +236,14 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 备注：GitHub 上包含服务端与离线测试，但并不意味着全球数据检索渠道已经全部开通、生产认证已经部署或机械仿真已经执行。专业专利申请前须复核权利要求、公开充分性、工程实现和权属。
 
 跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
+
+
+## 🔭 三级知识星图与文献记忆
+
+新增可审计的文献知识星图，覆盖单份专利/论文、单个研发案卷、仅获批准公开的跨项目研究网络。单研究运行独立保存 knowledge.sqlite3，自动记录文献关键词、引用、TF-IDF 候选相似关系、已有技术谱系与逐字校验后仍待人工复核的技术三元组；每个文档创建 document_memory/generated/EV-*.md，人工维护的 manual/ 文件不被覆盖。
+
+    python -m mechanical_patent atlas-index --case-dir cases/已有研究运行
+    python -m mechanical_patent atlas-export --case-dir cases/已有研究运行 --scope project --output ./project-graph.json
+    python -m mechanical_patent atlas-global --workspace ./private_patent_workspace --output ./global-public.json
+
+本地打包的 atlas-web 使用 Cytoscape.js 浏览生成的 JSON：cd atlas-web && npm install && npm run dev。MCP 新增 patent_knowledge_index、patent_knowledge_graph、patent_knowledge_record_fact 与 patent_knowledge_global_public；内网/未申请项目绝不进入公开全局投影。相似度及待复核技术关系不能代替真实权要核查、人工审查和法律判断。详情：docs/KNOWLEDGE_ATLAS.md、skills/patent-knowledge-atlas/SKILL.md。
