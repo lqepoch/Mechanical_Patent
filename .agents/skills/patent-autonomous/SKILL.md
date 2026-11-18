@@ -50,6 +50,9 @@ user-invocable: true
 ## 发明树与 MCP 分派
 进入自主专利研发时，从全球专利与论文检索证据出发自动读取 patent-idea-fission/SKILL.md，调用 MCP 工具 patent_idea_plan 生成多代 TRIZ/SCAMPER/FMEA/跨领域任务，按每一方向的真实技术内容 register/evaluate/frontier；对值得继续的候选逐项反证，再 promote 进入现有专利交底、结构附图和正式申请底稿流程。所有工具只记录实际执行结果，真实检索和企业外发必须经过当前轮保密审批。SDK 与工具目录见 docs/MCP_INTERFACE.md。
 
+## 前沿专利与 LaTeX 主源（2026-11-18）
+接到一条全新研发指令后，读取 patent-project-storage、patent-frontier-innovation、patent-latex-research 三项技能；锁定当前 project_id 的 SQLite；按实际供应商检索时间刷新专利索引及公开论文前沿。已有专利名称必须先核对真实公开号再裂变。研究论文保存分节 LaTeX 和 BibTeX 后再输出申请底稿；各个变种均按原权要逐技术特征反证，不能跳过工程实用性验证。
+
 
 ## 知识星图闭环：单文献、单项目、跨项目
 开展双源检索后，必须读取 skills/patent-knowledge-atlas/SKILL.md。每批真实专利/论文入库后执行 atlas-index 或 MCP patent_knowledge_index；根据 patent_knowledge_graph 的单文献/单项目关联，追查相似专利原始权利要求、跨领域原理与尚未验证的假设。单文献自动记忆在 document_memory/generated/，工程与权要复核写在 document_memory/manual/，任何自动重建不得覆盖人工记忆。对已存正文的 AI 技术三元组使用 patent_knowledge_record_fact 并附可复核原文引句，标记待人工核实；引用数和文本相似不代表法律新颖性或创造性。跨项目图只能调用 global_public 公开投影；保密项目不得写入全局公开索引。可视化采用本地打包 Cytoscape.js，导出 JSON 由浏览器本地加载，禁止外部 CDN 上传案卷数据。
