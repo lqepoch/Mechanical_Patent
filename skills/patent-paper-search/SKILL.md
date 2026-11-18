@@ -1,28 +1,32 @@
 ---
 name: patent-paper-search
-description: "检索全球学术论文、预印本、工程文献，利用 OpenAlex、Crossref、arXiv 等合法来源发掘机械发明原理、方法、理论和跨领域技术；生成 DOI 溯源与反证论文清单。"
+description: "联合 OpenAlex、Crossref、arXiv 等检索机械、材料、控制、流体等学术论文和跨领域科研方法，输出 DOI、技术机理和可迁移性证据并供专利反证使用。"
 user-invocable: true
 ---
 
-# Scholarly discovery for mechanical inventions
+# 全球论文与科研文献检索技能
 
-The invoking AI (ChatGPT/Codex) is the search analyst. No LLM API keys are used.
+## 何时使用
+技术路线研究、理论可行性核验、跨学科创新与候选方案反证。
 
-1. From user's mechanical problem, derive 4-8 distinct Chinese/English academic search themes: fundamental physics, system constraints, alternate mechanisms, analogies from adjacent fields and failure modes.
-2. Use currently available native web/connector tools. Where a local shell is accessible use OpenAlex and Crossref through the model-free Python providers. Their public metadata APIs may work without keys; optional OpenAlex key raises provider budget.
-3. Keep DOI/OpenAlex ID, exact title, date, journal/venue when present, abstract as provided, source URL, and actual retrieval time. Do not synthesize a DOI or quote missing abstracts. Record full-text missingness.
-4. For open-access HTML permitted by site policies, delegate article extraction to Crawl4AI. For a PDF supplied by user or available through a proper document handler, inspect the actual file and figures. Obey author/publisher rights and reuse limits.
-5. Classify scientific methods by physical assumptions, variables, constraints, validity range, experimental reproducibility and possible adaptation to the target machine.
-6. Compare against patent prior art to isolate what the paper teaches, what the patent claims, and what remains unsolved. Papers can be legally relevant prior art even without a patent number.
-7. Rerun academic searches for every candidate invention, specifically seeking counterexamples, previous interdisciplinary applications, obvious transfer explanations and inconsistent physical assumptions.
-8. Output an evidence-linked technical matrix and DOIs, with hypotheses, falsification tests, uncertainties, exact coverage and source status. Include non-publication sources such as standards or technical handbooks only when legally accessible.
+## 责任智能体
+参考 agents/README.md 中的第 04、05、07、08 号角色；运行环境可以用当前 AI 在同一会话中依次切换专业角色。
 
-Example for an AI-capable shell, paired with patent queries:
+## 输入资料
+物理问题、学科范围、中英文检索词、论文获取权限。
 
-    python -m mechanical_patent research --direction "消防泵低气压吸水" \
-      --paper-query "centrifugal pump cavitation altitude" \
-      --paper-query "air entrainment two-phase priming" \
-      --patent-query "pump inlet gas separator control" \
-      --allow-search-exposure --case-dir cases/low-pressure-001
+## 工作流程
+1. 从用户技术难题展开物理现象、实验模型、数值方法、临界参数及异行业应用。
+2. 分别检索 OpenAlex 与 Crossref；可用时补 arXiv 和有许可的学术资源。
+3. 记录 DOI、发表日期、论文标题、来源机构、摘要可用性及全文阅读状态。
+4. 对有合法权限的网页使用 Crawl4AI；对论文 PDF 采用专门文件工具阅读，不把元数据当成全文。
+5. 抽取方程、量纲、适用边界、实验设计和反例，建立可转用技术原理的映射。
+6. 每次发明后按新机理再次检索，寻找相关论文的否定证据。
 
-No AI model installation, OpenAI inference API, Qwen runtime or paid research API is required for the default no-key scholarly metadata search. Patent coverage, paper coverage and full-text verification must be reported separately.
+## 必交付成果
+03_papers.json、物理机理矩阵、科研来源和论文反证列表。
+
+## 质量门禁与失败处置
+没有看到论文全文时明确说明；绝对不能伪造 DOI、表格、实验参数；引用遵守版权和许可。
+
+检索或工具调用失败时保存错误、实际检查范围和后续动作，记录到案卷的质量门禁；未经证实的假设不得当作事实。输出应使用简体中文，保留 DOI、专利公开号、IPC/CPC、技术公式和标准名称的原始准确写法。

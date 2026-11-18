@@ -6,17 +6,23 @@ import asyncio
 import os
 from pathlib import Path
 import sys
+import sqlite3
 from uuid import uuid4
 
 from .core import PatentWorkflowError
 from .papers import CrossrefProvider, OpenAlexProvider
 from .providers import EPOOPSProvider, ImportedPatentProvider
 from .workflow import PatentResearch, validate_case
+from .workspace_cli import add_workspace_parser, handle_workspace
 
 
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument("--direction", required=True, help="User's engineering problem; kept in private dossier")
     command.add_argument("--case-dir", type=Path, help="New output folder; existing folders cannot be overwritten")
+    command.add_argument("--workspace-db", type=Path, default=None,
+                         help="索引数据库路径；缺省为案卷父目录/index.sqlite3")
+    command.add_argument("--workflow-case-id",
+                         help="挂载到已有任务队列案卷；联网前强制验证当前轮次的保密审批")
     command.add_argument("--patent-provider", choices=["auto", "epo-ops", "import", "none"], default="auto")
     command.add_argument("--import-json", type=Path, help="Imported records for offline research; always unverified")
     command.add_argument("--paper-provider", action="append", choices=["openalex", "crossref", "import", "none"],
@@ -39,9 +45,12 @@ def main(argv: list[str] | None = None) -> int:
     _add_research_arguments(sub.add_parser("run", help="Alias of 'research'; no LLM API required"))
     validate = sub.add_parser("validate", help="Check AI-written evidence-linked application draft")
     validate.add_argument("--case-dir", required=True, type=Path)
+    add_workspace_parser(sub)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "workspace":
+            return handle_workspace(args)
         if args.command == "validate":
             result = validate_case(args.case_dir)
             print("Quality gate:", result["status"])
@@ -50,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
             print("Filing authorized: false")
             return 0 if not result["issues"] else 2
 
+        folder = args.case_dir or Path("cases") / ("case-" + uuid4().hex[:12])
+        database = args.workspace_db or (folder.parent / "index.sqlite3")
+        from .local_workspace import LocalPatentWorkspace
+        workspace = LocalPatentWorkspace(database)
         remote_requested = bool(
             args.patent_provider == "epo-ops"
             or (args.patent_provider == "auto" and os.getenv("EPO_OPS_CLIENT_ID") and os.getenv("EPO_OPS_CLIENT_SECRET"))
@@ -58,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         if remote_requested and not args.allow_search_exposure:
             raise PatentWorkflowError("Remote search requires --allow-search-exposure after secrecy review.")
+        if args.workflow_case_id and (remote_requested or args.web_url):
+            if not workspace.can_egress(args.workflow_case_id):
+                raise PatentWorkflowError(
+                    "当前案卷未通过本轮保密审批，无法调用外部专利、论文或网页数据源。"
+                )
         if args.patent_provider == "import":
             if not args.import_json:
                 raise PatentWorkflowError("--import-json required when selecting import patent provider")
@@ -93,19 +111,22 @@ def main(argv: list[str] | None = None) -> int:
             gateway = Crawl4AIGateway(set(args.web_allow_domain))
             web_docs, web_errors = asyncio.run(gateway.collect(args.web_url))
 
-        folder = args.case_dir or Path("cases") / ("case-" + uuid4().hex[:12])
         result = PatentResearch(
             patent_provider, paper_providers, folder,
             supplemental_sources=[doc.to_evidence() for doc in web_docs],
             web_documents=web_docs, web_errors=web_errors,
-        ).run(args.direction, args.patent_query, args.paper_query, limit=max(1, min(args.limit, 25)))
+        ).run(args.direction, args.patent_query, args.paper_query,
+              limit=max(1, min(args.limit, 25)), case_id=args.workflow_case_id)
+        indexed = workspace.import_case(folder)
+        print("本地文献索引:", database.resolve())
+        print("已登记索引:", indexed["indexed"])
         print("AI research handoff:", (folder / "AGENT_NEXT_STEPS.md").resolve())
         print("Patents with retrieved claims:", result["patent_claims_available"])
         print("Scholarly papers:", result["papers_discovered"])
         print("Next: use this chat's AI to investigate, invent, challenge, and write the application.")
         print("Filing authorized: false")
         return 0
-    except (PatentWorkflowError, ValueError, FileExistsError, OSError) as exc:
+    except (PatentWorkflowError, ValueError, FileExistsError, OSError, sqlite3.Error) as exc:
         print("ERROR:", str(exc), file=sys.stderr)
         return 3
 

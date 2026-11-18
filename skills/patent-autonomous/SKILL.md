@@ -1,44 +1,43 @@
 ---
 name: patent-autonomous
-description: "一条指令自动检索中国和全球专利、学术论文与跨领域技术文献，产生可解释机械发明方案，完成反证检索、工程可行性分析、中国发明专利交底与申请草稿。由当前 ChatGPT/Codex 模型直接执行，不要求配置外部模型 API。"
+description: "用户给出机械装备技术问题时，自动完成全球专利和学术论文双检索、TRIZ等创新方案、反证检索、工程理论论证、中文发明专利申请草稿和独立审核，全程由当前 ChatGPT/Codex 会话执行。"
 user-invocable: true
 ---
 
-# Patent Autonomous — AI native
+# 发明专利一体化总控技能
 
-## Mandatory operating model
+## 何时使用
+用户要求研发创新点、写中国发明专利、检索现有技术并撰写申请文件时默认触发。
 
-The CURRENT ChatGPT/Codex/compatible AI client is the inventor, reviewer and patent drafter. This Skill supplies instructions and tool contracts; it never asks to install Qwen/Ollama or configure an OpenAI-compatible LLM API.
+## 责任智能体
+参考 agents/README.md 中的第 01、02、03、04、05、06、07、08、09、10、11、12、13 号角色；运行环境可以用当前 AI 在同一会话中依次切换专业角色。
 
-Read repo AGENTS.md and docs/AI_CLIENTS.md first. When there is no local terminal (ChatGPT website), use the current conversation's authorized web, repository connector and document tools and write the reports in the chat or connected repo. Do not claim a downloaded local repository is automatically visible in ChatGPT web.
+## 输入资料
+自然语言技术问题、应用场景、工况与目标、可选 STEP/CAD/BOM、保密授权、拟申请国家。
 
-## Single instruction, full workflow
+## 工作流程
+1. 读根目录 AGENTS.md、agents/README.md、docs/ENTERPRISE_BLUEPRINT.md；初始化项目案卷和保密分级。
+2. 检索中国和全球公开专利，检索国际论文及技术公开资料；记录来源及缺失范围。
+3. 融合专利权要和论文机理，识别传统方法的结构、控制、可靠性和成本约束。
+4. 独立生成至少三种技术原理不同的候选发明；对每个方案写完整机理和可实施路径。
+5. 对每个候选再检索专利与论文，生成 D1/D2 特征对照和反证记录。
+6. 执行独立工程理论分析与可证伪测试规划，排除物理不一致或公开不充分的方案。
+7. 调用中文专利撰写、附图及质量复核技能，提交申请草稿和审查问题表。
+8. 保存证据图谱、案卷状态、质量门禁与人工审签待办。
 
-1. Identify real-world engineering problem, physical environment, constraints, confidentiality class and intended invention patent jurisdiction.
-2. Run prior-art patent search AND scholarly paper search before any invention writing. Read sibling skills/patent-global-search/SKILL.md and skills/patent-paper-search/SKILL.md. Expand Mandarin/English synonyms, mechanical principles, IPC/CPC and cross-field analogs. Record both result sets with publication dates and exact identifiers.
-3. Compare patents by claims/description/figures, and scholarly papers by principles, method, assumptions and experimental scope. Extract technical defects and residual contradictions. Record inadequate search coverage.
-4. Generate multiple independent designs using TRIZ, SCAMPER, FMEA, Design Thinking, biomimicry/cross-domain physical principles and ambitious but physically coherent hypotheses. Each candidate needs components, assembly/control interactions, stepwise mechanisms, falsifiable equations, design constraints and alternatives.
-5. For EACH candidate perform new patent and paper countersearch: feature-by-feature D1/D2 comparison, motivation-to-combine analysis and citation-backed objection table. Novelty/inventiveness, feasibility and FTO are distinct evaluations.
-6. Verify theory via engineering checks: force, flow/NPSH, energy, heat, tolerance, materials, kinematics, boundaries, reliability and safety as applicable. Do not pretend to run SolidWorks/ANSYS or physical experiments unless actual tools and files are available. State equations, units, parameter assumptions, failure mechanisms and verification plan.
-7. Use pinned Chinese subskills external/patent-disclosure-skill/skills/patent-disclosure/SKILL.md and .../patent-application/SKILL.md for thorough legal drafting and Chinese terminology. Include technical disclosure, abstract, independent and dependent claims, complete enabling specification, drawing legend and claim-support matrix. If STEP CAD is available, use isolated china-patent-figure-skill for line art and cross-check marks.
-8. Independently audit: every citation real and dated, every distinction grounded, each claim supported, sufficient disclosure of reproducible mechanism and boundaries, numbering, official statutory formatting vs template preferences, confidentiality, actual human inventors. Mark a draft as pending engineering/patent-professional review. Never automatically submit the application.
+## 必交付成果
+专利/论文检索报告、技术路线矩阵、创新候选、反证表、工程论证、交底书、权利要求和说明书、摘要、附图计划、审查清单。
 
-## Tool contract (optional CLI)
+## 质量门禁与失败处置
+检索不完整可继续开展研究，但不得宣称查全；没有可实施细节不得形成已通过审核的申请；未知实验数据必须注明待验证。
 
-The native AI produces the queries and authored material. Python tools only fetch and structure data, never request an LLM.
+检索或工具调用失败时保存错误、实际检查范围和后续动作，记录到案卷的质量门禁；未经证实的假设不得当作事实。输出应使用简体中文，保留 DOI、专利公开号、IPC/CPC、技术公式和标准名称的原始准确写法。
 
-    python -m mechanical_patent research \
-      --direction "消防泵高海拔吸水创新" \
-      --patent-query "high altitude pump inlet air separation" \
-      --paper-query "cavitation high altitude centrifugal pump" \
-      --allow-search-exposure --case-dir cases/new-case-001
 
-Academic APIs use OpenAlex + Crossref by default after search approval, with optional no-key public access. Patent APIs may require EPO/other authorized provider accounts. If data access is missing, report this and continue using permitted native web search. Read AGENT_NEXT_STEPS.md and fill 05_inventions.json, 06_countersearch.json, 07_engineering.json, 08_application.json with evidence IDs. Then run the static gate:
+## 企业级统一执行要求
 
-    python -m mechanical_patent validate --case-dir cases/new-case-001
+当当前 ChatGPT/Codex 可执行代码时，优先使用统一案卷工作流：创建案卷 → 保密审批 → 绑定 workflow-case-id 的专利和论文双检索 → 证据入库 → 来源核验 → 方向评审 → 多路线创新 → 反证与工程审核 → 中文专利申请草稿 → 独立 QA 与专业审核。
 
-## Output
+不同 Agent 可以在宿主支持的范围内并行领取任务，并通过本地 SQLite 索引、任务依赖和审批记录交接。需要独立核验的专利原文，保存原始公开 PDF HTTPS 地址以供在线查看；许可允许时额外归档本地 PDF。研究方向被否定或需要修改时，创建新的 revision 并保留原先的证据、失败原因和结论。
 
-Patent and paper search logs, source coverage, parallel invention matrix, patent/paper counterevidence, physics and implementation report, Chinese invention application draft, figure plan and uncertainty/approval checklist.
-
-Missing literature or experiments must remain identified as missing. Any invented public patent number, fake paper, fabricated measurement or claim of authorization is a hard failure.
+执行失败应调用对应失败/重试流程并保存任务结果；不得绕过保密审批或把未获取的专利全文、论文全文、工程仿真与实验结果标为已完成。企业架构、任务租约、方向决策和本地 PDF 详见 docs/ENTERPRISE_BLUEPRINT.md 与 docs/WORKFLOW_OPERATIONS.md。
