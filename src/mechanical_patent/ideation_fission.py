@@ -93,6 +93,20 @@ class FissionBoard:
             "notice": "研究设想与内部评分均非新颖性、创造性或自由实施法律结论。",
         }
 
+    def _verified_patent_ids(self) -> set[str]:
+        path = self.case_dir / "04_evidence.json"
+        if not path.is_file():
+            return set()
+        ids: set[str] = set()
+        for raw in json.loads(path.read_text(encoding="utf-8")).get("records", []):
+            try:
+                record = Evidence.from_dict(raw)
+            except (TypeError, ValueError, KeyError):
+                continue
+            if record.verified and record.kind == "patent" and record.claims.strip():
+                ids.add(evidence_id(record))
+        return ids
+
     def _evidence_ids(self) -> set[str]:
         path = self.case_dir / "04_evidence.json"
         if not path.exists():
@@ -261,6 +275,7 @@ class FissionBoard:
             parent_id = parents_raw[0]
             synergy = _required(candidate.get("synergy"), "两机理协同原理")
             interface = _required(candidate.get("interface_definition"), "接口及耦合边界")
+        repair_rationale = ""
         references = candidate.get("evidence_ids", [])
         if not isinstance(references, list) or len(references) > 30 or any(not isinstance(x, str) for x in references):
             raise PatentWorkflowError("来源编号必须是列表，最多30条。")
@@ -280,7 +295,11 @@ class FissionBoard:
                 raise PatentWorkflowError("父构思不存在。")
             parents = [lookup[pid] for pid in parent_identifiers]
             if any(p.get("status") == "rejected_research_route" for p in parents):
-                raise PatentWorkflowError("已否定路线无法直接作为组合亲本；须另建修复假说。")
+                if len(parents) != 1 or candidate.get("repair_of_failed_route") is not True:
+                    raise PatentWorkflowError("已否定路线只能通过显式修复子代继续，不能直接用于跨方案组合。")
+                repair_rationale = _required(candidate.get("repair_rationale"), "修复失败约束的具体机制")
+                if not parents[0].get("rejection", {}).get("learned_constraints"):
+                    raise PatentWorkflowError("失败祖先缺少可追溯约束。")
             if len(parents) > 1 and len({p["technical_axis"] for p in parents}) < 2:
                 raise PatentWorkflowError("跨方案组合至少覆盖两个不同的技术轴。")
             generation = 1 + max((p["generation"] for p in parents), default=-1)
@@ -297,7 +316,9 @@ class FissionBoard:
             item = {
                 "id": "IF-" + uuid4().hex[:12].upper(), "parent_id": parent_id,
                 "parent_ids": parent_identifiers, "synergy": synergy,
-                "interface_definition": interface, "text_overlap_neighbors": neighbors,
+                "interface_definition": interface, "repair_rationale": repair_rationale,
+                "repairs_failed_route": bool(repair_rationale),
+                "text_overlap_neighbors": neighbors,
                 "generation": generation, "title": title, "technical_problem": problem,
                 "mechanism": mechanism, "enabling_details": enabling,
                 "distinguishing_features": features, "assumptions": assumptions,
@@ -389,6 +410,10 @@ class FissionBoard:
             review = item.get("evaluation") or {}
             if not item["evidence_ids"] or not review.get("countersearch_refs") or not review.get("physical_principle"):
                 raise PatentWorkflowError("缺少来源、反证记录或理论依据，无法移交专利申请流程。")
+            verified_patents = self._verified_patent_ids()
+            if (not verified_patents.intersection(item["evidence_ids"])
+                    or not verified_patents.intersection(review["countersearch_refs"])):
+                raise PatentWorkflowError("申请流程移交须有经原始来源核验的专利权利要求反证证据。")
             file = self.case_dir / "05_inventions.json"
             existing = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {"candidates": []}
             items = existing.get("candidates", [])
