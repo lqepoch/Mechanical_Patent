@@ -57,9 +57,19 @@ def main(argv: list[str] | None = None) -> int:
     extract.add_argument("--source-url", default="")
     extract.add_argument("--docling-artifacts", type=Path)
     extract.add_argument("--authorized", action="store_true")
+    bridge = sub.add_parser("mcp-import", help="导入有授权的行业专利 MCP 结构化返回，待核实原始文献")
+    bridge.add_argument("--input", required=True, type=Path)
+    bridge.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "mcp-import":
+            from .mcp_bridge import import_mcp_json
+            result = import_mcp_json(args.input, args.output)
+            print("外部专利证据入库条目:", result["records"])
+            print("证据核验状态:", result["status"])
+            print("来源记录 SHA-256:", result["payload_sha256"])
+            return 0
         if args.command == "benchmark":
             from .benchmarks import run_benchmark
             result = run_benchmark(args.gold, args.results, args.rights, args.output)
