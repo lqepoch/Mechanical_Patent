@@ -177,3 +177,9 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 ## 正文页码搜索的 MCP 接口（2026-11-19）
 
 提供 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,limit=20)`、`patent_literature_fulltext_pending(case_id,limit=30)`；直接使用项目级全文 SQLite，提供可追溯 PDF SHA256、页码及解析状态，不返回文件系统任意读取能力。原文获取、许可审批和本地离线 Docling 由受控 CLI 运行；当前缺少请求级真实企业身份和签名的 MCP 外部写入不提供此能力。见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+## 文献短引核验增量 MCP（2026-11-19）
+
+新增 patent_literature_fulltext_quote(case_id, doc_id, anchor, verbatim)：依托当前项目绑定的 FulltextPipeline，检查证据位置形如 p2:b1、文献当前已解析 PDF 的哈希和段落文本是否含指定原文短引。响应 exact_match 与 SHA256、来源 URL、verification_level=parsed_text_match_only 和 full_text_verified=false；错误页码、其他项目来源和旧版 PDF 返回确定性拒绝。此工具只读，依赖已有合法 OA 下载、离线 Docling 和单项目案卷授权机制；没有任意路径或远程文献读取权限。
+
+patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF 段落锚点真实性校验，记录分析使用的 PDF/解析版本 SHA256 以供历史审计。旧版 metadata/abstract 记忆可以保留，不自动升级证据可信等级。
