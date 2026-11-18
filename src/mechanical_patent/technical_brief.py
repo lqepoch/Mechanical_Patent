@@ -96,6 +96,11 @@ def validate_brief(data: dict[str, Any], *, known_evidence: set[str] | None = No
         asset = item.get("asset", "")
         if asset and (not isinstance(asset, str) or not _ASSET.fullmatch(asset)):
             raise PatentWorkflowError("图片必须为 figures/ 下的安全文件名（pdf/png/jpg）。")
+    locations = {"overview", "mechanism", "structure", "process", "innovation",
+                 "prior_art", "verification", "risk", "appendix"}
+    for fig in figures:
+        if "placement" in fig and fig["placement"] not in locations:
+            raise PatentWorkflowError("图片的放置章节无效。")
     profile = data.get("profile", "auto")
     if profile not in PROFILES:
         raise PatentWorkflowError("未知技术方案模板风格。")
@@ -152,16 +157,20 @@ def _table(headers: tuple[str, ...], rows: list[list[str]], widths: tuple[str, .
 
 def render_brief(data: dict[str, Any], case_dir: Path, *,
                  known_evidence: set[str] | None = None) -> tuple[str, dict[str, Any]]:
-    """返回独立 XeLaTeX 文档和审阅元数据，绝不执行外部命令。"""
+    """按所述机理把图放在对应段落之后；不运行 TeX/浏览器/CAD。"""
     report = validate_brief(data, known_evidence=known_evidence)
     root = Path(case_dir).resolve()
-    parts = [
-        _section("一页理解方案",
-                 r"\textbf{技术问题：}" + _para(data["technical_problem"])
-                 + "\n\n" + r"\textbf{一句话方案：}" + _para(data["solution"])
-                 + "\n\n" + r"\textbf{预期效果：}" + _para(data["expected_effect"])),
-        _section("工作原理与创新机理", _para(data["mechanism"])),
-    ]
+    sections: list[tuple[str, str, str]] = []
+
+    def add(key: str, title: str, body: str) -> None:
+        sections.append((key, title, body))
+
+    add("overview", "一页理解方案",
+        r"\textbf{技术问题：}" + _para(data["technical_problem"])
+        + "\n\n" + r"\textbf{一句话方案：}" + _para(data["solution"])
+        + "\n\n" + r"\textbf{预期效果：}" + _para(data["expected_effect"]))
+    add("mechanism", "工作原理与创新机理", _para(data["mechanism"]))
+
     components = data.get("components", [])
     steps = data.get("process_steps", [])
     comp_body = _table(("标号", "部件", "作用"), [
@@ -172,71 +181,89 @@ def render_brief(data: dict[str, Any], case_dir: Path, *,
     ], (".27", ".35", ".29"))
     if report["profile"] == "control":
         if steps_body:
-            parts.append(_section("执行步骤与条件逻辑", steps_body))
+            add("process", "执行步骤与条件逻辑", steps_body)
         if comp_body:
-            parts.append(_section("结构和接口说明", comp_body))
+            add("structure", "结构和接口说明", comp_body)
     else:
         if comp_body:
-            parts.append(_section("结构和接口说明", comp_body))
+            add("structure", "结构和接口说明", comp_body)
         if steps_body:
-            parts.append(_section("执行步骤与条件逻辑", steps_body))
+            add("process", "执行步骤与条件逻辑", steps_body)
 
     innovation_rows = [
         r"\textbf{具体区别：}" + _para(x["feature"])
         + "\n" + r"\textbf{对照差异：}" + _para(x["prior_difference"])
         + "\n" + r"\textbf{技术效果：}" + _para(x["technical_effect"])
-        + "\n" + r"\textbf{证据编号：}" + tex_escape("、".join(x.get("evidence_ids", [])) or "待检索确认")
+        + "\n" + r"\textbf{证据编号：}"
+        + tex_escape("、".join(x.get("evidence_ids", [])) or "待检索确认")
         for x in data["innovation_points"]
     ]
-    parts.append(_section("值得保护的技术创新点（初筛）", _bullets(innovation_rows)))
-
+    add("innovation", "值得保护的技术创新点（初筛）", _bullets(innovation_rows))
     if data.get("prior_art"):
-        parts.append(_section("相关公开技术与差异", _table(
+        add("prior_art", "相关公开技术与差异", _table(
             ("来源 ID", "已知方案", "本方案区别"),
             [[x["evidence_id"], x["known_solution"], x["difference"]] for x in data["prior_art"]],
-            (".17", ".35", ".39"))))
+            (".17", ".35", ".39")))
     if data.get("risks"):
-        parts.append(_section("工程风险与失效处理", _table(
+        add("risk", "工程风险与失效处理", _table(
             ("风险/失效", "应对和验证"),
             [[x["failure"], x["mitigation"]] for x in data["risks"]],
-            (".38", ".53"))))
-    parts.append(_section("试验和评审计划", _para(data["verification_plan"])))
+            (".38", ".53")))
+    add("verification", "试验和评审计划", _para(data["verification_plan"]))
 
-    figures = []
-    missing = []
+    defaults = {
+        "structure": "structure", "section": "structure",
+        "exploded": "structure", "photo": "structure",
+        "principle": "mechanism", "flowchart": "process",
+        "sequence": "process", "state": "process",
+        "comparison": "prior_art", "curve": "verification",
+    }
+    available = {key for key, _, _ in sections}
+    figures_by_key: dict[str, list[str]] = {}
+    missing: list[dict[str, Any]] = []
     for number, fig in enumerate(data.get("figures", []), 1):
         asset = fig.get("asset")
         if not asset:
             missing.append({"number": number, "reason": "未提供已导出的图片", "kind": fig["kind"]})
             continue
         path = root / asset
-        # 安全路径只能是固定 figures 子目录下的非符号链接实际文件。
         if path.is_symlink() or not path.resolve().is_relative_to(root / "figures") or not path.is_file():
             missing.append({"number": number, "reason": "图纸未在案卷文件夹中找到", "asset": asset})
             continue
-        figures.append(
+        placement = fig.get("placement", defaults[fig["kind"]])
+        if placement not in available:
+            placement = "innovation" if placement == "prior_art" else "mechanism"
+        figures_by_key.setdefault(placement, []).append(
             r"\begin{figure}[htbp]" + "\n" + r"\centering" + "\n"
             + r"\includegraphics[width=.9\linewidth]{" + asset + "}\n"
             + r"\caption{" + tex_escape(fig["caption"]) + "}\n"
-            + r"\end{figure}")
-    if figures:
-        parts.append(_section("按需选用的技术图示", "\n".join(figures)))
+            + r"\end{figure}"
+        )
+    parts = [
+        _section(title, body + ("\n\n" + "\n\n".join(figures_by_key[key])
+                               if key in figures_by_key else ""))
+        for key, title, body in sections
+    ]
     if missing:
         parts.append(_section("待补图纸清单", _bullets([
-            tex_escape(f"图{f['number']}：{f.get('asset','无导出文件')}，{f['reason']}")
+            tex_escape(f"图{f['number']}：{f.get('asset', '无导出文件')}，{f['reason']}")
             for f in missing
         ])))
     if report["warnings"]:
-        parts.append(_section("当前证据及表达缺口", _bullets([tex_escape(x) for x in report["warnings"]])))
-    parts.append(_section("评审结论状态",
-                          "当前为工程技术方案审阅稿。工程结构和控制可行性需要专业人员签核；"
-                          "专利检索和创造性意见仅为阶段性研究，"
-                          "尚未批准申请，不包含法定格式的权利要求、说明书或摘要。"))
-    template = resources.files("mechanical_patent").joinpath("templates/engineering_brief.tex").read_text(encoding="utf-8")
+        parts.append(_section("当前证据及表达缺口",
+                              _bullets([tex_escape(x) for x in report["warnings"]])))
+    parts.append(_section(
+        "评审结论状态",
+        "当前为工程技术方案审阅稿。结构和控制可行性需专业人员签核；"
+        "专利检索与创造性意见仅为阶段性研究，"
+        "申请转换需单独批准，本文件不包含权利要求、说明书或专利摘要。"))
+    template = resources.files("mechanical_patent").joinpath(
+        "templates/engineering_brief.tex").read_text(encoding="utf-8")
     latex = template.replace("%%TITLE%%", tex_escape(data["title"])).replace(
         "%%CANDIDATE%%", tex_escape(data["candidate_id"])
     ).replace("%%PROFILE%%", tex_escape(report["profile"])).replace(
         "%%CONTENT%%", "\n\n".join(parts))
     report["missing_figures"] = missing
     report["latex_length"] = len(latex)
+    report["figure_placements"] = {key: len(values) for key, values in figures_by_key.items()}
     return latex, report
