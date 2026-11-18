@@ -86,8 +86,11 @@ class LocalPatentWorkspace:
             conn.close()
 
     def _init(self) -> None:
-        with self.connect(write=True) as db:
-            db.execute("PRAGMA journal_mode = WAL") if not db.in_transaction else None
+        # SQLite executescript() performs implicit transaction management.
+        # Run schema installation outside the write transaction, then use
+        # BEGIN IMMEDIATE for every ordinary state mutation.
+        with self.connect() as db:
+            db.execute("PRAGMA journal_mode = WAL")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS cases (
                   case_id TEXT PRIMARY KEY, direction TEXT NOT NULL,
@@ -233,9 +236,11 @@ class LocalPatentWorkspace:
         now = utc_now()
         until = (_utc() + timedelta(seconds=lease_seconds)).isoformat(timespec="seconds")
         with self.connect(write=True) as db:
-            case = db.execute("SELECT revision FROM cases WHERE case_id=?", (case_id,)).fetchone()
+            case = db.execute("SELECT revision,status FROM cases WHERE case_id=?", (case_id,)).fetchone()
             if case is None:
                 raise PatentWorkflowError("案卷不存在。")
+            if case["status"] != "研究中":
+                raise PatentWorkflowError("案卷已调整方向或终止，当前轮次暂停领取任务。")
             revision = int(case["revision"])
             db.execute(
                 "UPDATE tasks SET status='待领取',assigned_to=NULL,lease_expires=NULL, "
@@ -282,6 +287,11 @@ class LocalPatentWorkspace:
             row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
             if row is None or row["status"] != "运行中" or row["assigned_to"] != actor:
                 raise PatentWorkflowError("任务不存在、尚未领取或执行人与租约不匹配。")
+            case_record = db.execute(
+                "SELECT revision,status FROM cases WHERE case_id=?", (row["case_id"],)
+            ).fetchone()
+            if case_record is None or case_record["status"] != "研究中" or int(case_record["revision"]) != int(row["revision"]):
+                raise PatentWorkflowError("案卷当前轮次已改变，无法提交旧任务结果。")
             if row["lease_expires"] and _date(row["lease_expires"]) < _utc():
                 raise PatentWorkflowError("任务租约已过期，请重新领取。")
             case_id = row["case_id"]
@@ -332,8 +342,8 @@ class LocalPatentWorkspace:
                 f"AND verification_status='已核验' AND doc_id IN ({placeholders})",
                 (case_id, *ids),
             ).fetchall()
-            if len(rows) != len(set(ids)):
-                raise PatentWorkflowError("方向依据含未入库或未完成核验的文献编号。")
+            if len(ids) != len(set(ids)) or len(rows) != len(set(ids)):
+                raise PatentWorkflowError("方向依据存在重复、未入库或未完成核验的文献编号。")
         db.execute(
             "INSERT INTO direction_decisions(case_id,revision,decision,rationale,evidence_ids_json,reviewed_by,created_at) "
             "VALUES(?,?,?,?,?,?,?)",
@@ -435,8 +445,11 @@ class LocalPatentWorkspace:
             ).fetchone()
             if row is None:
                 raise PatentWorkflowError("不存在该案卷的文献记录。")
-            if accepted and not row["metadata_verified"]:
-                raise PatentWorkflowError("尚未从可信源直接获得元数据，需先核对原始文献。")
+            # Provider-verified metadata and a human source review are separate states.
+            # A reviewer may independently verify an imported record against the original
+            # public page/PDF; this must never quietly upgrade metadata_verified.
+            if accepted and not (row["source_url"] or public_pdf_url):
+                raise PatentWorkflowError("缺少可打开的原始文献来源，无法核验。")
             pdf = row["public_pdf_url"]
             if public_pdf_url is not None:
                 from urllib.parse import urlsplit
