@@ -40,7 +40,7 @@ class Evidence:
         parsed = urlparse(self.url)
         if parsed.scheme != "https" or not parsed.netloc:
             raise ValueError("Evidence requires a publicly inspectable HTTPS source URL")
-        if self.kind not in {"patent", "paper", "standard", "manual"}:
+        if self.kind not in {"patent", "paper", "standard", "manual", "web"}:
             raise ValueError("Unsupported evidence kind")
 
     @classmethod
