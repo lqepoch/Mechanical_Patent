@@ -25,8 +25,8 @@ class HarvestBudget:
     def __post_init__(self) -> None:
         if not 1 <= self.max_documents <= 10000:
             raise PatentWorkflowError("每个检索词的文献预算须在1至10000条之间。")
-        if not 1 <= self.page_size <= 100:
-            raise PatentWorkflowError("每次请求最多100条文献。")
+        if not 1 <= self.page_size <= 1000:
+            raise PatentWorkflowError("每次请求最多1000条文献；大页仅用于 Bulk 检索。")
         if not 1 <= self.max_pages <= 200:
             raise PatentWorkflowError("每个检索词最多200页。")
         if not 10 <= self.max_seconds <= 3600:
@@ -47,6 +47,10 @@ class LiteratureHarvester:
     ) -> dict[str, Any]:
         """恢复已保存游标；Crossref 老游标失效后通过幂等去重从第一页重检。"""
         limits = budget or HarvestBudget()
+        if getattr(provider, "name", "") == "semantic-scholar-bulk" and (
+            limits.page_size != 1000 or limits.max_documents % 1000 != 0
+        ):
+            raise PatentWorkflowError("Semantic Scholar Bulk 需要每页1000条且总数为1000的整数倍。")
         if not query or len(query.strip()) > 240:
             raise PatentWorkflowError("检索词不能为空且不得超过240字符。")
         if not hasattr(provider, "search_page"):

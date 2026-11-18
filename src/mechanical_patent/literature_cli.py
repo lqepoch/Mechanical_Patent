@@ -73,7 +73,8 @@ def add_literature_parser(subparsers: Any) -> None:
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
                          choices=["openalex", "crossref", "semantic-scholar",
-                                  "arxiv", "europe-pmc", "pubmed", "epo-ops"])
+                                  "arxiv", "europe-pmc", "pubmed",
+                                  "semantic-scholar-bulk", "epo-ops"])
     harvest.add_argument("--query", action="append", required=True)
     harvest.add_argument("--workflow-case-id", required=True)
     harvest.add_argument("--workspace-db", required=True, type=Path)
@@ -159,7 +160,10 @@ def handle_literature(args: argparse.Namespace) -> int:
         if not workspace.can_egress(args.workflow_case_id):
             raise PatentWorkflowError("工作流未批准当前案卷外部查询。")
         from .papers import CrossrefProvider, OpenAlexProvider
-        from .paper_sources import SemanticScholarProvider, ArxivProvider, EuropePMCProvider, PubMedProvider
+        from .paper_sources import (
+            SemanticScholarProvider, SemanticScholarBulkProvider,
+            ArxivProvider, EuropePMCProvider, PubMedProvider,
+        )
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         budgets = HarvestBudget(
@@ -168,7 +172,9 @@ def handle_literature(args: argparse.Namespace) -> int:
         )
         types = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
-            "semantic-scholar": SemanticScholarProvider, "arxiv": ArxivProvider,
+            "semantic-scholar": SemanticScholarProvider,
+            "semantic-scholar-bulk": SemanticScholarBulkProvider,
+            "arxiv": ArxivProvider,
             "europe-pmc": EuropePMCProvider, "pubmed": PubMedProvider,
             "epo-ops": EPOOPSProvider,
         }
