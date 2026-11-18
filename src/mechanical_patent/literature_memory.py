@@ -408,6 +408,52 @@ class LiteratureMemoryStore:
                 "path": str(path), "content_hash": row["content_hash"],
                 "analysis_count": row["analysis_count"]}
 
+    def write_machine_extraction(
+        self, doc_id: str, *, pdf_sha256: str,
+        parsed_json_path: str, blocks: int, source_url: str,
+    ) -> dict[str, Any]:
+        """机器 PDF 提取索引存入文献 MD，保留用户此前所有研究批注。"""
+        if not re.fullmatch(r"[0-9a-f]{64}", pdf_sha256):
+            raise PatentWorkflowError("解析结果缺少有效 PDF 内容哈希。")
+        if not 1 <= int(blocks) <= 30000:
+            raise PatentWorkflowError("解析段落统计不合法。")
+        path = Path(parsed_json_path)
+        if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(
+            (self.root / "pdf_extracted").resolve()
+        ):
+            raise PatentWorkflowError("解析结果位于项目范围以外。")
+        paper = self.paper_source(doc_id)
+        current = self.read(doc_id)["markdown"]
+        start = "<!-- BEGIN MACHINE PDF EXTRACTION -->"
+        end = "<!-- END MACHINE PDF EXTRACTION -->"
+        if AUTO_END not in current:
+            raise PatentWorkflowError("文献 Markdown 模板缺少机器区标记。")
+        # Metadata is a machine hint. No claim that the paper was scientifically verified.
+        section = (
+            start + "\n\n## 已归档全文与页码索引（机器提取，待原文核验）\n\n"
+            + "- PDF SHA256：" + pdf_sha256 + "\n"
+            + "- 来源：" + _safe_markdown(source_url, 1600) + "\n"
+            + "- 解析结果：" + _safe_markdown(str(path.relative_to(self.root)), 240) + "\n"
+            + "- 可检索段落：" + str(blocks) + "\n"
+            + "- 全文结论核验：未完成；需人工对照原始 PDF、页码、公式及表格。\n\n"
+            + end
+        )
+        pre, tail = current.split(AUTO_END, 1)
+        if start in tail:
+            left, right = tail.split(start, 1)
+            if end not in right:
+                raise PatentWorkflowError("机器全文区域标记损坏，拒绝覆盖。")
+            tail = left + right.split(end, 1)[1]
+        updated = pre + AUTO_END + "\n\n" + section + "\n" + tail.lstrip("\n")
+        if len(updated) > MAX_NOTES:
+            raise PatentWorkflowError("文献记忆超过长度上限。")
+        note = self._note_path(doc_id, "paper")
+        _atomic_text(note, updated)
+        with self.connect(write=True) as db:
+            self._index_fts(db, doc_id, body=updated)
+        return {"doc_id": doc_id, "pdf_sha256": pdf_sha256, "blocks": blocks,
+                "reviewed": False, "note_path": str(note)}
+
     def write_analysis(
         self, doc_id: str, *, analyst: str, basis: str,
         analysis: dict[str, str], source_positions: list[str] | None = None,
