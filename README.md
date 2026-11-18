@@ -95,3 +95,29 @@ If the decision is to file overseas for inventions completed in China, run an ad
 The initial integration searches EPO OPS (authorized credentials required) and optionally user-imported documents. EPO bibliographic XML may not contain claims or abstracts; the program fetches claims separately when available. OPS coverage cannot establish an exhaustive worldwide search. Professional searching for CNIPA, WIPO/PCT, US and non-patent literature remains an explicitly tracked rollout item.
 
 Automatic legal filing, automatic inventor attribution and automatic patentability guarantees are intentionally excluded.
+
+
+## Full upstream source and Crawl4AI
+
+The project now pins five complete licensed upstream codebases through Git submodules. Use the recursive checkout to obtain their full original code and license files:
+
+    git clone --recurse-submodules https://github.com/lqepoch/Mechanical_Patent.git
+    git submodule update --init --recursive
+
+To copy one pinned licensed source into this repository for direct modifications:
+
+    python scripts/vendor_upstreams.py chinese-patent
+    python scripts/vendor_upstreams.py figure
+    python scripts/vendor_upstreams.py all
+
+This populates vendor/<name> with an auditable Git commit snapshot, license and metadata. Source upgrades are deliberate PRs. AutoPatent code is excluded until a compatible license is confirmed.
+
+For HTML pages and online technical documents, Mechanical_Patent uses **Crawl4AI**. Official patent database retrieval remains separate from web scraping. Crawl4AI is an opt-in dependency:
+
+    python -m pip install -e ".[web]"
+    crawl4ai-setup
+    crawl4ai-doctor
+
+To include an authorized public webpage as non-patent evidence, use the run command with --web-url, --web-allow-domain and --allow-web-exposure. Robots checking, explicit host permission and provenance records are built in. See docs/CRAWL4AI.md, docs/SECURITY.md and NOTICE. Substantive and legal review still applies.
+
+**Important:** Current production completeness remains limited to the evidenced Python research slice, EPO OPS integration requiring credentials, and a Chinese drafting prompt adapter. The pinned source trees expose upstream scripts but do not automatically certify their operations or grant rights to patent databases.
