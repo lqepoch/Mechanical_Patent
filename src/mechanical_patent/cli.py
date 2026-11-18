@@ -14,6 +14,7 @@ from .papers import CrossrefProvider, OpenAlexProvider
 from .providers import EPOOPSProvider, ImportedPatentProvider
 from .workflow import PatentResearch, validate_case
 from .workspace_cli import add_workspace_parser, handle_workspace
+from .literature_cli import add_literature_parser, handle_literature
 
 
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
@@ -49,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     validate = sub.add_parser("validate", help="Check AI-written evidence-linked application draft")
     validate.add_argument("--case-dir", required=True, type=Path)
     add_workspace_parser(sub)
+    add_literature_parser(sub)
     benchmark = sub.add_parser("benchmark", help="按授权标注集评测专利检索排序、同族召回率")
     benchmark.add_argument("--gold", required=True, type=Path)
     benchmark.add_argument("--results", required=True, type=Path)
@@ -167,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "workspace":
             return handle_workspace(args)
+        if args.command == "literature":
+            return handle_literature(args)
         if args.command == "validate":
             result = validate_case(args.case_dir)
             print("Quality gate:", result["status"])
