@@ -81,3 +81,11 @@ AI 再把论文的流动机理、汽蚀阈值、传感控制和材料知识转�
 每发现一篇资料，立即生成带证据编号和可打开链接的 Markdown。AI 按每批10–30篇进行白话技术解读，记录原理、结构、控制、参数、作用效果、缺点、反证、创新点和跨文献连接；basis 标记 metadata/abstract/claims/full_text，声称读过完整原文必须记录页码/章节。研究快照 RESEARCH_RESUME.md 保存当前事实、发明候选、未解决问题、下次任务。元数据自动成文不等于实质读完。
 
 开源复用：官方 OpenAlex、Crossref 元数据 API；已有引证扩展 OpenCitations；合法全文可接已有 Docling PDF 解析、PaperQA2 证据检索方式及 GROBID TEI，但要核查模型权重、版权和使用许可。大规模批量离线可评估 OpenAlex Snapshot，降低反复 API 查询成本。专业检索覆盖用已授权的召回金标准持续验证。
+
+## 论文检索多来源标准接口（2026-11-18）
+
+统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
+
+平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
+
+CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。

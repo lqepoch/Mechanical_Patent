@@ -148,3 +148,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 容器部署和发行规范（2026-11-18）
 
 容器化、磁盘、GHCR 和灾备任务必须读取 skills/patent-deployment/SKILL.md 与 docs/DEPLOYMENT_UBUNTU26.md。Ubuntu 26.04 使用宿主机独立磁盘挂载 /data，并配置 PATENT_MCP_PROJECT_ID；每项目 SQLite 位于 projects/<project-id>/patents.sqlite3。服务仅允许本机 127.0.0.1:8765 访问；公开镜像不包含私有案卷和密钥。PR 完成测试后由 main / 版本标签发布，远程接入须先落实 OIDC 和项目 ABAC。
+
+## 论文平台选择及长期文献记忆（2026-11-18）
+
+论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。

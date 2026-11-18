@@ -43,3 +43,13 @@ user-invocable: true
 本技能与 patent-literature-memory/SKILL.md 联用。使用 OpenAlex/Crossref 官方 cursor 分批查询论文并在该项目 knowledge/documents/papers/ 下为每个 DOI/OpenAlex ID 生成单独 MD；去重后的全部元数据和批注索引归属于同项目 literature.sqlite3。OpenAlex 深分页需要免费 API Key；Crossref cursor 过期可按相同查询重新运行，通过 DOI 幂等去重恢复。遇配额、超时或缺失摘要时记录真实缺口。
 
 经授权获取论文全文后记录其结构、关键方程、参数边界、实验结果出处、局限和可迁移机理。使用 patent_literature_note 的 basis 字段区分 metadata、abstract、claims、full_text；声明全文依据时必须有页码/章节。每批次研究先恢复 RESEARCH_RESUME.md，后加载相关文献与未完成队列；定期保存下一轮创新想法与反证关键词。
+
+## 统一科研数据源与多渠道选择（2026-11-18）
+
+1. 调用 `paper-sources` / MCP `patent_capabilities` 获取平台能力。按问题选择：广域关键词 OpenAlex + Crossref；引文扩展 Semantic Scholar；预印本 arXiv；生医 Europe PMC + PubMed；有许可的机构库 CORE；专利与学术引用协同 Lens。缺少来源时解释覆盖盲区。
+2. 使用明确外发审批后的 `--paper-provider` 或 MCP `paper_sources`。默认 OpenAlex、Crossref、Semantic Scholar；`all` 跳过无商业授权或无凭证的 CORE/Lens；单独选择有价平台必须既提供 Key，又明确 `--allow-paid-paper-apis` / MCP `allow_paid_paper_apis`。
+3. 通过 DOI 合并不同源元数据，统一记录来源列表、作者、引用数、发表日、OA、许可、候选 PDF URL。Unpaywall 仅做 DOI 合法 OA 位置补全（需真实邮件），未获取/核验全文时 `full_text_verified=false`。
+4. 保存 03_papers.json、04_evidence.json、03_paper_memory/EV-*.md，每篇文献独立记忆元数据、可追溯链接、待核对全文的实验/公式和相反证据。优先在项目私有工作空间内持久化，通过 manifest 校验，不将内部技术与大文件提交到公共仓库。
+5. 供应商异常、缺摘要、失效 PDF/非开放许可、限额及 429 时记录缺口并保留可用来源；仅在许可和审批后再下载原文，通过 Docling/PDF 审核核查页码、方程、实验结论，再联动专利权利要求反证。
+
+接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。

@@ -162,6 +162,10 @@ class LocalPatentWorkspace:
                   recorded_at TEXT NOT NULL
                 );
             """)
+            # 兼容既有项目级 SQLite；增量迁移不删除历史核验和 PDF 索引。
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)")}
+            if "paper_metadata_json" not in columns:
+                db.execute("ALTER TABLE documents ADD COLUMN paper_metadata_json TEXT NOT NULL DEFAULT '{}'")
 
     def create_case(self, case_id: str, direction: str, *, confidentiality: str = "秘密") -> dict[str, Any]:
         case_id = _token(case_id, field="案卷编号", maximum=120)
@@ -490,7 +494,7 @@ class LocalPatentWorkspace:
             ).fetchone()
             # 重复导入同一文献不会覆盖人工核验；变更原始来源或正文片段
             # 则强制撤回已有核验状态，重新等待资料核对人确认。
-            pdf = public_pdf_url or (existing["public_pdf_url"] if existing else "")
+            pdf = public_pdf_url or document.pdf_url or (existing["public_pdf_url"] if existing else "")
             changed = bool(existing and any((
                 existing["title"] != document.title,
                 existing["abstract"] != document.abstract[:12000],
@@ -502,17 +506,18 @@ class LocalPatentWorkspace:
             )))
             db.execute(
                 "INSERT INTO documents(case_id,doc_id,kind,publication,title,abstract,"
-                "source,source_url,public_pdf_url,publication_date,jurisdiction,metadata_verified,indexed_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "source,source_url,public_pdf_url,publication_date,jurisdiction,metadata_verified,indexed_at,paper_metadata_json) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(case_id,doc_id) DO UPDATE SET "
                 "title=excluded.title,abstract=excluded.abstract,source=excluded.source,"
                 "source_url=excluded.source_url,public_pdf_url=excluded.public_pdf_url,"
                 "publication_date=excluded.publication_date,jurisdiction=excluded.jurisdiction,"
-                "metadata_verified=excluded.metadata_verified,indexed_at=excluded.indexed_at",
+                "metadata_verified=excluded.metadata_verified,indexed_at=excluded.indexed_at,"
+                "paper_metadata_json=excluded.paper_metadata_json",
                 (case_id, doc_id, document.kind, document.publication, document.title,
                  document.abstract[:12000], document.source, document.url, pdf,
                  document.publication_date, document.jurisdiction,
-                 int(document.verified), utc_now()),
+                 int(document.verified), utc_now(), _json(document.paper_metadata)),
             )
             if changed:
                 db.execute(
@@ -553,7 +558,7 @@ class LocalPatentWorkspace:
                 # authenticated database response; import as unverified data.
                 record = Evidence.from_dict(raw, imported=True)
                 if record.kind == kind:
-                    self.upsert_document(case_id, record)
+                    self.upsert_document(case_id, record, public_pdf_url=record.pdf_url)
                     counts[kind] += 1
         return {"case_id": case_id, "indexed": counts, "database": str(self.path)}
 
@@ -604,7 +609,7 @@ class LocalPatentWorkspace:
         sql = (
             "SELECT case_id,doc_id,kind,publication,title,source,source_url,"
             "public_pdf_url,publication_date,verification_status,"
-            "local_pdf_path,pdf_sha256 FROM documents "
+            "local_pdf_path,pdf_sha256,paper_metadata_json FROM documents "
             "WHERE (title LIKE ? ESCAPE '\\' OR publication LIKE ? ESCAPE '\\' "
             "OR abstract LIKE ? ESCAPE '\\')"
         )
@@ -615,7 +620,10 @@ class LocalPatentWorkspace:
         sql += " ORDER BY indexed_at DESC, publication LIMIT ?"
         params.append(max(1, min(int(limit), 200)))
         with self.connect() as db:
-            return [dict(x) for x in db.execute(sql, params).fetchall()]
+            rows = [dict(x) for x in db.execute(sql, params).fetchall()]
+        for row in rows:
+            row["paper_metadata"] = json.loads(row.pop("paper_metadata_json") or "{}")
+        return rows
 
     def pdf_source(self, case_id: str, doc_id: str) -> dict[str, Any]:
         with self.connect() as db:

@@ -114,3 +114,11 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 使用 Linux host network 保留 127.0.0.1 回环限制，通过 bind mount 将指定数据磁盘映射到容器 /data。每个进程绑定 PATENT_MCP_PROJECT_ID，存储目录 /data/projects/<project-id>/ 包含独立 SQLite、案卷、科研资料、论文及事件链；容器更新不改变这些持久化内容。支持一致性备份、SHA256 和镜像 digest 回滚。详见 docs/DEPLOYMENT_UBUNTU26.md。
 
 目前缺少公网身份鉴权 OIDC、真实用户/项目 ABAC；需要另行完成认证网关、限流、审计及异地恢复，才能开放远程项目访问。
+
+## 论文检索多来源标准接口（2026-11-18）
+
+统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
+
+平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
+
+CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。

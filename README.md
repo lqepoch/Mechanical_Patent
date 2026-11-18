@@ -304,3 +304,15 @@ bash scripts/deploy_ubuntu26.sh status
 ~~~
 
 完整安装、GHCR 包公开配置、备份/回滚与权限边界见 docs/DEPLOYMENT_UBUNTU26.md。
+
+## 学术检索平台组合与统一元数据（2026-11-18）
+
+先运行 `python -m mechanical_patent paper-sources` 查看可用渠道，再在已有工作流保密审批后使用：
+
+```bash
+python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-query "high altitude centrifugal pump cavitation" \
+  --paper-provider openalex --paper-provider semantic-scholar --paper-provider arxiv \
+  --enrich-unpaywall --allow-search-exposure --case-dir cases/example-paper-search
+```
+
+参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。

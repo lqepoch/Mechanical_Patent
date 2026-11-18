@@ -10,7 +10,7 @@ import sqlite3
 from uuid import uuid4
 
 from .core import PatentWorkflowError
-from .papers import CrossrefProvider, OpenAlexProvider
+from .paper_sources import (SEARCH_SOURCES, UnpaywallEnricher, build_paper_providers, paper_source_catalog)
 from .providers import EPOOPSProvider, ImportedPatentProvider
 from .workflow import PatentResearch, validate_case
 from .workspace_cli import add_workspace_parser, handle_workspace
@@ -29,8 +29,14 @@ def _add_research_arguments(command: argparse.ArgumentParser) -> None:
                          help="挂载到已有任务队列案卷；联网前强制验证当前轮次的保密审批")
     command.add_argument("--patent-provider", choices=["auto", "epo-ops", "import", "none"], default="auto")
     command.add_argument("--import-json", type=Path, help="Imported records for offline research; always unverified")
-    command.add_argument("--paper-provider", action="append", choices=["openalex", "crossref", "import", "none"],
-                         help="Repeatable; default OpenAlex+Crossref after explicit search approval")
+    command.add_argument("--paper-provider", action="append", choices=[*SEARCH_SOURCES, "all", "import", "none"],
+                         help="可重复；默认 OpenAlex+Crossref+Semantic Scholar；all 包含已授权的商业源")
+    command.add_argument("--allow-paid-paper-apis", action="store_true",
+                         help="额外批准使用已获合同许可的 CORE/Lens 数据源")
+    command.add_argument("--enrich-unpaywall", action="store_true",
+                         help="通过 DOI 查找合法开放获取的 PDF 位置")
+    command.add_argument("--unpaywall-limit", type=int, default=20,
+                         help="Unpaywall 每轮查询上限 0-100")
     command.add_argument("--paper-import-json", type=Path, help="Optional imported unverified scholarly corpus")
     command.add_argument("--patent-query", action="append", default=[], help="Repeat 1-8 times; AI derives safe terms")
     command.add_argument("--paper-query", action="append", default=[], help="Repeat 1-8 times; AI derives safe terms")
@@ -73,9 +79,14 @@ def main(argv: list[str] | None = None) -> int:
     citations.add_argument("--allow-search-exposure", action="store_true")
     citations.add_argument("--workflow-case-id", help="需要工作流保密批准的现有案卷编号")
     citations.add_argument("--workspace-db", type=Path, help="工作流数据库路径")
+    sub.add_parser("paper-sources", help="列出全部论文数据源、平台用途及本机凭证配置")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "paper-sources":
+            import json
+            print(json.dumps(paper_source_catalog(), ensure_ascii=False, indent=2))
+            return 0
         if args.command == "citations":
             if not args.allow_search_exposure:
                 raise PatentWorkflowError("外部 DOI 引证查询需要明确的 --allow-search-exposure 审批。")
@@ -159,8 +170,9 @@ def main(argv: list[str] | None = None) -> int:
         remote_requested = bool(
             args.patent_provider == "epo-ops"
             or (args.patent_provider == "auto" and os.getenv("EPO_OPS_CLIENT_ID") and os.getenv("EPO_OPS_CLIENT_SECRET"))
-            or any(x in {"openalex", "crossref"} for x in (args.paper_provider or []))
+            or any(x not in {"import", "none"} for x in (args.paper_provider or []))
             or (args.paper_provider is None and bool(args.paper_query))
+            or args.enrich_unpaywall
         )
         if remote_requested and not args.allow_search_exposure:
             raise PatentWorkflowError("Remote search requires --allow-search-exposure after secrecy review.")
@@ -182,20 +194,22 @@ def main(argv: list[str] | None = None) -> int:
 
         paper_modes = args.paper_provider
         if paper_modes is None:
-            paper_modes = ["openalex", "crossref"] if args.allow_search_exposure else []
-        if any(x in {"openalex", "crossref"} for x in paper_modes) and not args.allow_search_exposure:
+            paper_modes = ["openalex", "crossref", "semantic-scholar"] if args.allow_search_exposure else []
+        if any(x not in {"import", "none"} for x in paper_modes) and not args.allow_search_exposure:
             raise PatentWorkflowError("Paper API queries require --allow-search-exposure.")
-        paper_providers = []
-        for mode in dict.fromkeys(paper_modes):
-            if mode == "openalex":
-                paper_providers.append(OpenAlexProvider())
-            elif mode == "crossref":
-                paper_providers.append(CrossrefProvider())
-            elif mode == "import":
-                file = args.paper_import_json or args.import_json
-                if not file:
-                    raise PatentWorkflowError("--paper-import-json required for imported papers")
-                paper_providers.append(ImportedPatentProvider(file))
+        remote_paper_modes = [x for x in paper_modes if x not in {"import", "none"}]
+        paper_providers, paper_warnings = (
+            build_paper_providers(remote_paper_modes, allow_paid=args.allow_paid_paper_apis)
+            if remote_paper_modes else ([], [])
+        )
+        if "import" in paper_modes:
+            file = args.paper_import_json or args.import_json
+            if not file:
+                raise PatentWorkflowError("--paper-import-json required for imported papers")
+            paper_providers.append(ImportedPatentProvider(file))
+        if not 0 <= args.unpaywall_limit <= 100:
+            raise PatentWorkflowError("--unpaywall-limit 须在 0-100 之间。")
+        enricher = UnpaywallEnricher() if args.enrich_unpaywall else None
         web_docs, web_errors = [], []
         if args.web_url:
             if not args.allow_web_exposure:
@@ -208,6 +222,8 @@ def main(argv: list[str] | None = None) -> int:
             patent_provider, paper_providers, folder,
             supplemental_sources=[doc.to_evidence() for doc in web_docs],
             web_documents=web_docs, web_errors=web_errors,
+            paper_enricher=enricher, enrichment_limit=args.unpaywall_limit,
+            paper_source_warnings=paper_warnings,
         ).run(args.direction, args.patent_query, args.paper_query,
               limit=max(1, min(args.limit, 25)), case_id=args.workflow_case_id)
         indexed = workspace.import_case(folder)

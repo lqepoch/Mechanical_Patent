@@ -150,3 +150,9 @@ LaTeX 文稿和实时前沿索引见 docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOL
 MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM 调用。新研究会话应依次调用 resume→search/read→pending→note→resume_save；遇乐观锁冲突先重新读取合并。现有专利检索/导入流程也写入项目记忆。项目路径为 projects/{project_id}/cases/{case_id}/knowledge/；各项目独立 patents.sqlite3 案卷库，每案卷独立 literature.sqlite3 文献库，MCP 进程固定绑定唯一 project_id。
 
 企业正式上线还须增加 MCP 请求身份级授权、项目级 ABAC、集中服务配额、后台 worker、合规原文下载和页码锚定、备份恢复与可观测性。MCP 同步检索有时间/请求预算，不能标记为无配额的全量检索。
+
+## 论文平台动态选择与标准化（2026-11-18）
+
+`patent_research` 新增可选 `paper_sources: list[str]`、`enrich_unpaywall: bool` 和 `allow_paid_paper_apis: bool`。未提供平台时默认 OpenAlex、Crossref、Semantic Scholar。已登记的保密外发批准对所有外部渠道生效；Lens、CORE 除此以外还需 Token 与商业许可明确批准。
+
+`patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
