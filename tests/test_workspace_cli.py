@@ -70,6 +70,47 @@ class WorkspaceCLITests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(json.loads(state)["revision"], 1)
 
+    def test_bound_research_keeps_case_and_blocks_unapproved_external_calls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = Path(folder) / "index.sqlite3"
+            directory = Path(folder) / "research"
+            from mechanical_patent.local_workspace import LocalPatentWorkspace
+            workspace = LocalPatentWorkspace(db)
+            workspace.create_case("PM-ALPHA", "新型气液分离结构研发")
+            self.assertFalse(workspace.can_egress("PM-ALPHA"))
+            # 不触网的任务仍可由当前 AI 在已有案卷中保存并索引。
+            code, output = invoke([
+                "research", "--workflow-case-id", "PM-ALPHA",
+                "--direction", "高海拔进水控制",
+                "--patent-provider", "none", "--paper-provider", "none",
+                "--workspace-db", str(db), "--case-dir", str(directory),
+            ])
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                json.loads((directory / "00_intake.json").read_text())["case_id"],
+                "PM-ALPHA",
+            )
+            self.assertEqual(workspace.status("PM-ALPHA")["revision"], 1)
+            # 对外论文检索即使有命令行开关，也必须先有案卷保密批准。
+            blocked, _ = invoke([
+                "research", "--workflow-case-id", "PM-ALPHA",
+                "--direction", "高海拔进水控制",
+                "--patent-provider", "none",
+                "--paper-provider", "crossref",
+                "--paper-query", "cavitation flow",
+                "--allow-search-exposure", "--workspace-db", str(db),
+                "--case-dir", str(Path(folder) / "blocked"),
+            ])
+            self.assertEqual(blocked, 3)
+            self.assertFalse((Path(folder) / "blocked").exists())
+            task = workspace.claim(
+                "PM-ALPHA", role="保密与权限智能体", actor="保密审核员"
+            )
+            workspace.finish(task["task_id"], actor="保密审核员", result={
+                "outbound_approved": True,
+            })
+            self.assertTrue(workspace.can_egress("PM-ALPHA"))
+
     def test_invalid_document_location_is_reported(self):
         with tempfile.TemporaryDirectory() as folder:
             db = Path(folder) / "index.sqlite3"
