@@ -68,9 +68,49 @@ def main(argv: list[str] | None = None) -> int:
     citations.add_argument("--allow-search-exposure", action="store_true")
     citations.add_argument("--workflow-case-id", help="需要工作流保密批准的现有案卷编号")
     citations.add_argument("--workspace-db", type=Path, help="工作流数据库路径")
+    atlas_index = sub.add_parser("atlas-index", help="离线建立案卷文献相似图、证据关系与文献记忆")
+    atlas_index.add_argument("--case-dir", type=Path, required=True)
+    atlas_index.add_argument("--top-k", type=int, default=8)
+    atlas_index.add_argument("--threshold", type=float, default=0.15)
+    atlas_export = sub.add_parser("atlas-export", help="输出单文献/单项目 Cytoscape.js 星图 JSON")
+    atlas_export.add_argument("--case-dir", type=Path, required=True)
+    atlas_export.add_argument("--scope", choices=["project", "document"], default="project")
+    atlas_export.add_argument("--document-id", default="")
+    atlas_export.add_argument("--max-nodes", type=int, default=250)
+    atlas_export.add_argument("--min-score", type=float, default=0.0)
+    atlas_export.add_argument("--output", type=Path, required=True)
+    atlas_global = sub.add_parser("atlas-global", help="仅导出已批准公开的项目跨案卷星图")
+    atlas_global.add_argument("--workspace", type=Path, required=True)
+    atlas_global.add_argument("--max-nodes", type=int, default=250)
+    atlas_global.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "atlas-index":
+            from .knowledge_atlas import index_case_atlas
+            result = index_case_atlas(args.case_dir, top_k=args.top_k,
+                                      threshold=args.threshold)
+            print("案卷图谱:", result["status"], "文献:", result["documents"],
+                  "节点:", result["nodes"], "关系:", result["edges"])
+            return 0
+        if args.command == "atlas-export":
+            from .knowledge_atlas import case_atlas
+            from .core import save_json
+            result = case_atlas(args.case_dir, scope=args.scope,
+                                document_id=args.document_id,
+                                max_nodes=args.max_nodes, min_score=args.min_score)
+            save_json(args.output, result)
+            print("图谱输出:", args.output, "节点:", len(result["nodes"]),
+                  "关系:", len(result["edges"]))
+            return 0
+        if args.command == "atlas-global":
+            from .knowledge_atlas import global_public_atlas
+            from .core import save_json
+            result = global_public_atlas(args.workspace, max_nodes=args.max_nodes)
+            save_json(args.output, result)
+            print("已批准公开的全局图谱输出:", args.output,
+                  "节点:", len(result["nodes"]))
+            return 0
         if args.command == "citations":
             if not args.allow_search_exposure:
                 raise PatentWorkflowError("外部 DOI 引证查询需要明确的 --allow-search-exposure 审批。")
