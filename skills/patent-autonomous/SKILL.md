@@ -37,3 +37,15 @@ user-invocable: true
 ## 论文数据源选择与研究记忆（2026-11-18）
 
 多轮研究时调用 `paper-sources` 或 MCP capabilities，按任务配置 OpenAlex/Crossref/Semantic Scholar/arXiv/Europe PMC/PubMed/CORE/Lens；通过 Unpaywall 补 DOI 合法 OA PDF。所有检索仍受审批、许可和预算约束；输出跨平台 DOI 归并记录和逐篇 `03_paper_memory/EV-*.md`。每一轮需要加载上轮 Markdown 与来源索引，防止上下文裁剪造成重复检索。存档本地并经哈希检查，全文核验与专利实质对照单独推进。详见 docs/PAPER_SOURCES.md。
+
+
+## 长期课题来源发现优先级（2026-11-19执行协议）
+
+用户要求“自己找题目/研究方向”、跟踪最新行业问题或开始任何消防机械方向查新时，必须先执行：
+1. 使用 MCP patent_source_catalog（approved）、patent_topic_catalog、patent_discovery_inbox 读取已有20个来源种子、20个机械课题和增量公告。CLI 可用 mechanical-patent source-catalog sources/topics/inbox。
+2. 优先核实来源官网发布日期和更新频率；过期项目保留历史研究价值但不能视为开放申报。平台新增时通过 patent_source_propose 入 pending，AI 不具备 source approve 权限。
+3. 对来源观察执行 patent_public_observe，再以专利/论文/跨行业机制、FMEA、TRIZ 导出具体零部件/可测技术效果。通过 patent_topic_derive 形成可回溯的研究假说，并关联可证伪实验。保密研发信息禁止写入公共目录。
+4. 对候选先复用 project 文献记忆，然后调用 patent_topic_plan 与既有多源检索、想法裂变、独立反证、工程审查工具；研究笔记必须标明原始 URL、证据缺口、发生时间和可信度，保存为未独立核验状态。
+5. 用户选择课题后使用 patent_topic_adopt 转为单项目 SQLite 案卷，保密审批通过后方可对外发送新检索词。未真实执行工程试验时禁止宣称工程已验证或具备专利授权条件。
+6. 只批准和处理有明确版权/访问权的公共数据。独立管理员通过本地 CLI 审批新源；AI 可提议但不能自我认证。
+详细工作流参见 docs/PROBLEM_DISCOVERY.md，源码 src/mechanical_patent/problem_sources.py，平台和课题种子存于 src/mechanical_patent/data/。
