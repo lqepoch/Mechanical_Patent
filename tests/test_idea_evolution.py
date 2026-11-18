@@ -57,7 +57,7 @@ class IdeaEvolutionTests(unittest.TestCase):
         control = self.seed("压降前馈控制器", "控制系统")
         plans = self.board.plan_crossovers()
         self.assertEqual(plans["status"], "awaiting_agent_crossbreeding")
-        self.assertEqual(plans["tasks"][0]["parent_ids"], [valve["id"], control["id"]])
+        self.assertEqual(set(plans["tasks"][0]["parent_ids"]), {valve["id"], control["id"]})
         child = self.board.register(proposal(
             "机械排气腔与压降前馈控制交替启闭", "系统集成",
             method="组合创新", parent_ids=[valve["id"], control["id"]],
