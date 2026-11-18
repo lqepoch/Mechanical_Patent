@@ -122,3 +122,11 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+
+
+## 可追溯原文段落子系统（2026-11-19）
+
+已在每案卷 knowledge/literature.sqlite3 内加入 fulltext_sources、fulltext_blocks、fulltext_revisions 与可选 trigram FTS5。已获授权的本地 Docling 解析 JSON 需和当前实际 PDF 的 SHA256 精确一致、doc_id 必须在案卷 documents 中存在；绑定后原件/JSON 按哈希存档于 knowledge/fulltext/EV-.../，段落可由 p{page}:b{block} 检索。全文引用与 AI 写入 full_text 批注时强制验证锚点存在，并通过单独的 quote 校验短引和段落原文是否逐字一致。
+
+此模块与正在研发的知识星图相互补充：图谱可消费经证据定位的原文段落，但未取得实际原文的关系仍按 AI 假说标记。后续需要在专家黄金集上验证真实扫描件、图表、公式、复杂权利要求和页码准确性；OCR、GROBID TEI 引证、图文多模态检索、向量重排由独立模块阶段交付。详见 docs/FULLTEXT_EVIDENCE.md。
