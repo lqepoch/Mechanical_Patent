@@ -30,7 +30,7 @@ class KnowledgeAtlasTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.case = self.root / "PUMP" / "runs" / "RUN-ONE"
+        self.case = self.root / "cases" / "PUMP" / "runs" / "RUN-ONE"
         self.case.mkdir(parents=True)
         self.docs = [
             record("CN111111111A", "高海拔消防泵的气液分离结构"),
