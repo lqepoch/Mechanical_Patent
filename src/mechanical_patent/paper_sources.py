@@ -661,6 +661,11 @@ def paper_source_catalog() -> list[dict[str, Any]]:
             "configured": (bool(os.getenv(required)) if required else True),
         })
     sources.append({
+        "id": "semantic-scholar-bulk", "capability": "deep_search",
+        "description": "Semantic Scholar 官方 Bulk Search，按1000条完整页与 token 深分页，属于 literature harvest 通道",
+        "commercial_license_gate": False, "configured": True,
+    })
+    sources.append({
         "id": "unpaywall", "capability": "doi_enrich",
         "description": SOURCE_DESCRIPTIONS["unpaywall"],
         "commercial_license_gate": False,

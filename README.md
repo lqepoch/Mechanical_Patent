@@ -343,3 +343,5 @@ python -m mechanical_patent literature --project-dir /private/cases/CASE-001 har
 ```
 
 OpenAlex 第二页需要 API Key；Semantic Scholar 相关性分页最多 1,000 条/检索词，更大规模可将论文来源组合并进行关键词扩展，避免把当前单源 1,000 条上限包装成已查全。详见 docs/PAPER_SOURCES.md。
+
+Semantic Scholar 的大规模 Basic Metadata 搜索可通过 `literature harvest --provider semantic-scholar-bulk --page-size 1000 --max-documents 5000` 使用 token 分页；需搭配案卷保密审批和明确来源预算。相关来源能力可在 `paper-sources` 查看。

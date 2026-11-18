@@ -96,3 +96,14 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 项目级批量采集入口 literature harvest 现在支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed，以及 EPO OPS 专利。每个来源采用自身分页机制（OpenAlex/Crossref cursor、Europe PMC cursorMark、Semantic Scholar 相关性 offset、arXiv start、PubMed retstart），批次逐页落地 SQLite、单篇 Markdown 和原有进度 checkpoint。失败/中断会在允许的恢复窗口内复用已保存的游标。详情见 docs/PAPER_SOURCES.md。
 
 **平台边界**：Semantic Scholar 标准相关性检索上限为 1,000 条，超过此规模需独立接入 Bulk Search/Datasets；OpenAlex 深分页第二页开始需要 API Key。受版权或商业订阅约束的 CORE/Lens 现阶段保留受控单轮搜索，未放入无穷分页采集。免费来源也受速率/账单上限控制；某条来源失败不会被系统伪装为全球查全。
+
+
+## Semantic Scholar Bulk 深分页（2026-11-19）
+
+Semantic Scholar 单检索词超过 1,000 条相关性排序上限时，可调用独立的 literature harvest 提供方 semantic-scholar-bulk。此适配器使用官方 Academic Graph /paper/search/bulk 和 token 游标，每页最大 1,000 条。为严格防止分页记录截断，执行时要求 --page-size 1000 与 --max-documents 为 1000 的整数倍；全文与作者信息后续由 DOI/论文详情补齐，Bulk 返回基础书目元数据，不包含完整引文网络。用到 API 的真实访问率和配额仍须按授权账号独立核验。
+
+示例：
+
+    python -m mechanical_patent literature --project-dir /private/cases/CASE-001 harvest       --provider semantic-scholar-bulk --query "centrifugal pump"       --workflow-case-id CASE-001 --workspace-db /private/index.sqlite3       --allow-search-exposure --page-size 1000 --max-documents 5000 --max-pages 5
+
+MCP patent_literature_harvest 增加可选 page_size 参数，需通过本项目既有保密门禁。

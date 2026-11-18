@@ -69,3 +69,5 @@ user-invocable: true
 ## 论文分页检索与中断恢复（2026-11-19）
 
 对于数百至上千篇论文的需求，使用已有 literature harvest 而非仅调用单页 research。支持 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed。按各提供方原生 cursor / offset 查询，并逐页保存 checkpoint、项目私有 SQLite 与单篇 MD；失败允许在时限内从游标恢复。需明确留存每个来源的条数、API 异常和实际检索日期。OpenAlex 深分页第二页需要 API Key，Semantic Scholar 相关性搜索最多 1,000 条，其他平台的全文获取与版权仍单独核对。详细操作见 docs/PAPER_SOURCES.md。
+
+**Semantic Scholar Bulk 采集**：当相关性检索超过 1000 条时，进入 literature harvest --provider semantic-scholar-bulk，使用 page_size=1000、max_documents=1000的整数倍，并按 token 游标续检。Bulk 返回基本著录数据，需通过 DOI/开放原文补充实验工况与方程；不得把批量结果视为全文核验。见 docs/PAPER_SOURCES.md。
