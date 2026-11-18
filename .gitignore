@@ -15,3 +15,11 @@ outputs/
 *.sldprt
 *.sldasm
 *.slddrw
+
+# 专利资料库、可恢复工作流状态、允许归档的公开原始文献
+data/
+patent_library/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.db
