@@ -316,3 +316,9 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ```
 
 参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
+
+
+
+## 授权 PDF 的页码级长期证据索引（2026-11-19）
+
+单个研发案卷的 knowledge/literature.sqlite3 新增 fulltext_sources、fulltext_blocks、fulltext_revisions 和可选 FTS5 trigram。先通过现有 parse-pdf/离线 Docling 将 PDF 形成结构化 JSON，再使用 literature ingest-pdf 或 MCP patent_literature_fulltext_ingest 绑定实际源 PDF SHA256，归档不可变版本。研究时通过 literature passages / patent_literature_passages 获取真实页码 p2:b7，调用 literature quote / patent_literature_quote 核对原句，AI 在 patent_literature_note 使用 full_text 依据时强制校验锚点存在。机器解析结果始终标记待原始 PDF 核验。详见 docs/FULLTEXT_EVIDENCE.md。
