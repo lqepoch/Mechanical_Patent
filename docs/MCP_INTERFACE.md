@@ -156,3 +156,14 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 `patent_research` 新增可选 `paper_sources: list[str]`、`enrich_unpaywall: bool` 和 `allow_paid_paper_apis: bool`。未提供平台时默认 OpenAlex、Crossref、Semantic Scholar。已登记的保密外发批准对所有外部渠道生效；Lens、CORE 除此以外还需 Token 与商业许可明确批准。
 
 `patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+## 1.7：创新裂变的跨技术轴交叉与否定记忆
+
+| MCP 工具 | 输入 | 返回及边界 |
+|---|---|---|
+| `patent_idea_crossovers` | case_id、run_id、limit | 已评价且不同技术轴的双亲配对任务，必须由 AI 再提出可实施耦合方案 |
+| `patent_idea_reject` | case_id、run_id、candidate_id、reason、learned_constraints、source_ids（可选） | 保留原构思，记录反证与工程失败约束；禁止被否定构思直接晋级申请 |
+
+`patent_idea_register` 新增可选 `parent_ids`（2–3个），该字段存在时 `inventive_method` 必须为 `组合创新`，并提交 `synergy` 和 `interface_definition`。服务端核查父节点、技术轴差异、最大裂变代数、父子谱系和证据编号。历史 `parent_id` 单亲本请求继续兼容。生成结果还包括 `text_overlap_neighbors` 供人工识别重复方案；这只是文本相似预警。
+
+反证记录如果仅有标题/摘要或未核验原始权利要求，不得写成排除授权风险、侵权风险或已实现效果。负面记忆会进入下一轮 `patent_idea_plan` 的 `avoid_failed_constraints`。
