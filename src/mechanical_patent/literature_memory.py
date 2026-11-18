@@ -370,8 +370,10 @@ class LiteratureMemoryStore:
         if basis not in ALLOWED_BASIS:
             raise PatentWorkflowError("未知的文献分析依据。")
         positions = source_positions or []
-        if basis == "full_text" and not positions:
-            raise PatentWorkflowError("声称阅读原文全文时必须提供页码/章节引用。")
+        if basis == "full_text":
+            # 先查证锚点属于本案卷真实存档的 PDF 解析版本，杜绝虚构页码。
+            from .literature_evidence import FullTextEvidence
+            FullTextEvidence(self).validate_positions(doc_id, positions)
         if not isinstance(analysis, dict) or not analysis:
             raise PatentWorkflowError("分析必须为非空结构化对象。")
         allowed = {"plain_summary", "technical_mechanism", "structures_and_parameters",
