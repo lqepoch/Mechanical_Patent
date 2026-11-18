@@ -248,7 +248,7 @@ class PatentMCPService:
         outfile.write_text(latex, encoding="utf-8")
         from .audit import append_audit_event
         append_audit_event(folder, stage="工程技术方案", action="生成白话工程方案及LaTeX模板",
-                           actor="MCP 工具", role="工具",
+                           actor="MCP 工具", role="系统",
                            payload={"candidate_id": candidate_id,
                                     "brief_sha256": sha256((folder / "08a_technical_brief.json").read_bytes()).hexdigest(),
                                     "tex_sha256": sha256(outfile.read_bytes()).hexdigest()})
