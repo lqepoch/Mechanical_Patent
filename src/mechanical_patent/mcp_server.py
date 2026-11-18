@@ -92,7 +92,9 @@ class PatentMCPService:
         return import_external_sources(self, case_id, run_id, records, patent_queries, paper_queries)
 
     def research(self, case_id: str, patent_queries: list[str], paper_queries: list[str],
-                 limit: int = 10) -> dict[str, Any]:
+                 limit: int = 10, paper_sources: list[str] | None = None,
+                 enrich_unpaywall: bool = False,
+                 allow_paid_paper_apis: bool = False) -> dict[str, Any]:
         """必须通过已经登记的保密审批才会对外发送真实检索词。"""
         self._case(case_id)
         if not self.workspace.can_egress(case_id):
@@ -106,20 +108,25 @@ class PatentMCPService:
         if patent_queries and not (os.getenv("EPO_OPS_CLIENT_ID") and os.getenv("EPO_OPS_CLIENT_SECRET")):
             raise PatentWorkflowError("专利检索尚缺 EPO OPS 授权凭证；可通过已授权行业 MCP 导入真实证据。")
         from .providers import EPOOPSProvider
-        from .papers import OpenAlexProvider, CrossrefProvider
+        from .paper_sources import UnpaywallEnricher, build_paper_providers
         provider = EPOOPSProvider() if patent_queries else None
-        papers = [OpenAlexProvider(), CrossrefProvider()] if paper_queries else []
+        papers, paper_warnings = build_paper_providers(
+            paper_sources, allow_paid=allow_paid_paper_apis
+        ) if paper_queries else ([], [])
+        enricher = UnpaywallEnricher() if (paper_queries and enrich_unpaywall) else None
         case = self._case(case_id)
         run_id = "RUN-" + uuid4().hex[:16].upper()
         path = self.root / "cases" / case_id / "runs" / run_id
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        result = PatentResearch(provider, papers, path).run(
+        result = PatentResearch(provider, papers, path, paper_enricher=enricher,
+                                paper_source_warnings=paper_warnings).run(
             case["direction"], patent_queries, paper_queries,
             limit=limit, case_id=case_id,
         )
         indexing = self.workspace.import_case(path)
         return {"case_id": case_id, "run_id": run_id, "patents_with_claims": result["patent_claims_available"],
                 "paper_count": result["papers_discovered"], "provider_errors": result["search_errors"],
+                "paper_sources": [x.name for x in papers], "paper_source_warnings": paper_warnings,
                 "indexed": indexing.get("indexed", 0), "complete_global_search": False,
                 "filing_authorized": False}
 
@@ -263,7 +270,9 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "contract_version": "1.1",
+        from .paper_sources import paper_source_catalog
+        return {"service": "Mechanical_Patent", "contract_version": "1.2",
+                "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -281,9 +290,13 @@ def create_server(service: PatentMCPService):
 
     @server.tool()
     def patent_research(case_id: str, patent_queries: list[str],
-                        paper_queries: list[str], limit: int = 10) -> dict[str, Any]:
-        """使用已获许可的 EPO/论文数据源执行真实检索并创建研究运行。"""
-        return service.research(case_id, patent_queries, paper_queries, limit)
+                        paper_queries: list[str], limit: int = 10,
+                        paper_sources: list[str] | None = None,
+                        enrich_unpaywall: bool = False,
+                        allow_paid_paper_apis: bool = False) -> dict[str, Any]:
+        """选择论文检索平台；商业来源和保密数据外发需独立审批。"""
+        return service.research(case_id, patent_queries, paper_queries, limit,
+                                paper_sources, enrich_unpaywall, allow_paid_paper_apis)
 
 
     @server.tool()
