@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from hashlib import sha256
 import json
 import os
@@ -234,14 +235,41 @@ class LiteratureMemoryStore:
         with self.connect(write=True) as db:
             for record in records:
                 doc_id = evidence_id(record)
+                old = db.execute(
+                    "SELECT content_hash,note_path,pdf_url,paper_metadata_json "
+                    "FROM documents WHERE doc_id=?",
+                    (doc_id,),
+                ).fetchone()
+                if old and record.kind == "paper":
+                    # 反复从不同 API 获取同一 DOI 时，保留先前发现的
+                    # PDF 候选和 source_ids，防止低信息来源抹除文献证据。
+                    previous = json.loads(old["paper_metadata_json"] or "{}")
+                    incoming = dict(record.paper_metadata)
+                    previous_sources = previous.get("sources") or []
+                    incoming_sources = incoming.get("sources") or []
+                    combined = {**previous, **incoming}
+                    combined["sources"] = list(dict.fromkeys(
+                        [*previous_sources, *incoming_sources]
+                    ))
+                    combined["source_ids"] = {
+                        **(previous.get("source_ids") or {}),
+                        **(incoming.get("source_ids") or {}),
+                    }
+                    combined["authors"] = incoming.get("authors") or previous.get("authors") or []
+                    combined["license"] = incoming.get("license") or previous.get("license") or ""
+                    combined["citation_count"] = max(
+                        (v for v in (previous.get("citation_count"), incoming.get("citation_count"))
+                         if type(v) is int), default=None,
+                    )
+                    combined["full_text_verified"] = False
+                    record = replace(
+                        record, pdf_url=record.pdf_url or old["pdf_url"],
+                        paper_metadata=combined,
+                    )
                 fingerprint = _digest({
                     key: value for key, value in record.to_dict().items()
                     if key != "retrieved_at"
                 })
-                old = db.execute(
-                    "SELECT content_hash,note_path FROM documents WHERE doc_id=?",
-                    (doc_id,),
-                ).fetchone()
                 file = self._note_path(doc_id, record.kind)
                 if file.is_symlink():
                     raise PatentWorkflowError("检测到文献文件符号链接，拒绝写入。")
