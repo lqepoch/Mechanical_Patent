@@ -66,3 +66,10 @@ CREATED → DUAL_SEARCH_PLAN → PATENT_RESULTS + PAPER_RESULTS → CROSS_SOURCE
 - 任何申请提交由真实发明人、企业 IP 管理与专利代理专业人员确认。
 
 详细 backlog 在 Issues #2–#10；最新 Agent 原生适配在 PR #11。
+
+
+## 2026-11-18 三级知识星图增量架构
+
+原案卷 04b_technology_graph.json 与 04c_paper_citations.json 继续保留真实来源和记录。新增 src/mechanical_patent/knowledge_atlas.py，在每次研究运行下以独立 knowledge.sqlite3 物化节点/边、来源、方法、置信度和 SHA256 内容指纹；文本相似算法使用倒排候选的 TF-IDF，AI 三元组须与本地原文引句逐字匹配且状态保持待人工复核。每个文档生成独立 generated MD，人工记忆在 manual MD 中保护。
+
+跨项目 global_public 仅汇总 LocalPatentWorkspace 中 confidentiality='公开' 的项目及文献最小著录字段；其他密级不可访问。商业组织横向权限模型仍需 OIDC/Keycloak、逐请求 ABAC、逐边过滤、审计及合规外发审批。新增 MCP/CLI 与 atlas-web (Cytoscape.js) 本地 Web 可视化，不依赖强制外部 LLM。生产增强候选：sqlite-vec、Microsoft GraphRAG、LightRAG、Sigma.js；须经许可证、性能和数据治理审批。完整设计见 docs/KNOWLEDGE_ATLAS.md。
