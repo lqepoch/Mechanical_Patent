@@ -45,43 +45,11 @@ def add_literature_parser(subparsers: Any) -> None:
     ])
     note.add_argument("--source-position", action="append", default=[])
 
-    pdf_status = subs.add_parser("pdf-status", help="查询单篇学术 PDF 的许可、归档和解析状态")
-    pdf_status.add_argument("--doc-id", required=True)
-    pdf_pages = subs.add_parser("pdf-pages", help="按页阅读 Docling 机器段落，保留证据锚点")
-    pdf_pages.add_argument("--doc-id", required=True)
-    pdf_pages.add_argument("--page", required=True, type=int)
-    pdf_pages.add_argument("--limit", type=int, default=30)
-
-    oa = subs.add_parser("oa-enrich", help="通过已批准的 DOI 查询补全 Unpaywall 合法 OA 位置")
-    oa.add_argument("--doc-id", required=True)
-    oa.add_argument("--workflow-case-id", required=True)
-    oa.add_argument("--workspace-db", required=True, type=Path)
-    oa.add_argument("--allow-search-exposure", action="store_true")
-    oa.add_argument("--authorized", action="store_true")
-
-    pdf_fetch = subs.add_parser("pdf-fetch", help="仅在审批与合法使用证明齐全后下载候选 PDF")
-    pdf_fetch.add_argument("--doc-id", required=True)
-    pdf_fetch.add_argument("--allowed-host", action="append", required=True)
-    pdf_fetch.add_argument("--rights-basis", required=True,
-                           choices=["open_license", "public_domain", "rightsholder_permission"])
-    pdf_fetch.add_argument("--rights-reference", required=True)
-    pdf_fetch.add_argument("--max-bytes", type=int, default=40*1024*1024)
-    pdf_fetch.add_argument("--workflow-case-id", required=True)
-    pdf_fetch.add_argument("--workspace-db", required=True, type=Path)
-    pdf_fetch.add_argument("--allow-search-exposure", action="store_true")
-    pdf_fetch.add_argument("--authorized", action="store_true")
-
-    pdf_parse = subs.add_parser("pdf-parse", help="离线解析已经合法归档的单篇 PDF")
-    pdf_parse.add_argument("--doc-id", required=True)
-    pdf_parse.add_argument("--docling-artifacts", type=Path)
-    pdf_parse.add_argument("--max-pages", type=int, default=200)
-    pdf_parse.add_argument("--authorized", action="store_true")
-
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
                          choices=["openalex", "crossref", "semantic-scholar",
-                                  "arxiv", "europe-pmc", "pubmed",
-                                  "semantic-scholar-bulk", "epo-ops"])
+                                  "semantic-scholar-bulk", "arxiv", "europe-pmc",
+                                  "pubmed", "epo-ops"])
     harvest.add_argument("--query", action="append", required=True)
     harvest.add_argument("--workflow-case-id", required=True)
     harvest.add_argument("--workspace-db", required=True, type=Path)
@@ -91,6 +59,54 @@ def add_literature_parser(subparsers: Any) -> None:
     harvest.add_argument("--max-pages", type=int, default=30)
     harvest.add_argument("--max-seconds", type=int, default=600)
     harvest.add_argument("--refresh", action="store_true")
+
+    oa = subs.add_parser("oa-enrich", help="按 DOI 查询 Unpaywall 并持久化开放获取候选位置")
+    oa.add_argument("--doc-id", required=True)
+    oa.add_argument("--workflow-case-id", required=True)
+    oa.add_argument("--workspace-db", required=True, type=Path)
+    oa.add_argument("--allow-search-exposure", action="store_true")
+    oa.add_argument("--authorized", action="store_true")
+
+    rights = subs.add_parser("fulltext-plan", help="经案卷权限与开放许可证审核登记 PDF 任务")
+    rights.add_argument("--doc-id", required=True)
+    rights.add_argument("--workflow-case-id", required=True)
+    rights.add_argument("--workspace-db", required=True, type=Path)
+    rights.add_argument("--rights-actor", required=True)
+    rights.add_argument("--rights-reference", required=True)
+    rights.add_argument("--rights-approved", action="store_true")
+
+    download = subs.add_parser("fulltext-process", help="执行一次安全 PDF 获取及离线 Docling 解析")
+    download.add_argument("--doc-id", required=True)
+    download.add_argument("--workflow-case-id", required=True)
+    download.add_argument("--workspace-db", required=True, type=Path)
+    download.add_argument("--allow-download", action="store_true")
+    download.add_argument("--allow-host", action="append", default=[], help="PDF 原始站点的精确域名白名单")
+    download.add_argument("--max-bytes", type=int, default=40 * 1024 * 1024)
+    download.add_argument("--docling-artifacts", type=Path,
+                          help="经许可、事先下载好的离线 Docling 模型目录")
+    download.add_argument("--download-only", action="store_true")
+
+    status = subs.add_parser("fulltext-status", help="按文献编号查看原文获取/解析状态")
+    status.add_argument("--doc-id", required=True)
+    passages = subs.add_parser("fulltext-search", help="从已解析 PDF 中检索页码级技术证据")
+    passages.add_argument("--query", required=True)
+    passages.add_argument("--limit", type=int, default=20)
+    pending_files = subs.add_parser("fulltext-pending", help="查看需要重试或继续解析的论文任务")
+    pending_files.add_argument("--limit", type=int, default=30)
+
+
+def _assert_fulltext_approval(args: argparse.Namespace) -> None:
+    """项目目录与案卷外发审批必须同时匹配，防止跨项目权限借用。"""
+    root = args.project_dir.expanduser().resolve()
+    database = args.workspace_db.expanduser().resolve()
+    if root.name != args.workflow_case_id or root.parent.name != "cases":
+        raise PatentWorkflowError("全文任务必须限定在指定研发案卷的项目目录。")
+    if database != root.parent.parent / "patents.sqlite3":
+        raise PatentWorkflowError("全文任务的权限数据库必须与实际项目存储一致。")
+    from .local_workspace import LocalPatentWorkspace
+    workspace = LocalPatentWorkspace(database)
+    if not workspace.can_egress(args.workflow_case_id):
+        raise PatentWorkflowError("当前案卷未通过真实出站审批，禁止远程全文获取。")
 
 
 def handle_literature(args: argparse.Namespace) -> int:
@@ -129,40 +145,41 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
-    elif command in {"pdf-status", "pdf-pages", "pdf-fetch", "pdf-parse", "oa-enrich"}:
-        from .paper_fulltext import PaperFullTextService
-        service = PaperFullTextService(memory)
-        if command == "pdf-status":
-            result = service.status(args.doc_id)
-        elif command == "pdf-pages":
-            result = service.pages(args.doc_id, page=args.page, limit=args.limit)
-        elif command in {"pdf-fetch", "oa-enrich"}:
-            if not args.authorized or not args.allow_search_exposure:
-                raise PatentWorkflowError("DOI 外部查询及 PDF 下载需要明确授权并通过检索词外发审批。")
-            if args.project_dir.name != args.workflow_case_id:
-                raise PatentWorkflowError("PDF 下载案卷编号与项目目录不匹配。")
-            from .local_workspace import LocalPatentWorkspace
-            workspace = LocalPatentWorkspace(args.workspace_db)
-            if not workspace.can_egress(args.workflow_case_id):
-                raise PatentWorkflowError("当前案卷缺少已登记的外发保密审批。")
-            if command == "oa-enrich":
-                result = service.enrich_oa(args.doc_id, authorized=True)
-            else:
-                result = service.download(
-                    args.doc_id, authorized=True, allowed_hosts=set(args.allowed_host),
-                    rights_basis=args.rights_basis, rights_reference=args.rights_reference,
-                    max_bytes=args.max_bytes,
-                )
+    elif command == "oa-enrich":
+        from .literature_oa import enrich_unpaywall
+        _assert_fulltext_approval(args)
+        if not args.authorized or not args.allow_search_exposure:
+            raise PatentWorkflowError("DOI 查询必须经过本轮外发审批并明确获得用户授权。")
+        result = enrich_unpaywall(memory, args.doc_id, authorized=True)
+    elif command in {"fulltext-plan", "fulltext-process", "fulltext-status",
+                     "fulltext-search", "fulltext-pending"}:
+        from .literature_fulltext import FulltextPipeline
+        pipeline = FulltextPipeline(memory)
+        if command == "fulltext-status":
+            result = pipeline.status(args.doc_id)
+        elif command == "fulltext-search":
+            result = {"records": pipeline.search(args.query, limit=args.limit),
+                      "review_status": "awaiting_original_pdf_review"}
+        elif command == "fulltext-pending":
+            result = {"jobs": pipeline.pending(limit=args.limit)}
         else:
-            result = service.parse(
-                args.doc_id, authorized=args.authorized,
-                artifacts=args.docling_artifacts, max_pages=args.max_pages,
-            )
+            _assert_fulltext_approval(args)
+            if command == "fulltext-plan":
+                result = pipeline.queue(
+                    args.doc_id, rights_actor=args.rights_actor,
+                    rights_reference=args.rights_reference, authorized=args.rights_approved,
+                )
+            else:
+                result = pipeline.process(
+                    args.doc_id, allowed_hosts=set(args.allow_host),
+                    authorized=args.allow_download, artifacts=args.docling_artifacts,
+                    max_bytes=args.max_bytes, parse=not args.download_only,
+                )
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
         if len(args.query) > 8 or len(args.provider) > 6:
-            raise PatentWorkflowError("单次最多8条查询词和6个分页检索来源。")
+            raise PatentWorkflowError("单次最多8条查询词和6个数据源。")
         if args.project_dir.name != args.workflow_case_id:
             raise PatentWorkflowError("项目目录名称必须与工作流案卷编号一致。")
         from .local_workspace import LocalPatentWorkspace
@@ -184,9 +201,8 @@ def handle_literature(args: argparse.Namespace) -> int:
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
             "semantic-scholar": SemanticScholarProvider,
             "semantic-scholar-bulk": SemanticScholarBulkProvider,
-            "arxiv": ArxivProvider,
-            "europe-pmc": EuropePMCProvider, "pubmed": PubMedProvider,
-            "epo-ops": EPOOPSProvider,
+            "arxiv": ArxivProvider, "europe-pmc": EuropePMCProvider,
+            "pubmed": PubMedProvider, "epo-ops": EPOOPSProvider,
         }
         harvester = LiteratureHarvester(memory)
         jobs = []
