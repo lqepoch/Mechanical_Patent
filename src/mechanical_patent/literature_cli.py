@@ -95,6 +95,22 @@ def add_literature_parser(subparsers: Any) -> None:
     page.add_argument("--page", required=True, type=int)
     page.add_argument("--limit", type=int, default=100)
 
+    batch = subs.add_parser("fulltext-batch", help="带项目检查点与预算的合法 PDF 批量归档解析")
+    batch.add_argument("--manifest", type=Path, required=True)
+    batch.add_argument("--authorized", action="store_true")
+    batch.add_argument("--allow-search-exposure", action="store_true")
+    batch.add_argument("--workflow-case-id")
+    batch.add_argument("--workspace-db", type=Path)
+    batch.add_argument("--docling-artifacts", type=Path)
+    batch.add_argument("--max-documents", type=int, default=100)
+    batch.add_argument("--max-seconds", type=int, default=900)
+    batch.add_argument("--max-total-bytes", type=int, default=2 * 1024 * 1024 * 1024)
+    batch.add_argument("--max-attempts", type=int, default=3)
+    batch.add_argument("--refresh", action="store_true")
+    batch_state = subs.add_parser("fulltext-batch-status", help="查询项目独立的批次检查点")
+    batch_state.add_argument("--batch-id", required=True)
+    batch_state.add_argument("--limit", type=int, default=100)
+
 
 def handle_literature(args: argparse.Namespace) -> int:
     memory = LiteratureMemoryStore(args.project_dir)
@@ -135,6 +151,7 @@ def handle_literature(args: argparse.Namespace) -> int:
     elif command in {
         "fulltext-import", "fulltext-fetch", "fulltext-parse",
         "fulltext-status", "fulltext-search", "fulltext-page",
+        "fulltext-batch", "fulltext-batch-status",
     }:
         pipeline = LiteratureFullText(memory)
         if command == "fulltext-import":
@@ -159,6 +176,35 @@ def handle_literature(args: argparse.Namespace) -> int:
             result = pipeline.parse(
                 args.doc_id, authorized=args.authorized,
                 artifacts=args.docling_artifacts, max_pages=args.max_pages,
+            )
+        elif command == "fulltext-batch":
+            from .literature_fulltext_batch import FullTextBatchRunner
+            manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+            is_remote = isinstance(manifest, dict) and any(
+                isinstance(item, dict) and item.get("source") == "remote"
+                for item in (manifest.get("items") or [])
+            )
+            outbound = False
+            if is_remote:
+                if (not args.allow_search_exposure or not args.workflow_case_id
+                        or not args.workspace_db
+                        or args.project_dir.name != args.workflow_case_id):
+                    raise PatentWorkflowError("远程全文批次缺少本轮外发批准、案卷或数据库绑定。")
+                from .local_workspace import LocalPatentWorkspace
+                outbound = LocalPatentWorkspace(args.workspace_db).can_egress(
+                    args.workflow_case_id
+                )
+            result = FullTextBatchRunner(pipeline).run(
+                manifest, authorized=args.authorized,
+                outbound_approved=outbound, artifacts=args.docling_artifacts,
+                max_documents=args.max_documents, max_seconds=args.max_seconds,
+                max_total_bytes=args.max_total_bytes,
+                max_attempts=args.max_attempts, refresh=args.refresh,
+            )
+        elif command == "fulltext-batch-status":
+            from .literature_fulltext_batch import FullTextBatchRunner
+            result = FullTextBatchRunner(pipeline).status(
+                args.batch_id, limit=args.limit,
             )
         elif command == "fulltext-status":
             result = pipeline.status(args.doc_id)
@@ -201,6 +247,8 @@ def handle_literature(args: argparse.Namespace) -> int:
     else:
         raise PatentWorkflowError("未知文献操作。")
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if not (
-        command == "harvest" and any(x["status"] == "failed" for x in result["jobs"])
-    ) else 2
+    if command == "harvest" and any(x["status"] == "failed" for x in result["jobs"]):
+        return 2
+    if command == "fulltext-batch" and result["status"] != "complete":
+        return 2
+    return 0
