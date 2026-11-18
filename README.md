@@ -236,3 +236,20 @@ Crawl4AI 负责合法允许的科研网页、技术文章、公开资料的 HTML
 备注：GitHub 上包含服务端与离线测试，但并不意味着全球数据检索渠道已经全部开通、生产认证已经部署或机械仿真已经执行。专业专利申请前须复核权利要求、公开充分性、工程实现和权属。
 
 跨供应商检索入口：patent_run_create（完全离线）+ patent_source_import（第三方专利/论文结构化证据强制待核验），可连接其他授权 MCP 工具，不依赖 EPO OPS 凭证才能建案。
+
+
+## 项目独立的千篇文献检索和永久 Markdown 记忆（2026-11-18）
+
+已整合基于官方 OpenAlex/Crossref/EPO OPS 的分页检索，项目级 SQLite FTS5 trigram 检索，按 DOI/专利公开号去重，并为每篇文献生成一份 Markdown，保留跨会话白话解读/机理/结构/参数/局限/创新方向。研究恢复入口、待分析队列、文件索引、分页检查点与历史快照全部位于单项目知识目录中。
+
+CLI 示例：
+
+    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 stats
+    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 search --query "泵入口空化"
+    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 pending --limit 20
+    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 resume-read
+    python -m mechanical_patent literature --project-dir private_workspace/cases/X01 harvest --provider openalex --provider crossref --query "pump cavitation NPSH" --workflow-case-id X01 --workspace-db private_workspace/index.sqlite3 --max-documents 1000 --allow-search-exposure
+
+MCP 支持 patent_literature_search/read/note/stats/pending/resume/resume_save/harvest。必须先获工作流外发许可；OpenAlex 深分页超过第一页需要免费 API Key，Crossref/EPO OPS 均受官方配额限制。所有 MD 初次仅含真实源著录数据、摘要/权要摘录，技术深入理解由宿主 AI 按照 patent-literature-memory Skill 逐篇写入并明确原文依据。研究资料不能提交 GitHub。
+
+详细实现、来源权限与企业升级路径参见 docs/ARCHITECTURE.md、docs/DUAL_LITERATURE.md 和 docs/MCP_INTERFACE.md。
