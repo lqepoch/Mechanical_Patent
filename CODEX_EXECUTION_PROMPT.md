@@ -82,3 +82,25 @@ J. 出具全链证据/来源/时间/风险/人工审批报告，最终仅给出�
 企业生产剩余任务包括：PostgreSQL + RLS/ABAC、统一身份认证与双人审批、持久队列/Outbox 与分布式锁、API 数据来源合同与增量抓取、真实 CNIPA/EPO/USPTO/WIPO + 论文全文检索、专业检索召回评测、Windows SolidWorks/ANSYS 实测、不可篡改证据存证、成本/告警/SLA 和灾备。任何未实现能力应在父子 Issue 保持打开，不得用示例数据代替真实完成度。
 
 每次提交前执行 CI 全部离线回归、安全扫描和开源许可证审查，确认通过后才允许合并 main。
+
+
+## 行业项目深度复用与新能力执行任务（2026-11-18）
+
+在 Mechanical_Patent 中继续吸收行业优秀开源项目，并始终保持当前 ChatGPT/Codex 是推理主体，不强制安装另一个 LLM。
+
+已固定完整源码：
+- external/patent-client-agents（Apache-2.0）：优先作为多国专利原始著录/权要/同族/MCP 数据客户端。
+- external/patentkit（Apache-2.0）：统一专利模型、权利要求特征分析、证据对照和检索架构组件。
+
+优先阅读 docs/INDUSTRY_REUSE.md，并检查两个上游库锁定 SHA、LICENSE、具体 Python API 和测试。复制/改造可授权源码时保留 NOTICE 和审查记录，不要以第三方 Git submodule 存在就宣称功能已经完整联通。
+
+新增的标准使用流程：
+1. 检索来源选择：Patent Client Agents MCP / 已授权官方 API / 当前 AI 的网页检索工具。
+2. 保存结构化结果到统一来源契约，利用 mechanical-patent mcp-import 标记待独立核实，并与现有本地文献库和案卷 revision 关联。
+3. 对真实公开 PDF 优先在线查看；许可允许时用 Docling 本地离线解析，保留页码和哈希以支持权项证据定位。
+4. 结合论文和专利，提出多个物理合理创新方向并逐项反证。
+5. 使用有明确商业许可的机械专利黄金样本运行 mechanical-patent benchmark，稳定计算同族级 Recall/Hit/MRR，保留测试集版本、样本缺失统计与原始来源。
+6. 扩展 PatentAgentBench 式新颖性、FTO、权项对照、撰写与 OA 评测；每项使用真实专家评分与经过许可的资料，非商业限制样本不得挪入企业。
+7. GROBID 和 BGE-M3 作为可选后续模块，待企业评测证明业务价值、成本/数据安全可接受后再生产部署。
+
+重要发现：Codex 仓库技能需放在 .agents/skills/ 才能自动发现，现有 14 个简体中文技能已同步，运行 scripts/sync_skill_mirrors.py --check 并在 CI 检测。未经用户明确授权，不连接外部 MCP 账户、上传技术机密或下载论文全文。工程/法律审查和正式专利申请始终由真实人员批准。
