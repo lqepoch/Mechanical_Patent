@@ -324,3 +324,7 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ## 论文合法 PDF 全文流水线（2026-11-19）
 
 针对每个项目独立的 `knowledge/literature.sqlite3`，新增逐篇开放许可确认、受控 HTTPS/TLS 固定公网 IP 下载、Docling 离线全文解析、页码证据 FTS5 索引、SHA256 哈希、任务租约与错误恢复。可通过 `mechanical-patent literature --project-dir ... fulltext-plan/fulltext-process/fulltext-status/fulltext-search/fulltext-pending` 操作。MCP 提供 `patent_literature_fulltext_status`、`patent_literature_fulltext_search`、`patent_literature_fulltext_pending` 三个只读工具。相关论文的机器解析产物始终标记待原文核验，开放许可与保密审批必须先行；受控 CLI 执行下载/解析。运行参数、安全要求、模型准备和容灾见 [docs/FULLTEXT_PIPELINE.md](docs/FULLTEXT_PIPELINE.md)。
+
+## 全文证据逐字核验与长期记忆（2026-11-19）
+
+在原有合法论文 PDF 下载、Docling 解析、项目 SQLite/Markdown 文献库基础上，增加 CLI fulltext-quote 和 MCP patent_literature_fulltext_quote，可按 p2:b1 真实页码段落核对短引，返回 PDF/解析版本 SHA256。AI 以 full_text 依据保存技术机理时程序会拒绝错误页码或过期 PDF，单篇 Markdown 保存对应解析版本。引用检查仅验证机器提取文本，真实论文和专利中的公式/技术效果仍需独立人员核对原始 PDF。详见 docs/FULLTEXT_PIPELINE.md。
