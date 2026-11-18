@@ -94,7 +94,8 @@ class PatentResearch:
 
     def __init__(self, patent_provider: Any | None, paper_providers: list[Any],
                  case_dir: Path, *, supplemental_sources: list[Evidence] | None = None,
-                 web_documents: list[Any] | None = None, web_errors: list[str] | None = None):
+                 web_documents: list[Any] | None = None, web_errors: list[str] | None = None,
+                 memory_root: Path | None = None):
         self.patent_provider = patent_provider
         self.paper_providers = paper_providers
         self.case_dir = Path(case_dir)
@@ -107,6 +108,7 @@ class PatentResearch:
         self.web_documents = list(web_documents or [])
         self.errors: list[str] = list(web_errors or [])
         self.hashes: dict[str, str] = {}
+        self.memory_root = Path(memory_root) if memory_root is not None else self.case_dir
 
     def save(self, name: str, value: Any) -> None:
         self.hashes[name] = save_json(self.case_dir / name, value)
@@ -184,6 +186,10 @@ class PatentResearch:
             "limitation": "DOI metadata and optional abstracts are not a verification of entire paper full text.",
         })
         all_records = deduplicate(patents + papers + self.other_sources)
+        from .literature_memory import LiteratureMemoryStore
+        memory_counts = LiteratureMemoryStore(self.memory_root).ingest_many(
+            [record for record in all_records if record.kind in {"patent", "paper"}]
+        )
         self.save("04_evidence.json", {
             "records": [x.to_dict() for x in all_records],
             "counts_by_kind": {
@@ -211,6 +217,7 @@ class PatentResearch:
             "filing_authorized": False, "human_signoff": False,
             "patent_claims_available": sum(bool(x.claims) and x.verified for x in patents),
             "papers_discovered": len(papers),
+            "memory_documents": memory_counts,
             "search_errors": list(self.errors),
             "blockers": [
                 "Agent must generate invention candidates, challenge them and draft supported claims.",
