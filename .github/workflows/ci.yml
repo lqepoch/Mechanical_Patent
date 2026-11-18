@@ -30,6 +30,7 @@ jobs:
           - test_skill_mirrors.py
           - test_citations.py
           - test_fission_mcp.py
+          - test_idea_evolution.py
           - test_literature_memory.py
           - test_project_latex_frontier.py
           - test_container_deployment.py
