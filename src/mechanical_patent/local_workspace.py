@@ -278,6 +278,67 @@ class LocalPatentWorkspace:
                 "step": row["step"], "role": role, "actor": actor, "lease_expires": until,
             }
 
+    def heartbeat(self, task_id: int, *, actor: str,
+                  lease_seconds: int = 1800) -> dict[str, Any]:
+        """长任务显式续约，必须为当前被授权领取者且原租约未过期。"""
+        actor = _token(actor, field="执行人")
+        if not 60 <= lease_seconds <= 7200:
+            raise PatentWorkflowError("续约时长必须为 60 至 7200 秒。")
+        with self.connect(write=True) as db:
+            row = db.execute(
+                "SELECT * FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()
+            if not row or row["status"] != "运行中" or row["assigned_to"] != actor:
+                raise PatentWorkflowError("未持有本任务的有效租约。")
+            if _date(row["lease_expires"]) <= _utc():
+                raise PatentWorkflowError("任务租约已过期，无法续约，请重新领取。")
+            case = db.execute(
+                "SELECT revision,status FROM cases WHERE case_id=?", (row["case_id"],)
+            ).fetchone()
+            if case is None or case["status"] != "研究中" or case["revision"] != row["revision"]:
+                raise PatentWorkflowError("案卷已经停止或切换研究轮次。")
+            due = (_utc() + timedelta(seconds=lease_seconds)).isoformat(timespec="seconds")
+            db.execute(
+                "UPDATE tasks SET lease_expires=?,updated_at=? WHERE id=?",
+                (due, utc_now(), task_id),
+            )
+            self._log(
+                db, row["case_id"], int(row["revision"]), row["step"],
+                actor, "任务续约", {"task_id": task_id, "lease_expires": due},
+            )
+            return {"task_id": task_id, "status": "运行中", "lease_expires": due}
+
+    def fail(self, task_id: int, *, actor: str, reason: str,
+             retryable: bool = True) -> dict[str, Any]:
+        """显式记录失败并按预算回队列；不会静默吞掉错误结果。"""
+        actor = _token(actor, field="执行人")
+        reason = _token(reason, field="失败原因", maximum=1000)
+        with self.connect(write=True) as db:
+            row = db.execute(
+                "SELECT * FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()
+            if not row or row["status"] != "运行中" or row["assigned_to"] != actor:
+                raise PatentWorkflowError("当前执行人无法结束其他人的任务。")
+            if row["lease_expires"] and _date(row["lease_expires"]) < _utc():
+                raise PatentWorkflowError("任务租约已经失效。")
+            status = "待领取" if retryable and int(row["attempts"]) < 3 else "已阻断"
+            db.execute(
+                "UPDATE tasks SET status=?,assigned_to=NULL,lease_expires=NULL,"
+                "result_json=?,updated_at=? WHERE id=?",
+                (status, _json({"error": reason, "retryable": retryable}), utc_now(), task_id),
+            )
+            self._log(
+                db, row["case_id"], int(row["revision"]), row["step"],
+                actor, "任务失败", {
+                    "task_id": task_id, "reason": reason,
+                    "retryable": retryable, "next_status": status,
+                },
+            )
+            return {
+                "task_id": task_id, "status": status,
+                "attempts": int(row["attempts"]), "reason": reason,
+            }
+
     def finish(self, task_id: int, *, actor: str, result: dict[str, Any]) -> dict[str, Any]:
         actor = _token(actor, field="执行人")
         if not isinstance(result, dict):
