@@ -14,11 +14,11 @@ Python 3.11+：
 
 启动本地 MCP：
 
-    python -m mechanical_patent.mcp_server --transport stdio --workspace /安全的私有目录/Mechanical_Patent
+    python -m mechanical_patent.mcp_server --transport stdio --workspace /安全的私有目录/Mechanical_Patent --project-id PM80
 
 在可联网的受控主机部署 HTTP（仅回环）：
 
-    python -m mechanical_patent.mcp_server --transport streamable-http --host 127.0.0.1 --port 8765 --workspace /安全的私有目录/Mechanical_Patent
+    python -m mechanical_patent.mcp_server --transport streamable-http --host 127.0.0.1 --port 8765 --workspace /安全的私有目录/Mechanical_Patent --project-id PM80
 
 HTTP 端点为 http://127.0.0.1:8765/mcp。公网、组织网络访问必须经过 TLS + 身份认证（OAuth2/OIDC/Keycloak）、访问权限和网络隔离网关；本代码拒绝监听 0.0.0.0。严禁将无认证的回环服务公开到公网或以负载均衡方式直接暴露。若有反向代理，必须保证代理到回环服务的链路仅由可信网关连接。生产环境还需要每个组织/项目独立的授权存储租户和真实用户身份审计。
 
@@ -31,6 +31,7 @@ HTTP 端点为 http://127.0.0.1:8765/mcp。公网、组织网络访问必须经�
           "args": [
             "-m", "mechanical_patent.mcp_server",
             "--transport", "stdio",
+            "--project-id", "PM80",
             "--workspace", "/安全的私有目录/mechanical-patent"
           ]
         }
@@ -100,6 +101,22 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 ### 其他数据供应商接入
 
 已有 Patsnap、Patent Client Agents 等授权检索能力的客户端，调用 patent_run_create 生成本地 RUN，再用 patent_source_import 导入结构化文献（publication/title/url/source/kind/abstract/claims 等）。所有输入一律标记为未核验，自动记入本地来源索引、检索词记录及技术证据图谱；随后须打开真实公开 PDF、核验权利要求与公开日期，再进入正式反证。此工具适用于 Factrix 的供应商无关集成，生产级高并发事务需转 PostgreSQL。
+
+
+## 项目隔离与扩展工具（2026-11-18）
+
+**新服务器必须传 --project-id**（或 PATENT_MCP_PROJECT_ID）。每个进程只持有 projects/<项目ID>/patents.sqlite3；项目内 case_id、run_id、文献、论文、状态与证据同库审计。不能通过另一个 case_id 访问相邻项目。
+
+增加 11 个 MCP 工具：
+
+- patent_project_info：查询当前服务器绑定项目与项目案卷数。
+- patent_index_refresh：已获外发批准后实时访问 EPO OPS，写入索引、时间和变化历史。
+- patent_index_search / patent_index_history：离线查看专利资料、时间、修改历史和缓存状态。
+- patent_frontier_scan：合法访问 OpenAlex 当前公开论文、保存真实 DOI/日期及来源。
+- patent_variant_plan：对已有真实公开专利的名称或公开号生成技术变种研究任务。
+- patent_manuscript_create/read/edit/revisions/export：保留 LaTeX + BibTeX 的 AI 分章节初稿、历史及 Pandoc 导出。
+
+LaTeX 文稿和实时前沿索引见 docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOLUTION.md；项目隔离见 docs/PROJECT_SQLITE.md。PDF TeX 编译仅可在隔离沙箱进行，MCP 本身无运行 TeX 的工具。
 
 
 ### 新增知识星图 MCP 工具
