@@ -147,6 +147,43 @@ class FullTextTests(unittest.TestCase):
         retried = self.service.parse(self.doc_id, authorized=True, converter=object())
         self.assertEqual(retried["state"], "parsed_unverified")
 
+    def test_doi_oa_enrichment_preserves_abstract_and_requires_permission(self):
+        from mechanical_patent.paper_sources import UnpaywallEnricher
+        def fetched(url):
+            self.assertIn("10.5555/pump.study", url)
+            return {"is_oa": True, "oa_status": "green",
+                    "best_oa_location": {"url_for_pdf": URL, "license": "cc-by"}}
+        enricher = UnpaywallEnricher(
+            contact_email="researcher@example.org", fetch_json=fetched,
+        )
+        original = Evidence(
+            kind="paper", publication="10.5555/second",
+            title="OA lookup source", url="https://doi.org/10.5555/second",
+            source="crossref", retrieved_at="2026-11-19", verified=True,
+            abstract="A complete preserved abstract",
+            paper_metadata={"doi": "10.5555/second", "sources": ["crossref"]},
+        )
+        second = evidence_id(original)
+        self.memory.ingest_many([original])
+        with self.assertRaises(PatentWorkflowError):
+            self.service.enrich_oa(second, authorized=False, enricher=enricher)
+        def second_fetch(_url):
+            return {"is_oa": True, "oa_status": "green",
+                    "best_oa_location": {"url_for_pdf": URL, "license": "cc-by"}}
+        result = self.service.enrich_oa(
+            second, authorized=True,
+            enricher=UnpaywallEnricher(contact_email="researcher@example.org",
+                                      fetch_json=second_fetch),
+        )
+        self.assertEqual(result["pdf_url"], URL)
+        note = self.memory.read(second)["markdown"]
+        self.assertIn("A complete preserved abstract", note)
+        self.assertEqual(
+            self.memory.paper_source(second)["paper_metadata"]["sources"],
+            ["crossref", "unpaywall"],
+        )
+        self.assertFalse(result["full_text_verified"])
+
     def test_no_pdf_source_cannot_download_or_process(self):
         second = Evidence(kind="paper", publication="arxiv:9999.12345",
                           title="No fulltext", url="https://arxiv.org/abs/9999.12345",
