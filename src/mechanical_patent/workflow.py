@@ -162,7 +162,7 @@ class PatentResearch:
                 '"claim_support":[{"claim":1,"specification_passage":""}],"figure_plan":[]}. '
                 "Produce a detailed Chinese invention APPLICATION DRAFT with reproducible embodiments, "
                 "connections, actions, suitable parameters with reasoned bounds, alternatives, figure plan. "
-                Keep claimed distinguishing mechanisms supported by the description. "
+                "Keep claimed distinguishing mechanisms supported by the description. "
                 "Copy the exact supporting passage from the description into each claim_support item for deterministic matching. "
                 "Apply the upstream Chinese drafting practice where consistent with actual engineering and law. "
                 + self.cn_skill["guidance"][:14000] + " "
