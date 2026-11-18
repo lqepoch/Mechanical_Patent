@@ -36,3 +36,10 @@ user-invocable: true
 - 数据库和 Markdown 都属于保密研究资产；严禁提交到 Git 仓库，禁止公开检索词、原始 PDF、企业 BOM 和未申请技术方案。
 - 现阶段项目级文献库隔离，MCP 的工作流任务调度仍共用中心目录的 index.sqlite3。生产级企业隔离需要企业身份、权限和加密存储边界。
 - 来源元数据合法获取和开放全文版权许可需分别审查；EPO OPS 的公平使用限速不可通过增加并发绕过。
+
+
+## 原文段落与 MD 研究记忆的双向绑定
+
+用户以长期研究方式处理千篇专利/论文时，首先建立一篇文献一个稳定 EV- MD；只有合法取得 PDF 时再执行已有 Docling parse-pdf 与新增 ingest-pdf / patent_literature_fulltext_ingest。原文段落保存在当前案卷 literature.sqlite3 中，可通过 patent_literature_passages 按文本查得真实 page、block、PDF SHA256 和文字哈希。AI 在写 technical_mechanism、structures_and_parameters、limitations、counterevidence、innovation_hooks 时，尽量提供来自原文的 p2:b7 等锚点与精确短引，并在单篇 Markdown 内长期保存。
+
+full_text 等级的 source_positions 将程序验证实际存在。摘要推断和原文可验证事实不能混淆；所有 Docling 解析标记 awaiting_original_pdf_review，专利权要、图表和研究结论由独立人员阅读原始 PDF 后复核。文献 PDF 内容版本变化返回 stale_previous_notes，需对旧结论重新审阅。操作命令与 MCP 契约详见 docs/FULLTEXT_EVIDENCE.md。
