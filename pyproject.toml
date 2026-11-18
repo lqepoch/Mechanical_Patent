@@ -9,6 +9,9 @@ description = "Evidence-first autonomous mechanical patent research and drafting
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+web = ["crawl4ai==0.9.5"]
+
 [project.scripts]
 mechanical-patent = "mechanical_patent.cli:main"
 
