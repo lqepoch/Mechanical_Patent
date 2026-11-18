@@ -152,3 +152,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 论文平台选择及长期文献记忆（2026-11-18）
 
 论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。
+
+
+## 按需可编辑图示流水线（2026-11-19）
+工程阶段默认先保存明确的部件连接 diagram_relations、顺序工作步骤 process_steps 和主体交互 sequence_messages；根据实际内容挑选 draw.io 原理关系、Mermaid 流程或时序图。读取 skills/patent-figure-cad/SKILL.md 与 docs/TECHNICAL_BRIEF_STANDARD.md 第10节，调用 patent_figure_prepare 创建内容哈希图源，交给独立无网络、非特权的图示渲染 worker 生成 PDF，再调用 patent_figure_sync 校核产物并更新 LaTeX。MCP 不得直接执行浏览器/Electron/TeX；图源和 PDF 均须记录 SHA256。技术方案修改导致签核哈希失效；任何图不能冒充真实 CAD 尺寸/结构。

@@ -122,3 +122,8 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+
+## 2026-11-19 图示工厂扩展
+技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
+真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。

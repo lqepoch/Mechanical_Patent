@@ -37,3 +37,7 @@ user-invocable: true
 ## 论文数据源选择与研究记忆（2026-11-18）
 
 多轮研究时调用 `paper-sources` 或 MCP capabilities，按任务配置 OpenAlex/Crossref/Semantic Scholar/arXiv/Europe PMC/PubMed/CORE/Lens；通过 Unpaywall 补 DOI 合法 OA PDF。所有检索仍受审批、许可和预算约束；输出跨平台 DOI 归并记录和逐篇 `03_paper_memory/EV-*.md`。每一轮需要加载上轮 Markdown 与来源索引，防止上下文裁剪造成重复检索。存档本地并经哈希检查，全文核验与专利实质对照单独推进。详见 docs/PAPER_SOURCES.md。
+
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
