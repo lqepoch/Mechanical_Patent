@@ -91,3 +91,12 @@ Web 代码采用 MIT 许可的 Cytoscape.js 3.35.0，Vite 8.3.8 仅用于本地�
 稳定性指标：千份/万份文献索引耗时、p95 邻域查询延迟、峰值 RAM、并发索引锁冲突率、结构化文本大小、前端 FPS，以及索引崩溃恢复。
 
 本期离线方案已有：项目级 SQLite、有界计算、词项倒排候选、稳定 ID、幂等输入哈希、证据类型分层、本地可交互 UI、单文献 Markdown 记忆、MCP/CLI 和单测。尚缺：真正大规模 GraphRAG/向量检索、索引任务队列和断点恢复、人工审核工作台、正式多用户 ABAC、专利同族/CPC/法域全量适配、PDF 页面级图节点、图谱精确率黄金评测、前端发布流水线和 SLA。不得把当前版本标为完成生产验收。
+
+
+## 与项目级长期文献记忆的协作（2026-11-18）
+
+现有 LiteratureMemoryStore（src/mechanical_patent/literature_memory.py）在每个已绑定项目的案卷知识目录维护权威文献 Markdown、全文阅读/证据级别和人工研究批注；该存储由文献导入或检索流程自动填充，研究者通过 patent_literature_read / patent_literature_note 追加可审计的技术分析。
+
+本星图模块的 document_memory/generated/EV-*.md 只作为**关系邻域派生索引**，记录相似文献、图边分数、引用与摘要指纹；不修改 LiteratureMemoryStore 的原文著录和既有人工注释。相同 Evidence ID 是两层之间的稳定关联键。document_memory/manual/ 是历史图谱特定人工注释兼容区，新的人工技术论证优先存入权威 LiteratureMemoryStore 及来源锚点，避免形成两份事实副本。
+
+本期已有书面证据和基础相似度图；将 LiteratureMemoryStore 中尚未纳入研究运行的几千篇全文统一进入项目级关系图、全文页面和权要分段图，列为后续聚合索引工作，不能把现有案卷图称为完整项目全量知识星图。
