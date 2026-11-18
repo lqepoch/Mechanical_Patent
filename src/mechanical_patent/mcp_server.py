@@ -143,6 +143,13 @@ class PatentMCPService:
         return {"case_id": case_id, "query": query[:160], "matches": rows,
                 "count": len(rows), "full_text_verified": False}
 
+    def literature_fulltext_quote(
+        self, case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        """依据项目独立的当前 PDF 解析版本校验逐字短引。"""
+        from .literature_fulltext import FulltextPipeline
+        return FulltextPipeline(self._memory(case_id)).quote(doc_id, anchor, verbatim)
+
     def literature_fulltext_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
         """列出当前项目尚未完成的 PDF 任务，供授权 CLI 执行。"""
         from .literature_fulltext import FulltextPipeline
@@ -512,6 +519,13 @@ def create_server(service: PatentMCPService):
                                           limit: int = 20) -> dict[str, Any]:
         """按 PDF 原文页码/段落检索可追溯的机器解析证据。"""
         return service.literature_fulltext_search(case_id, query, limit)
+
+    @server.tool()
+    def patent_literature_fulltext_quote(
+        case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        """逐字核对当前文献已解析 PDF 的 p2:b7 短引，仍须人工原文复核。"""
+        return service.literature_fulltext_quote(case_id, doc_id, anchor, verbatim)
 
     @server.tool()
     def patent_literature_fulltext_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
