@@ -6,6 +6,7 @@ import asyncio
 import os
 from pathlib import Path
 import sys
+import sqlite3
 from uuid import uuid4
 
 from .core import PatentWorkflowError
@@ -116,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Next: use this chat's AI to investigate, invent, challenge, and write the application.")
         print("Filing authorized: false")
         return 0
-    except (PatentWorkflowError, ValueError, FileExistsError, OSError) as exc:
+    except (PatentWorkflowError, ValueError, FileExistsError, OSError, sqlite3.Error) as exc:
         print("ERROR:", str(exc), file=sys.stderr)
         return 3
 
