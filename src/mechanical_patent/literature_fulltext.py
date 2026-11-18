@@ -409,6 +409,17 @@ class FulltextPipeline:
             _atomic_text(note, old + entry)
             self.memory._index_fts(db, doc_id, body=old + entry)
 
+    def pending(self, *, limit: int = 30) -> list[dict[str, Any]]:
+        """只返回有界任务状态；避免向 AI 一次输入整篇论文和原始 PDF。"""
+        count = max(1, min(int(limit), 200))
+        with self.memory.connect() as db:
+            rows = db.execute(
+                "SELECT doc_id,status,attempts,last_updated,error "
+                "FROM fulltext_jobs WHERE status!='parsed' "
+                "ORDER BY last_updated,doc_id LIMIT ?", (count,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def search(self, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
         """按正文页码/段落检索，返回可验证的 PDF SHA 与明确的未核验状态。"""
         term = str(query or "").strip()[:160]
