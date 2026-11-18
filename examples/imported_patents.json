@@ -1,0 +1,17 @@
+{
+  "warning": "Synthetic example data for deterministic tests; not a real patent or live patent database result.",
+  "records": [
+    {
+      "publication": "SYNTHETIC-EXAMPLE-0001",
+      "title": "Illustrative pump valve teaching (synthetic, not published)",
+      "url": "https://example.org/synthetic-record",
+      "source": "synthetic-example",
+      "retrieved_at": "2026-11-18T00:00:00+00:00",
+      "abstract": "Synthetic teaching about dual-valve pump control for local tests.",
+      "claims": "1. Synthetic example claim; not genuine prior art.",
+      "kind": "patent",
+      "jurisdiction": "",
+      "verified": false
+    }
+  ]
+}

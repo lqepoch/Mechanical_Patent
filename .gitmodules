@@ -1,0 +1,19 @@
+[submodule "external/patent-disclosure-skill"]
+	path = external/patent-disclosure-skill
+	url = https://github.com/handsomestWei/patent-disclosure-skill.git
+
+[submodule "external/china-patent-figure-skill"]
+	path = external/china-patent-figure-skill
+	url = https://github.com/PisenAILab/china-patent-figure-skill.git
+
+[submodule "external/patent-template"]
+	path = external/patent-template
+	url = https://github.com/lianghugjil/patent-template.git
+
+[submodule "external/ideaforge"]
+	path = external/ideaforge
+	url = https://github.com/joyboseroy/ideaforge.git
+
+[submodule "external/trinno"]
+	path = external/trinno
+	url = https://github.com/open1s/trinno.git

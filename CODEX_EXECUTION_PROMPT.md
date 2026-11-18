@@ -1,0 +1,125 @@
+# Codex implementation mandate — Mechanical_Patent
+
+Repository: https://github.com/lqepoch/Mechanical_Patent
+Goal: a single natural-language instruction results in a source-auditable global patent research process, multiple original mechanical ideas, independent prior-art challenges, physically plausible implementation paths, and a professionally reviewable Chinese invention patent application draft.
+
+Read all of README.md, AGENTS.md, docs/*, skills/patent-autonomous/SKILL.md and source tests. Start with a repository-wide architecture and license audit. Preserve existing working functionality and Git history. Propose changes as parent/child GitHub Issues, implement on feature branches, run tests, submit PR, and merge only after actual checks and permissions pass.
+
+### Mandatory upstream assessment and adapters
+
+- handsomestWei/patent-disclosure-skill: make its complete CN patent disclosure, claims, specification, drawing description and office action workflow available as independently pinned skill. Its CNIPA quick-scan is additive, not the main global search. Replace parent routing so searching, ideation and drafting run automatically on a one-command request. Keep its guardrails.
+- wangziying1004/AutoPatent: learn its checkpoints, stage reports and adversarial Claim Chart feedback, but do not copy source without clear permission.
+- joyboseroy/ideaforge: integrate TRIZ, SCAMPER, design thinking and cross-domain synthesis using traceable concept lineage; FalkorDB optional behind a graph interface.
+- open1s/trinno: add hypothesis, falsification experiment, evidence classification, stage rollback and reproducible run log.
+- PisenAILab/china-patent-figure-skill: local isolated STEP to patent figure adapter with CAD/geometry acceptance test; protect confidential CAD, map BOM/part numbers to claims.
+- lianghugjil/patent-template: merge only verified format and document QA checks, with separate configurable nonstatutory preferences.
+- patent-client-agents / Patsnap / EPO OPS / CNIPA authorized data / USPTO ODP / BigQuery / licensed WIPO products / OpenAlex: adapters with explicit coverage, terms, quotas, rights, metadata and provenance.
+
+### Proposed parent issue: Autonomous Patent Research Platform
+
+Child 1: Source-provider contracts and live CNIPA+EPO+US+PCT+NPL integration.
+- licensed authenticated APIs or bulk feeds; no forbidden public scraping;
+- DOI/publication/family dedup, full claims, publication date, patents/nonpatents;
+- rate limits, cursors, caching, delta refresh, source outages and API usage accounting;
+- bilingual queries, IPC/CPC expansion, citation forward/backward graph;
+- evidence IDs include verifiable publication/URL/excerpts; no missing-results novelty claims.
+
+Child 2: Hybrid prior-art retrieval and objective evaluation.
+- BM25 + multilingual embeddings + cross-encoder rerank;
+- 100+ gold mechanical cases, recall@K, claim-chart precision, bilingual coverage;
+- D1/D2 closest prior art, feature-element citations with paragraph/claim anchors.
+
+Child 3: Creativity agents and technical constraints.
+- TRIZ, SCAMPER, Design Thinking, FMEA, cross-domain analogy, impossible-idea falsifier;
+- concept graph traceability, physical mechanism, boundaries, alternatives;
+- explicit novel contribution vs routine substitution vs obvious combination.
+
+Child 4: Engineering verification and CAD.
+- analytical loads, stress, energy, pump curves, hydraulics, thermal and tolerance checks;
+- units and dimensional consistency; compare calculations/FEA/physical tests;
+- SolidWorks Windows-local APIs and STEP/assembly BOM source tracking;
+- simulation integration must require real solver execution with reproducible inputs.
+
+Child 5: Contrarian claim-chart / patentability / FTO separation.
+- separate inventions from prior art; show motivation to combine; independent reviewer;
+- CN three-step inventive-step workflow; FTO scope is territory/time/current claims specific;
+- never fabricate an attorney's clearance or a grant prediction.
+
+Child 6: CN disclosure and patent application generation.
+- pinned Chinese patent-disclosure-skill and patent-application integration;
+- independent/dependent claims, support matrix, enabling embodiments, reference numerals;
+- DOCX/PDF/SVG/DXF figure formats, auditable redlines and issue list.
+
+Child 7: Security, tenancy, governance.
+- project-level identity, SSO, roles, row-level security, immutable evidence and review trail;
+- outbound secrecy gates, no silent cloud upload, provider legal terms, retention and backups;
+- names/inventors reflect documented real contribution; CN foreign-filing secrecy checks.
+
+Child 8: Production operations, cross-cloud and observability.
+- PostgreSQL/pgvector, object storage abstraction, queue, checkpointed execution;
+- AWS Lambda/Alibaba FC thin adapters and common vendor-neutral Python business code;
+- replay, retry, rate limit, rollback, idempotency, watchdog, cost/token quotas, tracing;
+- production alerts, SLOs, runbooks, disaster recovery, CI/CD, penetration tests.
+
+Child 9: Evaluations and quality engineering.
+- offline mocked tests + provider contract tests (no real API credential in CI);
+- golden cases, hallucination traps, prompt injection from retrieved patent data,
+  falsely verified imported data, unsupported claim wording, model/data outage tests;
+- specialist patent attorney and mechanical engineer signoff.
+
+Child 10: Governance for external dependencies and releases.
+- record upstream commit SHA, license, security notices and accepted code;
+- no automatic import of unlicensed AutoPatent code;
+- create PRs with evidence of tests and verify status before merging into main;
+- use semantic releases and migration scripts, never silently overwrite case data.
+
+### Release gates
+
+G0: documented source/architecture/licenses and working deterministic tests.
+G1: authentic live multi-country evidence retrieval with measured coverage and claims.
+G2: independent inventive concepts, physical support and adversarial traceability.
+G3: full CN claim/specification/figure dossier with specialist signoff.
+G4: confidential enterprise production with SSO, logs, SLA, disaster recovery and CAD adapter.
+
+The code in the first integration implements parts of G0 and selected pieces of G1-G3 only. Do not claim a production-ready release before all gates are verified. Keep implementation and tests synchronized.
+
+### Non-negotiable output contract
+
+Every generated patent dossier includes:
+A. exact original request, classification and confidentiality decision;
+B. source list, retrieval timestamps, search syntax, pagination and coverage holes;
+C. prior patents, claims / excerpt anchors and counterevidence;
+D. multi-method invention alternatives, mechanism, distinguishing features and rationale;
+E. equations with units, theoretical assumptions, physical model, test plan and faults;
+F. claim-element support table and draft CN application, including figure plan;
+G. open issues, failed steps, legal qualifications, human signoff and file hashes.
+
+No fabricated publication, citation, measurement or patent status. Never automatically submit an application.
+
+
+## Mandatory Crawl4AI and upstream source reuse contract (2026-11-18)
+
+The user specifically requires Crawl4AI as the web extraction engine. Build all browser/webpage parsing through the pinned local Crawl4AI Python library (0.9.5 initially), not ad-hoc browser/HTTP page scrapers. Structured official patent APIs and authorized bulk downloads remain API connectors; this exception is not browser crawling. Use search services (where licensed) to discover URL seeds, then Crawl4AI for permitted articles, patents’ public detail pages where allowed, scientific HTML and technical manuals. Ensure robots.txt checks, per-domain terms registry, explicit host permissions, source snapshots, per-redirect firewall/DNS protection, retries, crawl budget and provenance. Never automate prohibited WIPO PATENTSCOPE public search or bypass website anti-bot controls.
+
+The user explicitly authorizes copying third-party source into Mechanical_Patent for derivative modifications. This is permitted only when the exact source and all dependencies grant the necessary rights. The project includes pinned git submodules for the full MIT/Apache source of:
+- handsomestWei/patent-disclosure-skill
+- PisenAILab/china-patent-figure-skill
+- lianghugjil/patent-template
+- joyboseroy/ideaforge
+- open1s/trinno
+
+To edit the original source inside this repository use scripts/vendor_upstreams.py to create vendor/<name> and commit that resulting folder to the feature branch with original LICENSE, attribution, upstream SHA, modification notice and reproducible tests. Prefer internally maintained adapters over patching upstream modules ad-hoc. Existing submodules are fixed-version source references and do not imply the runtime automatically executes all upstream methods. A Git submodule checkout is performed using git submodule update --init --recursive.
+
+Do not copy wangziying1004/AutoPatent source until the repository owner grants an explicit, suitable license; freely analyze and independently reimplement methods such as 7-stage persistence, citation expansion, reverse claim charts and idea revision. Do not directly import PatZilla AGPL code into this proprietary target without legal compatibility assessment. Crawl4AI Apache-2.0 has its own required attribution statement; preserve NOTICE.
+
+For the single user instruction, produce:
+1. Authenticated China+world patent and NPL retrieval with recorded exact coverage.
+2. Multiple technically distinct inventive candidates from TRIZ, SCAMPER, design thinking, physical cross-domain transfer and FMEA.
+3. Independent evidence-backed closest-prior-art and countersearch claim chart (not a patent grant score).
+4. Reproducible mechanism design with physical equations, units, engineering assumptions, failure modes and actual verification plan.
+5. Revised candidate/portfolio selection with claim-feature support, avoid unsupported predictions and routine substitutions.
+6. Chinese invention patent disclosure and application draft, followed by full independent claim/spec/figure consistency QA.
+7. Auditable JSON, Markdown, editable DOCX and patent line drawings as available, with explicit blockers whenever tools/data are missing.
+8. Engineering + patent expert signoff and manual filing only.
+
+Start from PR #1 and Epic #2 with Issues #3-#10. Keep all running code passing tests. For each source addition, document the exact pinned commit, license compatibility, typed interfaces, upstream tests and security review. If current EPO credentials or cloud model account are not configured, write and test authentic adapters but never label fake fixtures as live worldwide retrieval. Every missing acceptance gate remains open in the issue tracker.

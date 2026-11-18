@@ -1,0 +1,16 @@
+Mechanical_Patent — Third-party notices
+
+This product includes software developed by UncleCode (https://x.com/unclecode) as part of the Crawl4AI project (https://github.com/unclecode/crawl4ai).
+
+Crawl4AI runtime: Apache License 2.0 plus source attribution; pinned Python version 0.9.5.
+Copyright stays with the original authors.
+
+Git submodules are pinned to:
+handsomestWei/patent-disclosure-skill (MIT), 91e3b43a3e6b568c627bc83ffcb73ff453bf0304
+PisenAILab/china-patent-figure-skill (MIT), 6ced175436a557f0e27c0f12eaff42844f76d7fc
+lianghugjil/patent-template (MIT), 7176fdb97b3c53d65ebee1035bd7d947dd9d02d8
+joyboseroy/ideaforge (Apache-2.0), b091fff145965c533eab4f3f9e822ba5cb385197
+open1s/trinno (MIT), f35f322898a92a525a2a87ce4b48a7052dc531d0
+
+Each pinned upstream checkout retains its original LICENSE, notices, copyright and history.
+No endorsement implied. AutoPatent code not copied because a clear redistribution license was not observed.
