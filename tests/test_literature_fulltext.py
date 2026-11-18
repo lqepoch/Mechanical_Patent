@@ -106,6 +106,23 @@ class FulltextTests(unittest.TestCase):
         with self.assertRaises(PatentWorkflowError):
             self._queue()
 
+    def test_license_revocation_invalidates_existing_queue(self):
+        self._queue()
+        revoked = Evidence.from_dict({
+            **self.document.to_dict(),
+            "paper_metadata": {"is_open_access": False, "license": "all-rights-reserved"},
+        })
+        self.memory.ingest_many([revoked])
+        download_calls = []
+        with self.assertRaises(PatentWorkflowError):
+            self.pipeline.process(
+                self.doc_id, allowed_hosts={"repository.example.edu"},
+                authorized=True, downloader=self._downloader(download_calls),
+                parse=False,
+            )
+        self.assertEqual(download_calls, [])
+        self.assertEqual(self.pipeline.status(self.doc_id)["status"], "queued")
+
     def test_process_blocks_unapproved_host_and_records_failure(self):
         self._queue()
         with self.assertRaises(PatentWorkflowError):
