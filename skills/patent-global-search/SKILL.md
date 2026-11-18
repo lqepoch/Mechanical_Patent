@@ -1,22 +1,32 @@
 ---
 name: patent-global-search
-description: "中外专利查新、权利要求逐项比较、IPC/CPC 检索、同族与引证、论文交叉检索，生成可追溯的专利证据与创造性反证矩阵。"
+description: "机械装备专利查新、全球多国专利检索、IPC/CPC分类和同族引证扩展、D1/D2权利要求全文对照、创造性反证；检索失败和来源缺口必须留痕。"
 user-invocable: true
 ---
 
-# Global patent prior-art search
+# 全球专利检索技能
 
-Current AI performs planning and interpretation; this Skill controls the provider and evidence workflow.
+## 何时使用
+用户提出专利查新、竞争对标、权利要求分析或创新候选反证。
 
-1. Generate Chinese and English technical terms plus synonyms, IPC/CPC class candidates, alternative machine domains, component function and failure mode queries.
-2. Query authorized sources where available: CNIPA, EPO OPS, USPTO open data, Google Patents/BigQuery, WIPO licensed products and legal paid provider APIs. The included EPO client requires EPO-issued data credentials. Record provider permissions, date, query, filters, result count, limits and errors. Never claim a full global search when only EPO or a handful of web results are available.
-3. Open at least the relevant claims, description and figures for primary references; avoid novelty claims based solely on abstract similarity.
-4. Normalize publication number, application/family and country, publication date, earliest priority when verified, type, exact source URL, retrieved time and quoted passage/page/claim anchor. Keep publication date distinct from grant status and current legal status.
-5. Deduplicate families and rank closest patent references, then compare each proposed independent claim's features against D1/D2 evidence with explicit undisclosed elements.
-6. Run a second, adversarial search after AI generates inventive proposals, including adjacent fields, synonymous mechanisms and scientific papers. Identify combinations that might render the idea obvious.
-7. Separate global technical search, Chinese novelty and inventive step analyses, and legal FTO. FTO needs territory, effective claims, time and legal status information.
-8. Return evidence-linked patent landscape and claim chart, source caveats, queries for additional recall and specific engineering design constraints.
+## 责任智能体
+参考 agents/README.md 中的第 03、07 号角色；运行环境可以用当前 AI 在同一会话中依次切换专业角色。
 
-Official or licensed patent APIs are separate from Crawl4AI, which only extracts permitted HTML web pages and nonpatent sources. WIPO public PATENTSCOPE crawling is excluded.
+## 输入资料
+公开可外发关键词、技术领域、IPC/CPC 候选和权限确认。
 
-See ../patent-paper-search/SKILL.md for mandatory scholarly cross-search and ../patent-autonomous/SKILL.md for invention drafting and feasibility review.
+## 工作流程
+1. 围绕功能、结构、机理与工况生成中文和英文同义词、CPC/IPC 检索式。
+2. 调用有授权的 CNIPA、EPO OPS、USPTO 等数据库，记录精确查询条件、时间、页码、配额和错误。
+3. 对检索结果按公开号、专利同族及申请关系去重，保留各公开版本及优先权信息。
+4. 获取相关权利要求、说明书、附图和引证；正文缺失时标记仅摘要初筛。
+5. 提取最接近对比文件 D1、潜在 D2，逐特征写出原文位置、技术效果和是否公开。
+6. 对创新后的新特征追加专利反证搜索并反馈总控。
+
+## 必交付成果
+02_patents.json、D1/D2 对照、专利检索式日志、覆盖与缺失清单。
+
+## 质量门禁与失败处置
+官方/许可数据接口与 Crawl4AI 网页采集严格分离；WIPO 公共网页不得自动抓取；不得根据前十条结果判断全球无相关专利。
+
+检索或工具调用失败时保存错误、实际检查范围和后续动作，记录到案卷的质量门禁；未经证实的假设不得当作事实。输出应使用简体中文，保留 DOI、专利公开号、IPC/CPC、技术公式和标准名称的原始准确写法。
