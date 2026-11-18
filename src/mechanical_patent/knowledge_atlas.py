@@ -164,6 +164,14 @@ def _connection(path: Path) -> sqlite3.Connection:
         details_json TEXT NOT NULL DEFAULT '{}',
         PRIMARY KEY(source, target, relation, method)
       );
+      CREATE TABLE IF NOT EXISTS document_facts (
+        fact_id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        subject TEXT NOT NULL, predicate TEXT NOT NULL, object TEXT NOT NULL,
+        quote TEXT NOT NULL, location TEXT NOT NULL,
+        content_sha256 TEXT NOT NULL, review_status TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS ix_facts_doc ON document_facts(document_id);
       CREATE TABLE IF NOT EXISTS index_meta (
         key TEXT PRIMARY KEY, value TEXT NOT NULL
       );
@@ -188,6 +196,51 @@ def _edge(edges: dict[tuple[str, str, str, str], dict[str, Any]],
     edges[key] = {"source": src, "target": dst, "relation": relation,
                   "method": method, "score": score, "source_ref": source_ref,
                   "details": details or {}}
+
+
+FACT_PREDICATES = frozenset({
+    "包含", "连接", "控制", "检测", "支撑", "传递", "阻断",
+    "改善", "抑制", "驱动", "测量", "依赖", "解决", "属于",
+})
+
+
+def record_document_fact(case_dir: Path, document_id: str, *,
+                         subject: str, predicate: str, object: str,
+                         quote: str, location: str = "") -> dict[str, Any]:
+    """由宿主 AI 提交有原文锚点的候选三元组；引文匹配不等于关系已核实。"""
+    case = Path(case_dir)
+    if not IDENTIFIER.fullmatch(document_id):
+        raise PatentWorkflowError("文献证据编号无效。")
+    docs = _documents(case)
+    doc = docs.get(document_id)
+    if doc is None:
+        raise PatentWorkflowError("本案卷未包含对应原始文献。")
+    if not isinstance(predicate, str) or predicate not in FACT_PREDICATES:
+        raise PatentWorkflowError("技术关系未纳入已审核的谓词表。")
+    for value in (subject, object):
+        if not isinstance(value, str) or not 2 <= len(value.strip()) <= 120:
+            raise PatentWorkflowError("技术实体需为2至120字的可审阅文本。")
+    if not isinstance(quote, str) or not 6 <= len(quote.strip()) <= 600:
+        raise PatentWorkflowError("必须提供6至600字的原文引句。")
+    if not isinstance(location, str) or len(location) > 120:
+        raise PatentWorkflowError("原文位置字段长度超限。")
+    norm = lambda s: " ".join(s.split()).casefold()
+    if norm(quote) not in norm(doc["text"]):
+        raise PatentWorkflowError("原文引文在当前已存标题、摘要或权利要求中不可核对。")
+    value = [document_id, subject.strip(), predicate, object.strip(), norm(quote)]
+    fact_id = "FACT-" + sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest()[:20]
+    with _connection(case / "knowledge.sqlite3") as db:
+        db.execute(
+            "INSERT OR IGNORE INTO document_facts VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (fact_id, document_id, subject.strip(), predicate, object.strip(),
+             quote.strip(), location.strip(), doc["sha256"], "AI待人工复核"),
+        )
+        db.commit()
+    return {"fact_id": fact_id, "document_id": document_id,
+            "quote_matches_archived_text": True,
+            "technical_relation_verified": False,
+            "legal_novelty_verified": False,
+            "next_action": "须核查原始公开文件页码/权要及技术关系，再由工程师审阅。"}
 
 
 def _doc_memory(case: Path, documents: dict[str, dict[str, Any]],
@@ -240,6 +293,9 @@ def index_case_atlas(case_dir: Path, *, top_k: int = 8,
     tokens = {doc_id: _tokenize(d["text"]) for doc_id, d in docs.items()}
     nodes: dict[str, dict[str, Any]] = {}
     edges: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    with _connection(case / "knowledge.sqlite3") as stored:
+        facts = [dict(row) for row in stored.execute(
+            "SELECT * FROM document_facts ORDER BY fact_id")]
     for doc_id, doc in sorted(docs.items()):
         _node(nodes, doc_id, "专利文献" if doc["kind"] == "patent" else "论文文献",
               doc["title"], publication=doc["publication"], url=doc["url"],
@@ -289,7 +345,24 @@ def index_case_atlas(case_dir: Path, *, top_k: int = 8,
         if src in nodes and dst in nodes and isinstance(relation, str):
             _edge(edges, src, dst, relation, "existing_lineage",
                   source_ref=str(edge.get("evidence_id") or "04b_technology_graph.json"))
+    for fact in facts:
+        doc_id = fact["document_id"]
+        if doc_id not in docs or fact["content_sha256"] != docs[doc_id]["sha256"]:
+            continue
+        subject_id = "CONCEPT-" + sha256(fact["subject"].encode()).hexdigest()[:16]
+        object_id = "CONCEPT-" + sha256(fact["object"].encode()).hexdigest()[:16]
+        _node(nodes, subject_id, "候选技术实体", fact["subject"],
+              provenance="quote_matched_ai_extraction")
+        _node(nodes, object_id, "候选技术实体", fact["object"],
+              provenance="quote_matched_ai_extraction")
+        _edge(edges, doc_id, subject_id, "提及候选技术实体", "ai_review_pending",
+              source_ref=doc_id, details={"fact_id": fact["fact_id"]})
+        _edge(edges, subject_id, object_id, fact["predicate"], "ai_review_pending",
+              source_ref=doc_id, details={"fact_id": fact["fact_id"],
+              "quote": fact["quote"], "location": fact["location"],
+              "review_status": "AI待人工复核"})
     digest = sha256(json.dumps({
+        "facts": facts,
         "docs": {k: d["sha256"] for k, d in sorted(docs.items())},
         "citations": cited.get("edges", []), "lineage": lineage,
         "top_k": top_k, "threshold": threshold,
@@ -383,10 +456,10 @@ def case_atlas(case_dir: Path, *, scope: str = "project",
         adjacent = [e for e in edges if document_id in (e["source"], e["target"])]
         chosen = {document_id}
         for e in sorted(adjacent, key=lambda x: (-(x["score"] or 0), x["target"])):
-            chosen.add(e["source"])
-            chosen.add(e["target"])
+            other = e["target"] if e["source"] == document_id else e["source"]
             if len(chosen) >= max_nodes:
                 break
+            chosen.add(other)
     else:
         # 每个项目保留所有专利与论文优先，不允许主题词淹没文献节点。
         selected = sorted(nodes, key=lambda n: (
