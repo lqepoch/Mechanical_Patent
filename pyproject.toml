@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
+mcp = ["mcp>=2.0,<3.0"]
 web = ["crawl4ai==0.9.5"]
 pdf = ["docling==2.150.0"]
 patent-mcp = ["patent-client-agents[mcp]==0.32.0"]

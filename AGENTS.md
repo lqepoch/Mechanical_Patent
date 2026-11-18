@@ -109,3 +109,12 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 结合 IdeaForge 的技术关联图谱，区分理论前驱、后续方法改进与引用关系；据此寻找跨行业发明方向。每项新构思随后仍须重新检索专利权利要求与论文，并由独立反证角色和工程角色复核。具体记录格式见 docs/CITATION_DISCOVERY.md。
 
 源代码固定在 external/opencitations-api、external/paper-qa、external/google-patents-examples，使用许可和最新数据接口由企业发布审查单独核实。PaperQA2 上游的额外语言模型与 embedding 调用不能作为本项目默认依赖。
+
+
+## 构思裂变与对外 MCP（2026-11-18）
+
+用户提出技术问题并要求自主研发时，必须读取 skills/patent-idea-fission/SKILL.md；在真实专利/论文检索后创建多技术轴、多创新方法和父子代际构思。每项构思保存 mechanism、enabling_details、distinguishing_features、assumptions、falsification_tests 和 evidence_ids。使用 FissionBoard 或 patent_idea_* MCP 工具保存 05a_idea_fission.json，按质量—多样性保留独立技术方向。研究分数、创新收敛和专利保护价值必须明确分开；同一创新假设未经有效反证与工程复核不得直接认定为已具备创造性。
+
+新增标准 MCP 服务端 src/mechanical_patent/mcp_server.py，采用官方 MCP Python SDK v2，支持 stdio / Streamable HTTP；服务端本身不绑定外部 LLM API。涉及第三方查询词外发时，执行当前轮企业案卷保密审批；无授权时工具直接拒绝。MCP 提供专利检索、发明树、反证、工程假设、中文申请文件、QA 的统一业务工具与中文总控 Prompt。接口见 docs/MCP_INTERFACE.md。
+
+外部系统接入时，必须将 MCP 放在已实现 OAuth2/OIDC + TLS 的受控网关后，限制回环服务访问和真实组织/项目授权，避免未经授权读取未公开专利内容。当前服务未自带生产身份服务，不具备直接公网部署条件。任何真实试验、仿真、专业签核及正式递交都需要独立证据或真实人员操作。

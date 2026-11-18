@@ -45,3 +45,7 @@ user-invocable: true
 ## 新增：文献引证深挖
 
 专利+论文双源检索得到关键公开 DOI 后，调用 patent-citation-discovery 的一跳参考/被引检索。将 DOI 引证关系落入相同案卷，扩展跨学科机理、技术趋势和潜在反例，再针对发明候选做新的专利/论文反证。新发现 DOI 只有引证元数据，不代表已读原文或已确认科学结论。具体执行依据 docs/CITATION_DISCOVERY.md。
+
+
+## 发明树与 MCP 分派
+进入自主专利研发时，从全球专利与论文检索证据出发自动读取 patent-idea-fission/SKILL.md，调用 MCP 工具 patent_idea_plan 生成多代 TRIZ/SCAMPER/FMEA/跨领域任务，按每一方向的真实技术内容 register/evaluate/frontier；对值得继续的候选逐项反证，再 promote 进入现有专利交底、结构附图和正式申请底稿流程。所有工具只记录实际执行结果，真实检索和企业外发必须经过当前轮保密审批。SDK 与工具目录见 docs/MCP_INTERFACE.md。

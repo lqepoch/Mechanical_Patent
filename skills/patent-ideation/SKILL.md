@@ -29,3 +29,7 @@ user-invocable: true
 不存在具体实现路径的想法只作为探索假设；结构控制参数不能脱离守恒定律和合理工况。
 
 检索或工具调用失败时保存错误、实际检查范围和后续动作，记录到案卷的质量门禁；未经证实的假设不得当作事实。输出应使用简体中文，保留 DOI、专利公开号、IPC/CPC、技术公式和标准名称的原始准确写法。
+
+
+## 多代裂变工具
+优先调用 patent-idea-fission 技能，建立 05a_idea_fission.json，注册父子创新假说，通过 Quality-Diversity 保留不同物理机理，再逐候选反证检索与工程论证。创新方法交叉时必须给出可实施的结构/控制耦合机理。代码位于 src/mechanical_patent/ideation_fission.py；MCP 工具详见 docs/MCP_INTERFACE.md。
