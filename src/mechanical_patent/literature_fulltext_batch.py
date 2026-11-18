@@ -199,3 +199,34 @@ class FullTextBatchRunner:
             "errors": messages[:50],
             "full_text_verified": False,
         }
+
+    def status(self, batch_id: str, *, limit: int = 100) -> dict[str, Any]:
+        """只按当前项目 SQLite 的批次编号查询处理状态，限制返回条目。"""
+        import re
+        if not isinstance(batch_id, str) or not re.fullmatch(r"FTB-[0-9A-F]{20}", batch_id):
+            raise PatentWorkflowError("全文批次编号格式无效。")
+        limit = max(1, min(int(limit), 200))
+        with self.pipeline.memory.connect() as db:
+            batch = db.execute(
+                "SELECT batch_id,total,created_at,updated_at FROM fulltext_batches "
+                "WHERE batch_id=?", (batch_id,),
+            ).fetchone()
+            if batch is None:
+                raise PatentWorkflowError("本项目不存在指定全文批次。")
+            states = db.execute(
+                "SELECT state,COUNT(*) AS n FROM fulltext_batch_items "
+                "WHERE batch_id=? GROUP BY state", (batch_id,),
+            ).fetchall()
+            rows = db.execute(
+                "SELECT doc_id,state,attempts,pdf_sha256,last_error FROM fulltext_batch_items "
+                "WHERE batch_id=? ORDER BY ordinal LIMIT ?", (batch_id, limit),
+            ).fetchall()
+        counts = {r["state"]: r["n"] for r in states}
+        return {
+            "batch_id": batch_id, "total": batch["total"],
+            "created_at": batch["created_at"], "updated_at": batch["updated_at"],
+            "counts": counts,
+            "complete": counts.get("done", 0) == batch["total"],
+            "items": [dict(r) for r in rows],
+            "truncated": len(rows) < batch["total"],
+        }
