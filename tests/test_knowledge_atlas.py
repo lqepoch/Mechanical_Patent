@@ -94,6 +94,39 @@ class KnowledgeAtlasTests(unittest.TestCase):
         self.assertNotIn("PUMP", rendered)
         self.assertIn("CN999999999A", rendered)
 
+    def test_project_storage_public_projection_filters_secret_cases(self):
+        from mechanical_patent.project_storage import ProjectStorage
+        project1 = ProjectStorage(self.root, "FIRE")
+        project1.workspace.create_case("PUB", "已公开的消防设备", confidentiality="公开")
+        project1.workspace.create_case("SEC", "研发中的秘密装置", confidentiality="秘密")
+        public_folder = project1.run_dir("PUB", "RUN-ONE")
+        secret_folder = project1.run_dir("SEC", "RUN-ONE")
+        for folder, title, pub in (
+            (public_folder, "公开消防泵技术", "CN444444444A"),
+            (secret_folder, "秘密液压结构实验", "CN555555555A"),
+        ):
+            folder.mkdir(parents=True)
+            case_id = "PUB" if folder == public_folder else "SEC"
+            save_json(folder / "00_intake.json", {"case_id": case_id})
+            save_json(folder / "04_evidence.json", {"records": [record(pub, title)]})
+            index_case_atlas(folder)
+        project2 = ProjectStorage(self.root, "PM180")
+        project2.workspace.create_case("PUB2", "对外公布的机械结构", confidentiality="公开")
+        folder = project2.run_dir("PUB2", "RUN-ONE")
+        folder.mkdir(parents=True)
+        save_json(folder / "00_intake.json", {"case_id": "PUB2"})
+        save_json(folder / "04_evidence.json", {"records": [
+            record("CN444444444A", "公开消防泵技术"),
+        ]})
+        index_case_atlas(folder)
+        result = global_public_atlas(self.root, max_nodes=250)
+        rendered = json.dumps(result, ensure_ascii=False)
+        self.assertIn("CN444444444A", rendered)
+        self.assertNotIn("CN555555555A", rendered)
+        self.assertNotIn("秘密液压结构实验", rendered)
+        self.assertEqual(sum(x["relation"] == "同一公开文献"
+                             for x in result["edges"]), 1)
+
     def test_document_and_budget_safety(self):
         index_case_atlas(self.case)
         with self.assertRaises(PatentWorkflowError):
