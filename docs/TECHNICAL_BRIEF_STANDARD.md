@@ -82,3 +82,12 @@
 - Eisvogel：https://github.com/Wandmalfarbe/pandoc-latex-template （BSD-3-Clause，可借鉴视觉分层，暂未复制其源码）
 - 《专利法实施细则》：https://www.cnipa.gov.cn/art/2023/12/21/art_98_189197.html
 - 《专利审查指南》2025 年第84号令修改，自2026-01-01施行：https://www.cnipa.gov.cn/art/2025/11/13/art_74_202560.html
+
+
+## 9. 工程技术方案评审与结案合同
+
+\`patent_brief_audit\` 只评审阶段 A：要求每项主要创新点至少有一条已核验原始专利权利要求正文引用、明确的公开技术对比、当前候选的反证记录、机械理论与可证伪实验，以及已声明的图纸附件完整性。证据不足时仍可继续编辑方案，最终状态为 \`revision_required\`。
+
+通过静态检查后，进入 \`awaiting_dual_human_review\`。组织授权的工程人员与知识产权管理人员独立审查，可信审批服务形成 \`08c_technical_review.json\`，签署 \`approve_technical_brief\`。两名审查人 ID 必须不同。审批对象绑定案卷/运行/候选/技术方案 SHA256、技术结论、专利初筛意见和签字时间；独立签名密钥 \`PATENT_TECHNICAL_REVIEW_KEY\` 不同于申请转换密钥。MCP 提供只读验签，无自签接口。只有证据检查合格且双审阅签名有效时状态 \`technical_complete\`，即可研发结案，无须生成任何权利要求。
+
+研发结案与是否正式申请分开处理：已完成的技术方案可以归档，之后如申请仍要由用户明确作出申请决定，再由另一个独立审批服务签署 \`08b_conversion_approval.json\`。文件修改或签名过期自动失效。以上 HMAC 是本地安全控制，正式多租户环境应由组织身份审批、不可抵赖电子签名、密钥轮换、分级授权和长期审计替代或增强，跟踪 Issue #25。
