@@ -125,7 +125,7 @@ class LocalWorkflowTests(unittest.TestCase):
         imported = self.db.import_case(folder)
         self.assertEqual(imported["indexed"], {"patent": 1, "paper": 1})
         rows = self.db.search_documents("pump", case_id="X003")
-        self.assertEqual(len(rows), 0)
+        self.assertEqual(len(rows), 1)  # 论文 DOI 中包含 pump
         rows = self.db.search_documents("消防泵", case_id="X003")
         self.assertEqual(len(rows), 2)
         with self.db.connect() as conn:
