@@ -16,3 +16,6 @@ user-invocable: true
 
 ## 独立性
 同一模型自审只是辅助预检；核心工程判断、法律评估和申请审批由独立授权人员负责。错误或证据不足时标记阻断或待补，不伪造检索范围、仿真或授权结果。参见 docs/TECHNICAL_BRIEF_STANDARD.md。
+
+## 阶段 A 自动质量接口
+调用 MCP `patent_brief_audit` 检查单一发明方案，与正式 `patent_quality_audit` 的申请文稿质检分开。只有现有专利对照、工程验证计划及双人独立签名完整时，才记录 `technical_complete`。已结案技术方案无需继续生成权项。
