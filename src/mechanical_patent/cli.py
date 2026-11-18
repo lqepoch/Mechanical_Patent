@@ -18,7 +18,10 @@ from .workspace_cli import add_workspace_parser, handle_workspace
 
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument("--direction", required=True, help="User's engineering problem; kept in private dossier")
-    command.add_argument("--case-dir", type=Path, help="New output folder; existing folders cannot be overwritten")
+    command.add_argument("--case-dir", type=Path, help="新建案卷目录；项目模式下须位于当前项目内部")
+    command.add_argument("--project-id", help="新版本必备项目隔离 ID；未提供仅兼容旧 CLI")
+    command.add_argument("--storage-root", type=Path, default=Path("private_patent_workspace"),
+                         help="项目私有数据总目录，不共享 SQLite")
     command.add_argument("--workspace-db", type=Path, default=None,
                          help="索引数据库路径；缺省为案卷父目录/index.sqlite3")
     command.add_argument("--workflow-case-id",
@@ -143,10 +146,23 @@ def main(argv: list[str] | None = None) -> int:
             print("Filing authorized: false")
             return 0 if not result["issues"] else 2
 
-        folder = args.case_dir or Path("cases") / ("case-" + uuid4().hex[:12])
-        database = args.workspace_db or (folder.parent / "index.sqlite3")
-        from .local_workspace import LocalPatentWorkspace
-        workspace = LocalPatentWorkspace(database)
+        if args.project_id:
+            from .project_storage import ProjectStorage
+            project = ProjectStorage(args.storage_root, args.project_id)
+            if args.workspace_db is not None and args.workspace_db.resolve() != project.db_path.resolve():
+                raise PatentWorkflowError("项目模式禁止通过 --workspace-db 接入共享或其他项目数据库。")
+            folder = args.case_dir or project.root / "cases" / (
+                args.workflow_case_id or "case-" + uuid4().hex[:12]) / "runs" / (
+                "RUN-" + uuid4().hex[:12].upper())
+            if not folder.resolve().is_relative_to(project.root):
+                raise PatentWorkflowError("案卷目录必须位于绑定的项目内。")
+            database,workspace = project.db_path,project.workspace
+        else:
+            # 明确保留旧 CLI 兼容，不作为新增项目的正式入口。
+            folder = args.case_dir or Path("cases") / ("case-" + uuid4().hex[:12])
+            database = args.workspace_db or (folder.parent / "index.sqlite3")
+            from .local_workspace import LocalPatentWorkspace
+            workspace = LocalPatentWorkspace(database)
         remote_requested = bool(
             args.patent_provider == "epo-ops"
             or (args.patent_provider == "auto" and os.getenv("EPO_OPS_CLIENT_ID") and os.getenv("EPO_OPS_CLIENT_SECRET"))
