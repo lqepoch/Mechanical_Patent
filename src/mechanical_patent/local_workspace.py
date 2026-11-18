@@ -205,6 +205,26 @@ class LocalPatentWorkspace:
                     (ids[step], ids[dep]),
                 )
 
+    def can_egress(self, case_id: str) -> bool:
+        """仅允许当前轮次已明确批准外发的案卷使用远程数据查询。"""
+        with self.connect() as db:
+            case = db.execute(
+                "SELECT revision,status FROM cases WHERE case_id=?", (case_id,)
+            ).fetchone()
+            if case is None or case["status"] != "研究中":
+                return False
+            approval = db.execute(
+                "SELECT result_json FROM tasks WHERE case_id=? AND revision=? "
+                "AND step='保密审批' AND status='已完成'",
+                (case_id, case["revision"]),
+            ).fetchone()
+            if approval is None or not approval["result_json"]:
+                return False
+            try:
+                return json.loads(approval["result_json"]).get("outbound_approved") is True
+            except (ValueError, TypeError, json.JSONDecodeError):
+                return False
+
     def status(self, case_id: str) -> dict[str, Any]:
         with self.connect() as db:
             case = db.execute("SELECT * FROM cases WHERE case_id=?", (case_id,)).fetchone()
