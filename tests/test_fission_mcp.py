@@ -109,6 +109,27 @@ class FissionAndMCPTests(unittest.TestCase):
             ["Q=A*v，m^3/s", "NPSHa=(p_atm-p_v)/(rho*g)-h_f"],
             ["入口水温稳定"], ["干转"], ["以气液分离工况试验核查"]
         )
+        brief = {
+            "candidate_id": root["id"], "title": "双阀消防泵入口控制原理",
+            "technical_problem": "入口存在气塞", "solution": "入口阀与排气阀按压力联动",
+            "mechanism": "初始排气后开启主通道，保持压力连续",
+            "expected_effect": "预期缓解压力波动，尚无实测值",
+            "verification_plan": "以入口压力和含气量为控制变量开展台架试验",
+            "components": [{"number": "101", "name": "入口阀", "role": "主通道调节"}],
+            "innovation_points": [{
+                "feature": "入口双阀联动", "prior_difference": "相较于公开压力控制方案还需全文比对",
+                "technical_effect": "预期使排气先于流量上升", "evidence_ids": [self.patent_id],
+            }],
+            "prior_art": [{"evidence_id": self.patent_id,
+                           "known_solution": "公开的单阀压力调节",
+                           "difference": "此构想增加排气与入口联动"}],
+        }
+        saved_brief = self.service.brief_save(self.case_id, self.run_id, root["id"], brief)
+        self.assertTrue(saved_brief["saved"])
+        self.assertIn("08a_technical_brief.tex", saved_brief["latex_artifact"])
+        phase_a = self.service.brief_audit(self.case_id, self.run_id, root["id"])
+        self.assertEqual(phase_a["status"], "awaiting_dual_human_review")
+        self.assertFalse(phase_a["filing_authorized"])
         draft = {
             "title": "一种消防泵入口排气机构",
             "abstract": "在入口通过多级排气支路改善吸入条件，效果需要试验。",
@@ -125,12 +146,12 @@ class FissionAndMCPTests(unittest.TestCase):
             "claim_support": [{"claim": 1,
                 "specification_passage": "单向阀与旁路水力联动，排气支路独立控制。"}],
         }
-        saved = self.service.draft_save(self.case_id, self.run_id, root["id"], draft)
-        self.assertTrue(saved["saved"])
-        self.assertFalse(saved["filing_authorized"])
-        self.assertEqual(saved["draft_issues"], [])
+        # 未经可信企业审批签名，不得由 AI 擅自进入申请格式写作。
+        with self.assertRaises(PatentWorkflowError):
+            self.service.draft_save(self.case_id, self.run_id, root["id"], draft)
+        self.assertFalse(self.service.conversion_status(
+            self.case_id, self.run_id, root["id"])["conversion_authorized"])
         audit = self.service.quality(self.case_id, self.run_id)
-        self.assertEqual(audit["status"], "needs_human_review")
         self.assertFalse(audit["filing_authorized"])
         self.assertTrue(self.service.read_artifact(self.case_id, self.run_id,
                                                    "05a_idea_fission.json")["content"]["candidates"])
@@ -225,7 +246,8 @@ class FissionAndMCPTests(unittest.TestCase):
                 for name in ("patent_case_create", "patent_research", "patent_idea_plan",
                              "patent_idea_register", "patent_idea_evaluate", "patent_idea_frontier",
                              "patent_countersearch_record", "patent_engineering_record",
-                             "patent_draft_save", "patent_quality_audit", "patent_run_create",
+                             "patent_draft_save", "patent_brief_save", "patent_brief_audit", "patent_conversion_status",
+                             "patent_quality_audit", "patent_run_create",
                              "patent_source_import"):
                     self.assertIn(name, names)
                 result = await client.call_tool("patent_capabilities", {})

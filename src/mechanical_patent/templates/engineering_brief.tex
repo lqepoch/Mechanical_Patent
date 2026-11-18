@@ -1,0 +1,38 @@
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+% 工程技术方案模板。适用于内部审核，不能当作专利申请文本。
+\usepackage[margin=23mm,headheight=16pt]{geometry}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{5pt}
+\renewcommand{\arraystretch}{1.28}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{内部技术研发文件}
+\fancyhead[R]{工程技术方案}
+\fancyfoot[C]{\thepage}
+\begin{document}
+\begin{titlepage}
+\centering
+\vspace*{3.2cm}
+{\LARGE\bfseries 机械与控制技术研发方案\par}
+\vspace{1.6cm}
+{\Large\bfseries %%TITLE%%\par}
+\vspace{1.8cm}
+{\large 单一发明候选：%%CANDIDATE%%\par}
+\vspace{.5cm}
+{\large 模板类型：%%PROFILE%%\par}
+\vfill
+{\large 企业内部技术审阅版\par}
+\vspace{.5cm}
+{\small 预期效果与创新性仍需原始证据及专业人员审核；未经批准不得对外公开。\par}
+\end{titlepage}
+\tableofcontents
+\newpage
+%%CONTENT%%
+\end{document}
