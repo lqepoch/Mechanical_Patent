@@ -20,6 +20,7 @@ from .technical_brief import render_brief
 from .technical_review import inspect_brief
 from .filing_gate import conversion_status, require_conversion_approval
 from .local_workspace import LocalPatentWorkspace
+from .literature_memory import LiteratureMemoryStore
 from .project_storage import ProjectStorage
 from .quality import inspect_research_case, audit_research_case
 from .workflow import PatentResearch
@@ -69,6 +70,7 @@ class PatentMCPService:
         if not isinstance(case_id, str) or not _CASE_ID.fullmatch(case_id):
             raise PatentWorkflowError("案卷编号不合法。")
         result = self.workspace.create_case(case_id, direction, confidentiality=confidentiality)
+        LiteratureMemoryStore(self.root / "cases" / case_id)
         return {"case_id": result["case_id"], "status": result["status"],
                 "revision": result["revision"], "confidentiality": result["confidentiality"],
                 "next_action": "保密管理员在原有案卷工作流批准查询词外发后可执行专利检索。"}
@@ -80,6 +82,84 @@ class PatentMCPService:
                 "outbound_approved": self.workspace.can_egress(case_id),
                 "tasks": record.get("tasks", []), "document_totals": record.get("source_reviews", [])}
 
+
+    def _memory(self, case_id: str) -> LiteratureMemoryStore:
+        self._case(case_id)
+        project = self.root / "cases" / case_id
+        if project.is_symlink():
+            raise PatentWorkflowError("项目目录禁止符号链接。")
+        return LiteratureMemoryStore(project)
+
+    def literature_search(
+        self, case_id: str, query: str, kind: str | None = None, limit: int = 20,
+    ) -> dict[str, Any]:
+        """返回可查证的文献与稳定 MD 地址，避免把千篇正文塞入上下文。"""
+        records = self._memory(case_id).search(query, limit=limit, kind=kind)
+        return {"case_id": case_id, "matches": records, "count": len(records)}
+
+    def literature_read(
+        self, case_id: str, doc_id: str, max_chars: int = 24000,
+    ) -> dict[str, Any]:
+        note = self._memory(case_id).read(doc_id)
+        size = max(1000, min(int(max_chars), 60000))
+        return {"case_id": case_id, "doc_id": doc_id,
+                "markdown": note["markdown"][:size],
+                "truncated": len(note["markdown"]) > size,
+                "full_length": len(note["markdown"]), "note_path": note["path"],
+                "content_hash": note["content_hash"]}
+
+    def literature_note(
+        self, case_id: str, doc_id: str, analyst: str,
+        basis: str, analysis: dict[str, str], source_positions: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return self._memory(case_id).write_analysis(
+            doc_id, analyst=analyst, basis=basis,
+            analysis=analysis, source_positions=source_positions,
+        )
+
+    def literature_stats(self, case_id: str) -> dict[str, Any]:
+        return self._memory(case_id).stats()
+
+    def literature_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
+        return {"case_id": case_id, "pending": self._memory(case_id).pending_analysis(limit=limit)}
+
+    def literature_resume(self, case_id: str) -> dict[str, Any]:
+        return self._memory(case_id).read_resume()
+
+    def literature_resume_save(
+        self, case_id: str, analyst: str, markdown: str, expected_sha256: str,
+    ) -> dict[str, Any]:
+        return self._memory(case_id).update_resume(
+            markdown, analyst=analyst, expected_sha256=expected_sha256,
+        )
+
+    def literature_harvest(
+        self, case_id: str, provider: str, query: str,
+        max_documents: int = 200, max_pages: int = 4,
+        allow_search_exposure: bool = False,
+    ) -> dict[str, Any]:
+        """同步受控批量检索；更大规模由带预算的 CLI 持续分批调用。"""
+        self._case(case_id)
+        if not allow_search_exposure or not self.workspace.can_egress(case_id):
+            raise PatentWorkflowError("未同时取得显式外发授权和案卷保密批准。")
+        from .papers import CrossrefProvider, OpenAlexProvider
+        from .providers import EPOOPSProvider
+        from .literature_harvest import HarvestBudget, LiteratureHarvester
+        options = {
+            "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
+            "epo-ops": EPOOPSProvider,
+        }
+        if provider not in options:
+            raise PatentWorkflowError("不支持的文献数据源。")
+        budget = HarvestBudget(
+            max_documents=max(1, min(int(max_documents), 1000)),
+            page_size=20 if provider == "epo-ops" else 100,
+            max_pages=max(1, min(int(max_pages), 20)),
+            max_seconds=120,
+        )
+        return LiteratureHarvester(self._memory(case_id)).harvest(
+            options[provider](), query, budget=budget,
+        )
 
     def create_run(self, case_id: str) -> dict[str, Any]:
         """离线创建研究运行；供其他已授权搜索 MCP 导入结果。"""
@@ -116,7 +196,9 @@ class PatentMCPService:
         run_id = "RUN-" + uuid4().hex[:16].upper()
         path = self.root / "cases" / case_id / "runs" / run_id
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        result = PatentResearch(provider, papers, path).run(
+        result = PatentResearch(
+            provider, papers, path, memory_root=self.root / "cases" / case_id
+        ).run(
             case["direction"], patent_queries, paper_queries,
             limit=limit, case_id=case_id,
         )
@@ -338,7 +420,7 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.3",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.5",
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "knowledge_atlas": {"scopes": ["document", "project", "global_public"], "offline": True},
                  "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -366,6 +448,67 @@ def create_server(service: PatentMCPService):
         """使用已获许可的 EPO/论文数据源执行真实检索并创建研究运行。"""
         return service.research(case_id, patent_queries, paper_queries, limit)
 
+
+    @server.tool()
+    def patent_literature_search(
+        case_id: str, query: str, kind: str | None = None, limit: int = 20,
+    ) -> dict[str, Any]:
+        """项目内混合索引检索，返回单篇 MD 证据编号和永久路径。"""
+        return service.literature_search(case_id, query, kind, limit)
+
+    @server.tool()
+    def patent_literature_read(
+        case_id: str, doc_id: str, max_chars: int = 24000,
+    ) -> dict[str, Any]:
+        """按文献证据编号恢复上次 AI/研究者写入的原文摘要与技术分析。"""
+        return service.literature_read(case_id, doc_id, max_chars)
+
+    @server.tool()
+    def patent_literature_note(
+        case_id: str, doc_id: str, analyst: str,
+        basis: str, analysis: dict[str, str],
+        source_positions: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """保存白话解读、机械机理、反证与衍生方向；需标记阅读依据。"""
+        return service.literature_note(
+            case_id, doc_id, analyst, basis, analysis, source_positions,
+        )
+
+    @server.tool()
+    def patent_literature_stats(case_id: str) -> dict[str, Any]:
+        """文献累计规模、已分析数、未完分页任务及研究恢复文档位置。"""
+        return service.literature_stats(case_id)
+
+    @server.tool()
+    def patent_literature_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
+        """批量读取尚未写入实质研究分析的文献队列，逐篇处理。"""
+        return service.literature_pending(case_id, limit)
+
+    @server.tool()
+    def patent_literature_resume(case_id: str) -> dict[str, Any]:
+        """恢复项目最新研究任务、假设、证据与后续方向。"""
+        return service.literature_resume(case_id)
+
+    @server.tool()
+    def patent_literature_resume_save(
+        case_id: str, analyst: str, markdown: str, expected_sha256: str,
+    ) -> dict[str, Any]:
+        """乐观锁更新研究快照并归档旧版，防止上下文压缩和并发覆盖。"""
+        return service.literature_resume_save(
+            case_id, analyst, markdown, expected_sha256,
+        )
+
+    @server.tool()
+    def patent_literature_harvest(
+        case_id: str, provider: str, query: str,
+        max_documents: int = 200, max_pages: int = 4,
+        allow_search_exposure: bool = False,
+    ) -> dict[str, Any]:
+        """已获保密许可才按官方 API 分页查询，增量生成每篇 MD。"""
+        return service.literature_harvest(
+            case_id, provider, query, max_documents, max_pages,
+            allow_search_exposure,
+        )
 
     @server.tool()
     def patent_run_create(case_id: str) -> dict[str, Any]:
@@ -494,7 +637,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
             + "调用 patent_index_refresh 保持项目索引可追溯，patent_frontier_scan 发现公开前沿，并通过 patent_variant_plan 研究已公开专利的变种；"
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
-            + "先调用 patent_knowledge_index 和 patent_knowledge_graph 查看关联文献、差异及反证；"
+            + "先调用 patent_knowledge_index 和 patent_knowledge_graph 追溯文献关联及反证；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "默认用 patent_brief_save 输出工程技术方案；只有用户申请决定及企业验签通过才可写专利申请文本；"
