@@ -143,7 +143,16 @@ def validate_draft(draft: dict[str, Any], records: list[Evidence], idea: dict[st
     if not isinstance(support, list) or len(support) != len(claims or []):
         issues.append("Every claim requires a numbered specification support record.")
     else:
+        whole_description = (
+            " ".join(str(value) for value in description.values())
+            if isinstance(description, dict) else ""
+        )
+        normalized_description = " ".join(whole_description.split())
         for index, entry in enumerate(support, start=1):
             if not isinstance(entry, dict) or not str(entry.get("specification_passage", "")).strip():
                 issues.append(f"Claim {index} lacks a specification passage.")
+                continue
+            passage = " ".join(str(entry["specification_passage"]).split())
+            if passage not in normalized_description:
+                issues.append(f"Claim {index} support passage is absent from description.")
     return issues
