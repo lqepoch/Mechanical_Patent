@@ -117,6 +117,18 @@ class PatentMCPService:
             analysis=analysis, source_positions=source_positions,
         )
 
+    def paper_pdf_status(self, case_id: str, doc_id: str) -> dict[str, Any]:
+        """读取所属项目论文的 PDF/解析状态，不启动网络或模型。"""
+        from .paper_fulltext import PaperFullTextService
+        return PaperFullTextService(self._memory(case_id)).status(doc_id)
+
+    def paper_pdf_page(self, case_id: str, doc_id: str,
+                       page: int, limit: int = 30) -> dict[str, Any]:
+        """读取待核验的原文页码段落；下一步由 AI 做有位置标注的技术分析。"""
+        from .paper_fulltext import PaperFullTextService
+        return PaperFullTextService(self._memory(case_id)).pages(
+            doc_id, page=page, limit=limit)
+
     def literature_stats(self, case_id: str) -> dict[str, Any]:
         return self._memory(case_id).stats()
 
@@ -455,6 +467,17 @@ def create_server(service: PatentMCPService):
         return service.literature_note(
             case_id, doc_id, analyst, basis, analysis, source_positions,
         )
+
+    @server.tool()
+    def patent_paper_pdf_status(case_id: str, doc_id: str) -> dict[str, Any]:
+        """查找此项目内该论文的获许可 PDF 及 Docling 处理状态。"""
+        return service.paper_pdf_status(case_id, doc_id)
+
+    @server.tool()
+    def patent_paper_pdf_page(case_id: str, doc_id: str,
+                              page: int, limit: int = 30) -> dict[str, Any]:
+        """按页查询机器提取的 PDF 文本与页码位置，人工仍需核查。"""
+        return service.paper_pdf_page(case_id, doc_id, page, limit)
 
     @server.tool()
     def patent_literature_stats(case_id: str) -> dict[str, Any]:
