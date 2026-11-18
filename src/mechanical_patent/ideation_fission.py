@@ -48,6 +48,15 @@ def _fingerprint(mechanism: str, features: list[str]) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _similarity(left: str, right: str) -> float:
+    """只作近似文字提醒；中文二元组无语义推断或专利法效力。"""
+    def grams(value: str) -> set[str]:
+        normalized = re.sub(r"\s+", "", value.casefold())[:10000]
+        return {normalized[i:i+2] for i in range(len(normalized)-1)} or {normalized}
+    a, b = grams(left), grams(right)
+    return len(a & b) / len(a | b) if (a | b) else 1.0
+
+
 @contextmanager
 def _exclusive(path: Path) -> Iterator[None]:
     lock = path.with_suffix(".lock")
@@ -83,6 +92,20 @@ class FissionBoard:
             "created_at": utc_now(), "candidates": [], "events": [],
             "notice": "研究设想与内部评分均非新颖性、创造性或自由实施法律结论。",
         }
+
+    def _verified_patent_ids(self) -> set[str]:
+        path = self.case_dir / "04_evidence.json"
+        if not path.is_file():
+            return set()
+        ids: set[str] = set()
+        for raw in json.loads(path.read_text(encoding="utf-8")).get("records", []):
+            try:
+                record = Evidence.from_dict(raw)
+            except (TypeError, ValueError, KeyError):
+                continue
+            if record.verified and record.kind == "patent" and record.claims.strip():
+                ids.add(evidence_id(record))
+        return ids
 
     def _evidence_ids(self) -> set[str]:
         path = self.case_dir / "04_evidence.json"
@@ -126,9 +149,100 @@ class FissionBoard:
                 ],
                 "evidence_warning": "须继续搜索真实在先技术；评分不代表获得专利。",
             })
+        failed = [x for x in data["candidates"] if x.get("status") == "rejected_research_route"]
+        avoid = list(dict.fromkeys(
+            reason for item in failed[-20:] for reason in
+            (item.get("rejection") or {}).get("learned_constraints", [])
+        ))[:24]
+        if parent and parent.get("rejection"):
+            avoid = list(dict.fromkeys(parent["rejection"]["learned_constraints"] + avoid))
         return {"status": "awaiting_agent_ideas", "tasks": tasks,
+                "avoid_failed_constraints": avoid,
                 "budget": {"remaining_nodes": MAX_NODES - len(data["candidates"]),
                            "maximum_generation": MAX_GENERATION}}
+
+    def plan_crossovers(self, limit: int = 6) -> dict[str, Any]:
+        """仅配对跨技术轴且已评估的假说，保留双亲关联并强制要求耦合原理。"""
+        data = self._load()
+        count = max(1, min(int(limit), 12))
+        existing = {
+            frozenset(c.get("parent_ids", []))
+            for c in data["candidates"] if len(c.get("parent_ids", [])) >= 2
+        }
+        pool = [
+            c for c in data["candidates"]
+            if c.get("evaluation") and c.get("status") != "rejected_research_route"
+            and c.get("generation", MAX_GENERATION) < MAX_GENERATION
+        ]
+        pool.sort(key=lambda c: (-c["evaluation"]["heuristic_score"], c["id"]))
+        ranked = []
+        for i, left in enumerate(pool[:40]):
+            for right in pool[i+1:40]:
+                if left["technical_axis"] == right["technical_axis"]:
+                    continue
+                pair = frozenset((left["id"], right["id"]))
+                if pair in existing:
+                    continue
+                depth = max(left["generation"], right["generation"]) + 1
+                if depth > MAX_GENERATION:
+                    continue
+                ranked.append((
+                    -min(left["evaluation"]["heuristic_score"], right["evaluation"]["heuristic_score"]),
+                    -max(left["evaluation"]["heuristic_score"], right["evaluation"]["heuristic_score"]),
+                    left["id"], right["id"], depth, left, right
+                ))
+        ranked.sort(key=lambda p: p[:4])
+        tasks = []
+        for _, _, _, _, generation, left, right in ranked[:count]:
+            tasks.append({
+                "parent_ids": [left["id"], right["id"]], "generation": generation,
+                "axes": [left["technical_axis"], right["technical_axis"]],
+                "mechanisms": [left["mechanism"], right["mechanism"]],
+                "objective": "证明两机理通过可制造接口产生协同效果，而非功能简单并列",
+                "must_provide": [
+                    "synergy: 两机理的功能耦合及增益假说",
+                    "interface_definition: 机械/流体/电气接口与失效边界",
+                    "enabling_details: 构件、连接、动作和控制时序",
+                    "区别特征、物理方程、反证检索词和可证伪试验",
+                ],
+                "warning": "仅表示可探索的组合方向；未确认新颖性、创造性或物理实现。",
+            })
+        return {
+            "status": "awaiting_agent_crossbreeding",
+            "tasks": tasks, "eligible_candidates": len(pool),
+            "remaining_node_budget": MAX_NODES - len(data["candidates"]),
+            "patentability_approved": False,
+        }
+
+    def reject(self, candidate_id: str, reason: str, learned_constraints: list[str],
+               source_ids: list[str] | None = None) -> dict[str, Any]:
+        """将失败原因保留为下一轮显式避坑约束；不删除原假说或评价。"""
+        reason = _required(reason, "失败原因")
+        constraints = _list_of_text(learned_constraints, "新约束", maximum=8)
+        refs = source_ids or []
+        if not isinstance(refs, list) or len(refs) > 30 or any(not isinstance(r, str) for r in refs):
+            raise PatentWorkflowError("失败来源编号格式错误。")
+        if set(refs) - self._evidence_ids():
+            raise PatentWorkflowError("失败证据必须已录入本案卷。")
+        with _exclusive(self.path):
+            data = self._load()
+            item = next((x for x in data["candidates"] if x["id"] == candidate_id), None)
+            if item is None:
+                raise PatentWorkflowError("目标构思不存在。")
+            if item["status"] == "exported_for_review":
+                raise PatentWorkflowError("已移交审核的候选须走正式案卷撤回流程。")
+            if item["status"] == "rejected_research_route":
+                raise PatentWorkflowError("该路线已经归档为失败记忆。")
+            item["rejection"] = {
+                "reason": reason, "learned_constraints": constraints,
+                "source_ids": list(dict.fromkeys(refs)), "recorded_at": utc_now(),
+                "legal_conclusion": "none",
+            }
+            item["status"] = "rejected_research_route"
+            self._event(data, "archive_failed_hypothesis", candidate_id)
+            save_json(self.path, data)
+        return {"candidate_id": candidate_id, "status": "rejected_research_route",
+                "retained_for_learning": True, "legal_conclusion": "none"}
 
     def register(self, candidate: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(candidate, dict):
@@ -146,6 +260,22 @@ class FissionBoard:
         if axis not in AXES or method not in METHODS:
             raise PatentWorkflowError("技术轴或创新方法不在允许集合内。")
         parent_id = str(candidate.get("parent_id") or "")
+        parents_raw = candidate.get("parent_ids")
+        synergy = ""
+        interface = ""
+        if parents_raw is not None:
+            if (not isinstance(parents_raw, list) or not 2 <= len(parents_raw) <= 3
+                    or any(not isinstance(v, str) or not v for v in parents_raw)
+                    or len(set(parents_raw)) != len(parents_raw)):
+                raise PatentWorkflowError("交叉组合必须提供2至3个不同且有效的父构思ID。")
+            if method != "组合创新":
+                raise PatentWorkflowError("多亲本构思必须使用组合创新方法。")
+            if parent_id and parent_id != parents_raw[0]:
+                raise PatentWorkflowError("parent_id必须等于parent_ids的首项。")
+            parent_id = parents_raw[0]
+            synergy = _required(candidate.get("synergy"), "两机理协同原理")
+            interface = _required(candidate.get("interface_definition"), "接口及耦合边界")
+        repair_rationale = ""
         references = candidate.get("evidence_ids", [])
         if not isinstance(references, list) or len(references) > 30 or any(not isinstance(x, str) for x in references):
             raise PatentWorkflowError("来源编号必须是列表，最多30条。")
@@ -159,14 +289,36 @@ class FissionBoard:
                 raise PatentWorkflowError("候选数量达到预算上限，先进行质量—多样性筛选。")
             if any(x["fingerprint"] == fp for x in data["candidates"]):
                 raise PatentWorkflowError("发现技术特征完全重复的构思，停止无意义裂变。")
-            parent = next((x for x in data["candidates"] if x["id"] == parent_id), None) if parent_id else None
-            if parent_id and parent is None:
+            parent_identifiers = parents_raw if parents_raw is not None else ([parent_id] if parent_id else [])
+            lookup = {x["id"]: x for x in data["candidates"]}
+            if any(pid not in lookup for pid in parent_identifiers):
                 raise PatentWorkflowError("父构思不存在。")
-            generation = parent["generation"] + 1 if parent else 0
+            parents = [lookup[pid] for pid in parent_identifiers]
+            if any(p.get("status") == "rejected_research_route" for p in parents):
+                if len(parents) != 1 or candidate.get("repair_of_failed_route") is not True:
+                    raise PatentWorkflowError("已否定路线只能通过显式修复子代继续，不能直接用于跨方案组合。")
+                repair_rationale = _required(candidate.get("repair_rationale"), "修复失败约束的具体机制")
+                if not parents[0].get("rejection", {}).get("learned_constraints"):
+                    raise PatentWorkflowError("失败祖先缺少可追溯约束。")
+            if len(parents) > 1 and len({p["technical_axis"] for p in parents}) < 2:
+                raise PatentWorkflowError("跨方案组合至少覆盖两个不同的技术轴。")
+            generation = 1 + max((p["generation"] for p in parents), default=-1)
             if generation > MAX_GENERATION:
                 raise PatentWorkflowError("超过允许的裂变代数。")
+            reference_text = " ".join([mechanism] + features)
+            neighbors = sorted(
+                ({"candidate_id": other["id"], "text_overlap": round(score, 3)}
+                 for other in data["candidates"]
+                 if (score := _similarity(reference_text, " ".join(
+                     [other["mechanism"]] + other["distinguishing_features"]))) >= 0.72),
+                key=lambda x: (-x["text_overlap"], x["candidate_id"])
+            )[:5]
             item = {
                 "id": "IF-" + uuid4().hex[:12].upper(), "parent_id": parent_id,
+                "parent_ids": parent_identifiers, "synergy": synergy,
+                "interface_definition": interface, "repair_rationale": repair_rationale,
+                "repairs_failed_route": bool(repair_rationale),
+                "text_overlap_neighbors": neighbors,
                 "generation": generation, "title": title, "technical_problem": problem,
                 "mechanism": mechanism, "enabling_details": enabling,
                 "distinguishing_features": features, "assumptions": assumptions,
@@ -208,6 +360,8 @@ class FissionBoard:
             item = next((x for x in data["candidates"] if x["id"] == candidate_id), None)
             if item is None:
                 raise PatentWorkflowError("目标构思不存在。")
+            if item.get("status") == "rejected_research_route":
+                raise PatentWorkflowError("失败归档构思须作为下一代新候选修复，禁止直接重评。")
             item["evaluation"] = {
                 "scores": scores, "heuristic_score": score, "review": review,
                 "countersearch_refs": list(dict.fromkeys(countersearch_refs)),
@@ -251,9 +405,15 @@ class FissionBoard:
             item = next((x for x in data["candidates"] if x["id"] == candidate_id), None)
             if item is None:
                 raise PatentWorkflowError("构思不存在。")
+            if item.get("status") == "rejected_research_route":
+                raise PatentWorkflowError("已否定研究路线不得移交申请。")
             review = item.get("evaluation") or {}
             if not item["evidence_ids"] or not review.get("countersearch_refs") or not review.get("physical_principle"):
                 raise PatentWorkflowError("缺少来源、反证记录或理论依据，无法移交专利申请流程。")
+            verified_patents = self._verified_patent_ids()
+            if (not verified_patents.intersection(item["evidence_ids"])
+                    or not verified_patents.intersection(review["countersearch_refs"])):
+                raise PatentWorkflowError("申请流程移交须有经原始来源核验的专利权利要求反证证据。")
             file = self.case_dir / "05_inventions.json"
             existing = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {"candidates": []}
             items = existing.get("candidates", [])
@@ -270,6 +430,9 @@ class FissionBoard:
                 "falsification_tests": item["falsification_tests"],
                 "inventive_method": item["inventive_method"],
                 "evidence_ids": item["evidence_ids"], "fission_parent_id": item["parent_id"],
+                "fission_parent_ids": item.get("parent_ids", []),
+                "synergy": item.get("synergy", ""),
+                "interface_definition": item.get("interface_definition", ""),
                 "verification_status": "hypothesis_only",
                 "legal_patentability_verified": False,
             })
