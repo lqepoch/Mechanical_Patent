@@ -1,5 +1,6 @@
 """Single-command operator interface. Research never implies authorization to file."""
 import argparse
+import asyncio
 from pathlib import Path
 import sys
 from uuid import uuid4
@@ -19,6 +20,12 @@ def main(argv=None):
     run.add_argument("--import-json", type=Path, help="Offline corpus, not live verified prior art")
     run.add_argument("--case-dir", type=Path, help="New private folder; must not exist")
     run.add_argument("--max-ideas", type=int, default=5)
+    run.add_argument("--web-url", action="append", default=[],
+                     help="Public non-patent page to extract using local Crawl4AI; repeatable")
+    run.add_argument("--web-allow-domain", action="append", default=[],
+                     help="Explicit HTTPS host permission for Crawl4AI; repeatable")
+    run.add_argument("--allow-web-exposure", action="store_true",
+                     help="Approve public HTML fetch under website rules and robots.txt")
     run.add_argument("--model")
     run.add_argument("--llm-base-url")
     run.add_argument("--allow-external-llm", action="store_true")
@@ -36,7 +43,18 @@ def main(argv=None):
             provider = ImportedPatentProvider(args.import_json)
         llm = JSONGateway(base_url=args.llm_base_url, model=args.model, allow_external=args.allow_external_llm)
         folder = args.case_dir or Path("cases") / ("case-" + uuid4().hex[:12])
-        result = PatentResearch(provider, llm, folder, max_ideas=args.max_ideas).run(args.direction)
+        web_docs, web_errors = [], []
+        if args.web_url:
+            if not args.allow_web_exposure:
+                raise PatentWorkflowError("Web visits require explicit --allow-web-exposure after data-rights review.")
+            from .web_crawler import Crawl4AIGateway
+            gateway = Crawl4AIGateway(set(args.web_allow_domain))
+            web_docs, web_errors = asyncio.run(gateway.collect(args.web_url))
+        result = PatentResearch(
+            provider, llm, folder, max_ideas=args.max_ideas,
+            supplemental_sources=[doc.to_evidence() for doc in web_docs],
+            web_documents=web_docs, web_errors=web_errors,
+        ).run(args.direction)
         print("Research dossier:", (folder / "DOSSIER.md").resolve())
         print("Result:", result["status"], "| filing_authorized=false")
         return 0 if result["status"] == "needs_human_review" else 2
