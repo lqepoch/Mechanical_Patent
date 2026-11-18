@@ -8,6 +8,7 @@ from typing import Any
 
 from .core import Evidence, PatentWorkflowError
 from .literature_memory import LiteratureMemoryStore
+from .literature_fulltext import LiteratureFullText, RIGHTS_BASES
 
 
 def add_literature_parser(subparsers: Any) -> None:
@@ -58,6 +59,42 @@ def add_literature_parser(subparsers: Any) -> None:
     harvest.add_argument("--max-seconds", type=int, default=600)
     harvest.add_argument("--refresh", action="store_true")
 
+    local = subs.add_parser("fulltext-import", help="经资料授权导入项目内合法持有的 PDF")
+    local.add_argument("--doc-id", required=True)
+    local.add_argument("--input", type=Path, required=True)
+    local.add_argument("--rights-basis", required=True, choices=sorted(RIGHTS_BASES))
+    local.add_argument("--rights-reference", required=True)
+    local.add_argument("--source-url", default="")
+    local.add_argument("--authorized", action="store_true")
+
+    fetch = subs.add_parser("fulltext-fetch", help="安全获取已发现的公开论文 PDF 候选")
+    fetch.add_argument("--doc-id", required=True)
+    fetch.add_argument("--rights-basis", required=True, choices=sorted(RIGHTS_BASES))
+    fetch.add_argument("--rights-reference", required=True)
+    fetch.add_argument("--allowed-host", action="append", required=True)
+    fetch.add_argument("--authorized", action="store_true")
+    fetch.add_argument("--allow-search-exposure", action="store_true")
+    fetch.add_argument("--workflow-case-id", required=True)
+    fetch.add_argument("--workspace-db", type=Path, required=True)
+    fetch.add_argument("--max-bytes", type=int, default=40 * 1024 * 1024)
+
+    convert = subs.add_parser("fulltext-parse", help="使用离线 Docling 对已归档 PDF 建立页码索引")
+    convert.add_argument("--doc-id", required=True)
+    convert.add_argument("--docling-artifacts", type=Path, required=True)
+    convert.add_argument("--max-pages", type=int, default=200)
+    convert.add_argument("--authorized", action="store_true")
+
+    state = subs.add_parser("fulltext-status", help="读取已有论文 PDF/全文解析状态")
+    state.add_argument("--doc-id", required=True)
+    lookup = subs.add_parser("fulltext-search", help="按项目全文段落索引检索文字与页码")
+    lookup.add_argument("--query", required=True)
+    lookup.add_argument("--doc-id")
+    lookup.add_argument("--limit", type=int, default=20)
+    page = subs.add_parser("fulltext-page", help="读取指定 PDF 页面对应的原文段落")
+    page.add_argument("--doc-id", required=True)
+    page.add_argument("--page", required=True, type=int)
+    page.add_argument("--limit", type=int, default=100)
+
 
 def handle_literature(args: argparse.Namespace) -> int:
     memory = LiteratureMemoryStore(args.project_dir)
@@ -95,6 +132,41 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
+    elif command in {
+        "fulltext-import", "fulltext-fetch", "fulltext-parse",
+        "fulltext-status", "fulltext-search", "fulltext-page",
+    }:
+        pipeline = LiteratureFullText(memory)
+        if command == "fulltext-import":
+            result = pipeline.import_local(
+                args.doc_id, args.input, authorized=args.authorized,
+                rights_basis=args.rights_basis, rights_reference=args.rights_reference,
+                source_url=args.source_url,
+            )
+        elif command == "fulltext-fetch":
+            if not args.allow_search_exposure or args.project_dir.name != args.workflow_case_id:
+                raise PatentWorkflowError("下载论文必须明确外发授权且项目目录与案卷匹配。")
+            from .local_workspace import LocalPatentWorkspace
+            workspace = LocalPatentWorkspace(args.workspace_db)
+            result = pipeline.fetch(
+                args.doc_id, allowed_hosts=set(args.allowed_host),
+                authorized=args.authorized, rights_basis=args.rights_basis,
+                rights_reference=args.rights_reference,
+                outbound_approved=workspace.can_egress(args.workflow_case_id),
+                max_bytes=args.max_bytes,
+            )
+        elif command == "fulltext-parse":
+            result = pipeline.parse(
+                args.doc_id, authorized=args.authorized,
+                artifacts=args.docling_artifacts, max_pages=args.max_pages,
+            )
+        elif command == "fulltext-status":
+            result = pipeline.status(args.doc_id)
+        elif command == "fulltext-search":
+            result = {"hits": pipeline.search(args.query, doc_id=args.doc_id, limit=args.limit),
+                      "review_status": "awaiting_original_pdf_review"}
+        else:
+            result = pipeline.page(args.doc_id, args.page, limit=args.limit)
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
