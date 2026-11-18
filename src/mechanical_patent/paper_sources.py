@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from html import unescape
+import json
 import os
 import re
 import threading
@@ -66,6 +67,28 @@ def _fetch_xml(url: str, *, headers: dict[str, str] | None = None) -> bytes:
         raise PatentWorkflowError(f"学术 XML 来源 HTTP {exc.code}（配额、限流或授权问题）。") from exc
     except (error.URLError, OSError) as exc:
         raise PatentWorkflowError("学术 XML 来源不可用。") from exc
+
+
+def _post_json(url: str, *, body: dict[str, Any], headers: dict[str, str] | None = None) -> dict[str, Any]:
+    """授权学术数据源的有界 JSON POST；不会将访问令牌写入 URL。"""
+    req = request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                          method="POST", headers={
+                              "User-Agent": USER_AGENT, "Content-Type": "application/json",
+                              "Accept": "application/json", **(headers or {}),
+                          })
+    try:
+        with request.urlopen(req, timeout=25) as response:
+            raw = response.read(MAX_RESPONSE + 1)
+        if len(raw) > MAX_RESPONSE:
+            raise PatentWorkflowError("学术 JSON POST 响应超过安全长度。")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise PatentWorkflowError("学术 JSON POST 响应必须为对象。")
+        return data
+    except error.HTTPError as exc:
+        raise PatentWorkflowError(f"学术 JSON POST 来源 HTTP {exc.code}（检查授权和限额）。") from exc
+    except (error.URLError, OSError, ValueError) as exc:
+        raise PatentWorkflowError("学术 JSON POST 来源不可用或数据无效。") from exc
 
 
 def _https(value: Any) -> str:
@@ -201,7 +224,7 @@ class SemanticScholarProvider:
                        abstract=row.get("abstract"),
                        date=row.get("publicationDate") or row.get("year"),
                        pdf=oa_pdf.get("url") if isinstance(oa_pdf, dict) else "",
-                       authors=[a.get("name") for a in row.get("authors", []) if isinstance(a, dict)],
+                       authors=[a.get("name") for a in (row.get("authors") or []) if isinstance(a, dict)],
                        cited=row.get("citationCount"), is_oa=row.get("isOpenAccess"))
             if item:
                 out.append(item)
@@ -382,9 +405,12 @@ class COREProvider:
                 continue
             native = str(row.get("id") or "")
             authors = row.get("authors") or []
+            locations = row.get("sourceFulltextUrls") or []
+            if isinstance(locations, str):
+                locations = [locations]
+            landing = next((_https(x) for x in locations if _https(x)), "") if isinstance(locations, list) else ""
             item = _mk(self.name, title=row.get("title"), identifier="core:" + native,
-                       url=row.get("sourceFulltextUrls", [""])[0] if row.get("sourceFulltextUrls") else
-                       "https://core.ac.uk/works/" + parse.quote(native),
+                       url=landing or "https://core.ac.uk/works/" + parse.quote(native),
                        doi=row.get("doi"), abstract=row.get("abstract"),
                        date=row.get("publishedDate") or row.get("yearPublished"),
                        pdf=row.get("downloadUrl"),
@@ -402,14 +428,17 @@ class LensProvider:
         self.key = api_key if api_key is not None else os.getenv("LENS_API_TOKEN", "")
         if not self.key:
             raise PatentWorkflowError("Lens 需要机构授权的 LENS_API_TOKEN。")
-        self.fetch_json = fetch_json or _fetch_json
+        self.fetch_json = fetch_json or _post_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
         if not query.strip():
             return []
-        url = "https://api.lens.org/scholarly/search?" + parse.urlencode(
-            {"query": query.strip()[:MAX_QUERY], "size": max(1, min(limit, 25))})
-        payload = self.fetch_json(url, headers={"Authorization": "Bearer " + self.key})
+        # Lens Scholar API 采用 JSON DSL 的 POST 检索；许可证需事先明确。
+        payload = self.fetch_json(
+            "https://api.lens.org/scholarly/search",
+            body={"query": query.strip()[:MAX_QUERY], "size": max(1, min(limit, 25))},
+            headers={"Authorization": "Bearer " + self.key},
+        )
         rows = payload.get("data", [])
         if not isinstance(rows, list):
             raise PatentWorkflowError("Lens 数据结构无效。")
