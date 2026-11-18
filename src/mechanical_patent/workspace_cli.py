@@ -134,5 +134,61 @@ def handle_workspace(args: argparse.Namespace) -> int:
             )
         else:
             raise ValueError("未知的案卷操作。")
-    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    # 标准输出可能被终端或 CI 长期留存，因此不得输出未公开发明、
+    # 内部检索方向、人员身份、完整审查理由或本地秘密路径。
+    # 完整结构化结果始终在受控 SQLite 中，CLI 仅发布白名单字段。
+    if command in {"create", "status"}:
+        safe = {
+            "case_id": result["case_id"], "revision": result["revision"],
+            "status": result["status"],
+            "tasks": [
+                {"id": task["id"], "step": task["step"], "status": task["status"],
+                 "attempts": task["attempts"]}
+                for task in result["tasks"]
+            ],
+            "source_reviews": result["source_reviews"],
+        }
+    elif command == "claim":
+        safe = {
+            key: result[key] for key in
+            ("task_id", "case_id", "revision", "step", "role", "lease_expires", "status")
+            if key in result
+        }
+    elif command == "search":
+        safe = {
+            "match_count": len(result["records"]),
+            "records": [
+                {"case_id": row["case_id"], "doc_id": row["doc_id"],
+                 "publication": row["publication"], "title": row["title"],
+                 "kind": row["kind"], "verification_status": row["verification_status"]}
+                for row in result["records"]
+            ],
+        }
+    elif command == "source":
+        safe = {
+            "doc_id": result["doc_id"], "publication": result["publication"],
+            "public_pdf_url": result["public_pdf_url"],
+            "source_url": result["source_url"],
+            "verification_status": result["verification_status"],
+        }
+    elif command == "archive":
+        safe = {"case_id": result["case_id"], "doc_id": result["doc_id"],
+                "sha256": result["sha256"], "bytes": result["bytes"],
+                "status": "已归档（完整路径保留在数据库）"}
+    elif command == "review":
+        safe = {"doc_id": result["doc_id"],
+                "verification_status": result["verification_status"]}
+    elif command == "import":
+        safe = {"case_id": result["case_id"], "indexed": result["indexed"]}
+    elif command == "audit":
+        safe = {"valid": result["valid"], "count": result["count"],
+                "head_sha256": result["head_sha256"], "errors": result["errors"]}
+    else:
+        safe = {
+            "case_id": result.get("case_id"), "task_id": result.get("task_id"),
+            "step": result.get("step"), "revision": result.get("revision"),
+            "status": result.get("status"), "attempts": result.get("attempts"),
+        }
+        safe = {key: value for key, value in safe.items() if value is not None}
+    print(json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if (command != "audit" or result["valid"]) else 2
