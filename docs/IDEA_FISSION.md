@@ -42,3 +42,24 @@
 - 同源反证、独立专利专业评审、费用预算、队列租约、异常重试及审批人员身份。
 - 支持按工程学领域配置力学、流体、材料、机电、控制等计算验证插件，计算结果关联可复核文件哈希。
 - 专项检索评测：Hit@K、同族去重召回、权利要求对照来源准确率、工程假设复查一致性，以及多路线多样性。
+
+## 2026-11-19：双亲交叉创新与失败记忆
+
+在 `patent_idea_plan` 基础上新增两项确定性 MCP 工具：
+
+- `patent_idea_crossovers(case_id, run_id, limit)`：对已评价、跨技术轴、未归档为失败的候选按研发评分配对，输出 AI 待论证的双亲研究问题。只输出组合任务，不直接生成所谓新颖技术。
+- `patent_idea_reject(case_id, run_id, candidate_id, reason, learned_constraints, source_ids)`：保留被反证或工程试验否定的技术路线，记录真实来源编号和对下一代构思的负面约束。下次调用 `patent_idea_plan` 时返回 `avoid_failed_constraints`。
+
+AI 以 `patent_idea_register` 保存交叉构思时，需显式提供 `inventive_method="组合创新"`、`parent_ids`（2–3 个不同父节点）、`synergy`（组合后的功能耦合机理）、`interface_definition`（机械/流体/电气连接与失效界面），以及现有必填结构、证据和试验字段。父构思至少横跨两个技术轴，代数按所有父节点最大代数 +1 计算，仍执行四代/120 节点预算。
+
+新构思同时提供 `text_overlap_neighbors`（基于中文二元字组的文字重叠提醒）；这是轻量排查辅助信号，**既非语义近似定论，也不作为现有技术冲突或授权概率判断**。原有 SHA-256 完全重复门禁继续启用。失败路线可以产生新修复路线，但不能被直接重评、直接组合或直接移交申请。多亲本身份和协同接口会保留到 05_inventions.json；申请底稿仍必须经历独立反证、工程审核和人工签核。
+
+依据研究方向：IDEAgent 的 Quality-Diversity 谱系、Open Coscientist 的假说竞赛与迭代、Idea Darwin 的交叉育种与失败保留。这里采用自主实现的数据结构和校验逻辑，未复制上述第三方源码。
+
+### MCP 调用顺序示例
+
+1. `patent_idea_plan` 规划并 `patent_idea_register` 登记多个单机制方案。
+2. `patent_idea_evaluate` 对候选分别执行专利反证与工程评分。
+3. `patent_idea_crossovers` 选取不同技术轴的亲本，AI 描述实际耦合路径、构件接口、边界工况后，以 `parent_ids` 注册新的组合方案。
+4. 对失败路线调用 `patent_idea_reject`，保存约束和原始证据。下轮 `plan` 应显式避开已知失败条件。
+5. 重复 `evaluate` → `frontier` → `promote`，并进行独立的权利要求对照、公开充分性和工程验证。不得自动声明获授权或者全球检索完备。
