@@ -178,6 +178,17 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 
 提供 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,limit=20)`、`patent_literature_fulltext_pending(case_id,limit=30)`；直接使用项目级全文 SQLite，提供可追溯 PDF SHA256、页码及解析状态，不返回文件系统任意读取能力。原文获取、许可审批和本地离线 Docling 由受控 CLI 运行；当前缺少请求级真实企业身份和签名的 MCP 外部写入不提供此能力。见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
 
+
+## 工程图示生产流水线 / v1.4 (2026-11-19)
+
+- patent_figure_prepare(case_id,run_id,candidate_id,wanted?): 生成不超过三类内容证据驱动的可编辑 .drawio/.mmd 图源，记录源哈希、图类型和建议落点；不运行外部二进制。
+- patent_figure_source(case_id,run_id,figure_id): 只读取该案卷白名单中图源内容与 SHA256，可交由人工编辑器接收。
+- patent_figure_status(case_id,run_id): 读取已登记计划及隔离渲染结果的概要。
+- patent_figure_sync(case_id,run_id,candidate_id): 校验外部工作器完整 PDF 及 SHA256，再把图加入工程技术方案 JSON/TEX，失效之前的签名审批。
+- 独立工作器 `python -m mechanical_patent.figure_worker render-figures|compile-brief-pdf --case-dir <案例>`；MCP 不提供执行系统进程的接口。draw.io/Mermaid 的生成源是功能关系示意，真实 CAD 必须另经专用工具确认。
+
+独立工作器必须运行在已配置的企业安全隔离容器中，真实渲染版本需验收；本仓库 CI 对生成、源数据约束、失败关闭、伪造输出和 MCP 合同做离线验证。具体合同见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
+
 ## 文献短引核验增量 MCP（2026-11-19）
 
 新增 patent_literature_fulltext_quote(case_id, doc_id, anchor, verbatim)：依托当前项目绑定的 FulltextPipeline，检查证据位置形如 p2:b1、文献当前已解析 PDF 的哈希和段落文本是否含指定原文短引。响应 exact_match 与 SHA256、来源 URL、verification_level=parsed_text_match_only 和 full_text_verified=false；错误页码、其他项目来源和旧版 PDF 返回确定性拒绝。此工具只读，依赖已有合法 OA 下载、离线 Docling 和单项目案卷授权机制；没有任意路径或远程文献读取权限。

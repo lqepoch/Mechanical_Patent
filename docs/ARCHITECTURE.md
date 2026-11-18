@@ -126,3 +126,8 @@ CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --pape
 ## 论文 PDF 证据流水线（2026-11-19）
 
 已有 `literature_memory.py` 的项目独立 SQLite + Markdown 与论文 API 归一化继续保留。新增 `literature_fulltext.py` 管理全文任务的 license/oa/url/rights、downloaded/parsed 状态、内容 SHA256、租约和页码索引，复用 `pdf_archive.py` 的固定公网 IP TLS PDF 下载与 `pdf_extraction.py` 的 Docling 离线解析。MCP 只读暴露 fulltext status/search/pending；CLI 对外网文件获取继续调用项目身份与案卷出站审批。所有全文结论需要人工针对真实 PDF 独立复核。详细设计见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+
+## 2026-11-19 图示工厂扩展
+技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
+真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。

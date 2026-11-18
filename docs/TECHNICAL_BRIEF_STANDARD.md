@@ -91,3 +91,20 @@
 通过静态检查后，进入 \`awaiting_dual_human_review\`。组织授权的工程人员与知识产权管理人员独立审查，可信审批服务形成 \`08c_technical_review.json\`，签署 \`approve_technical_brief\`。两名审查人 ID 必须不同。审批对象绑定案卷/运行/候选/技术方案 SHA256、技术结论、专利初筛意见和签字时间；独立签名密钥 \`PATENT_TECHNICAL_REVIEW_KEY\` 不同于申请转换密钥。MCP 提供只读验签，无自签接口。只有证据检查合格且双审阅签名有效时状态 \`technical_complete\`，即可研发结案，无须生成任何权利要求。
 
 研发结案与是否正式申请分开处理：已完成的技术方案可以归档，之后如申请仍要由用户明确作出申请决定，再由另一个独立审批服务签署 \`08b_conversion_approval.json\`。文件修改或签名过期自动失效。以上 HMAC 是本地安全控制，正式多租户环境应由组织身份审批、不可抵赖电子签名、密钥轮换、分级授权和长期审计替代或增强，跟踪 Issue #25。
+
+
+## 10. 可编辑原理图及流程/时序图自动生成（2026-11-19）
+
+- 文件入口：工程方案 JSON 追加 `diagram_relations`（结构关系显式定义，source/target 对应 components[].number，kind 限 mechanical/hydraulic/pneumatic/electrical/signal，附 label）和 `sequence_messages`（发送方 sender/接收方 receiver/消息 message，可选 type=call|reply）。已提供的 process_steps 视为有序工作步骤，仅当步骤数≥2时生成流转图。
+- `patent_figure_prepare` 为当前 candidate 自动挑选最多三类：有真实明确连线才生成 draw.io 原理关系图；有连续步骤才生成 Mermaid 流程图；有跨主体消息才生成 Mermaid 时序图。无依据的类型自动跳过并登记原因。所谓“结构关系”只代表功能接口，不能充当有尺寸约束的 CAD 装配或剖视图。
+- 图源放在案卷 `figures/auto-<kind>-<sha16>.drawio/.mmd`；文件名以原始内容 SHA256 确定；计划 `08d_figure_plan.json` 与原始工程 brief SHA256 绑定。
+- 独立渲染命令为 `python -m mechanical_patent.figure_worker render-figures --case-dir <真实案卷目录>`。预装 Mermaid CLI 的 `mmdc`、draw.io Desktop CLI `drawio`（Linux 无显示可提供 xvfb-run）和 XeLaTeX。工作器与 MCP 分离、只接受固定命令参数、不经 shell，不记录可能泄密的原始工具日志。
+- 工作器输出 `figures/*.pdf` 与 `08e_figure_render.json`，记录实际 PDF SHA256/大小及源图 SHA、错误状态；拒绝无 PDF 标识/EOF、不在安全路径的文件、被篡改源图与超时的渲染任务。PDF 头尾和大小检查只是基础完整性检查，正式发布还应使用 PDF 解析与真实页面渲染检验。
+- 然后调用 `patent_figure_sync`：仅当计划、来源 SHA、产物 SHA、选中候选、原始技术方案哈希完全匹配才更新 `08a_technical_brief.json/.tex`，图按机理章节自动插入，输出 `08f_figure_sync.json`。技术方案哈希改变时，原双人审批和申请转换审批自动失效。调用 `patent_figure_status` 查询状态，`patent_figure_source` 读取图源供外部编辑器操作。
+- 可再于独立渲染工作器执行 `python -m mechanical_patent.figure_worker compile-brief-pdf --case-dir <案卷目录>`，通过 XeLaTeX 无 shell escape 两轮编译生成 `08a_technical_brief.pdf` 和 `08g_pdf_build.json`。图示未成功时编译器不会自动声称存在完整图解。
+
+### 运行安全与部署要求
+
+这些 CLI 运行外部 Chromium/Electron/TeX 二进制，必须放在**单独的非特权隔离容器**中，以无网络、只挂载当前获授权案卷、内存/PID/CPU/时间限额、只读根文件系统、临时目录及可观测告警运行。单纯 `subprocess.run(..., shell=False)` 与 `xelatex -no-shell-escape` 没有提供 OS 级安全隔离。容器镜像的二进制与字体需版本和校验和锁定，并经 SBOM、许可证、供应链安全扫描。
+
+单用户/本地开发可以手工执行隔离工作器，但不能把缺失真实沙箱的本地命令宣称为企业安全生产部署。按真实 STEP/SolidWorks 装配生成尺寸正确的结构线稿留给专用 CAD worker 与真实工程师核验。

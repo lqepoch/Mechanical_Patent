@@ -33,3 +33,7 @@ AI 的语言描述不能代替真实试验、求解器运行或计算复核；�
 
 ## 默认白话工程方案审阅
 在正式申请之前，必须检查 08a_technical_brief.json 的技术问题、组件接口、控制顺序、区别创新点、试验和故障保护；使用 patent-technical-brief 提供的纯工程说明书供设计人员审阅。工程审查通过即为阶段 A 完成，无需自动写权利要求。申请转换必须验证企业独立审批签名。详见 docs/TECHNICAL_BRIEF_STANDARD.md。
+
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。

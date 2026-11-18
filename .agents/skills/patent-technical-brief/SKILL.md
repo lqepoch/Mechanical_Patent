@@ -26,3 +26,7 @@ user-invocable: true
 
 ## 工程审阅结案
 `patent_brief_audit` 返回当前方案的证据充分程度、缺图、试验与技术核验问题。通过静态检查后等待工程与 IP 人员独立签核，签名记录须由组织可信审批系统写入，绑定方案 SHA。双人真实审批后返回 `technical_complete`，无需进入正式专利申请材料。
+
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
