@@ -167,3 +167,9 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 `patent_idea_register` 新增可选 `parent_ids`（2–3个），该字段存在时 `inventive_method` 必须为 `组合创新`，并提交 `synergy` 和 `interface_definition`。服务端核查父节点、技术轴差异、最大裂变代数、父子谱系和证据编号。历史 `parent_id` 单亲本请求继续兼容。生成结果还包括 `text_overlap_neighbors` 供人工识别重复方案；这只是文本相似预警。
 
 反证记录如果仅有标题/摘要或未核验原始权利要求，不得写成排除授权风险、侵权风险或已实现效果。负面记忆会进入下一轮 `patent_idea_plan` 的 `avoid_failed_constraints`。
+
+### 失败子案修复与可信检索门禁
+
+已归档为 `rejected_research_route` 的候选可以作为单亲本“修复来源”，但新构思必须使用新的 ID，并显式提交 `parent_id`、`repair_of_failed_route=true` 和 `repair_rationale`，描述如何具体消除原来的失败约束。原失败假说持续留档，不允许直接重评或晋级；失败路线也不能参加多亲本交叉。
+
+`patent_idea_promote` 现在额外要求案卷真实存在一份 `verified=true` 且带原文权利要求的专利来源，同时该来源必须出现在构思的 `evidence_ids` 与评审 `countersearch_refs` 中。导入的第三方检索结果默认 `verified=false`，无法通过这一安全门禁。此状态只证明来源被核验，并不代表权利要求反证已通过法律审查。
