@@ -132,6 +132,25 @@ LaTeX 文稿和实时前沿索引见 docs/LATEX_WORKFLOW.md、docs/FRONTIER_EVOL
 - `patent_brief_audit(case_id, run_id, candidate_id)`：独立审阅 `08a_technical_brief.json`，逐创新点核对真实已验证权利要求、D1/D2 对照、工程反证、可证伪试验和图纸完整性，结果为 `revision_required`、`awaiting_dual_human_review` 或 `technical_complete`。
 - `technical_complete` 需要企业可信签名的工程人员和 IP 管理人员分别签署 `08c_technical_review.json`（`PATENT_TECHNICAL_REVIEW_KEY` 单独管理），绑定技术方案 SHA、案卷、候选、结论与时间。该状态可直接结案，与独立的申请转换授权无关。单纯结构化校验不等于司法/专利法律上的确定新颖性。
 
+## 项目知识库扩展（契约版本 1.5）
+
+新增 MCP tool 名称和职责：
+
+| Tool | 作用 |
+|---|---|
+| patent_literature_search | 检索该项目的论文/专利及研究批注，返回稳定证据 ID 与 MD 路径 |
+| patent_literature_read | 读取指定单篇 MD，返回截断提示避免上下文膨胀 |
+| patent_literature_note | 标注可理解的作用效果、技术机理、工程特征、反例和新发明线索；记录研读层级和出处 |
+| patent_literature_stats | 项目数量、实际已分析数、未完成分页检索数 |
+| patent_literature_pending | 批次获取尚未详细解读的文献 |
+| patent_literature_resume | 取项目研究快照和 SHA256 以恢复会话 |
+| patent_literature_resume_save | 基于 SHA256 乐观锁保存新研究快照及旧历史 |
+| patent_literature_harvest | 保密审批和显式外发授权后用官方源有界分页检索和增量记忆落盘 |
+
+MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM 调用。新研究会话应依次调用 resume→search/read→pending→note→resume_save；遇乐观锁冲突先重新读取合并。现有专利检索/导入流程也写入项目记忆。项目路径为 projects/{project_id}/cases/{case_id}/knowledge/；各项目独立 patents.sqlite3 案卷库，每案卷独立 literature.sqlite3 文献库，MCP 进程固定绑定唯一 project_id。
+
+企业正式上线还须增加 MCP 请求身份级授权、项目级 ABAC、集中服务配额、后台 worker、合规原文下载和页码锚定、备份恢复与可观测性。MCP 同步检索有时间/请求预算，不能标记为无配额的全量检索。
+
 
 ### 新增知识星图 MCP 工具
 
