@@ -40,3 +40,8 @@ user-invocable: true
 ## 已授权论文全文索引的增量合并（2026-11-19）
 
 项目级 `knowledge/literature.sqlite3` 在旧文献表增量保留 `pdf_url` 和 `metadata_json`；全新 `fulltext_jobs/fulltext_events/fulltext_blocks` 及全文 FTS5 只归属当前案例。工作流先 `fulltext-status`，再按公司版权记录及保密审批执行 `fulltext-plan` 和 `fulltext-process`，可使用 `fulltext-pending` 做恢复队列。机器解析记录以稳定 SHA 标记附加至原单篇 EV-*.md，重复导入保留人工批注与断点。MCP 通过 `patent_literature_fulltext_status/search/pending` 按需读取原文证据，不提供未经身份认证的外部下载工具。详见 docs/FULLTEXT_PIPELINE.md。
+
+## 逐篇研究记忆的出处强校验（2026-11-19）
+
+合法取得当前案卷已解析全文后，AI 写 full_text 层级的摘要、工程机理和创新启发时，必须附 source_positions（例如 p2:b1）；精确引文先由 patent_literature_fulltext_quote 核对。数据库验证当前案卷的页码、段落、PDF SHA256 和解析版本，失效时拒绝写入。单篇 MD 持久记录引用版本及证据等级。metadata、abstract 可不提供全文锚点，但必须注明结论依据与局限。
+
