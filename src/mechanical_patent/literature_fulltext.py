@@ -13,6 +13,7 @@ import re
 import sqlite3
 import tempfile
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from .core import PatentWorkflowError, utc_now
 from .literature_memory import LiteratureMemoryStore
@@ -233,8 +234,11 @@ class LiteratureFullText:
             authorized=authorized, rights_basis=rights_basis, rights_reference=rights_reference
         )
         document = self._source(doc_id)
-        if source_url and not source_url.startswith("https://"):
-            raise PatentWorkflowError("原文在线出处必须是 HTTPS URL。")
+        if source_url:
+            link = urlsplit(source_url)
+            if (link.scheme != "https" or not link.hostname or
+                    link.username or link.password or link.port not in (None, 443)):
+                raise PatentWorkflowError("原文在线出处必须是无认证凭据的 HTTPS URL。")
         pdf = _atomic_copy_pdf(Path(pdf_path), self.root / "pdfs")
         return self._register(
             doc_id, pdf, source_url=source_url or document["source_url"],
@@ -310,7 +314,11 @@ class LiteratureFullText:
         if checksum != existing["pdf_sha256"]:
             raise PatentWorkflowError("原始 PDF 哈希变化，阻断下游解析。")
         out = self.root / "parsed" / (doc_id + "-" + checksum + ".json")
+        if out.parent.is_symlink() or out.is_symlink():
+            raise PatentWorkflowError("PDF 解析目标目录和文件禁止符号链接。")
         out.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not out.resolve().is_relative_to(self.root.resolve()):
+            raise PatentWorkflowError("PDF 解析输出路径越界。")
         try:
             parsed = parse_local_pdf(
                 source, out, authorized=True, source_url=existing["source_url"],
