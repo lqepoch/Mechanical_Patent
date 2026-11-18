@@ -89,3 +89,16 @@
 多 Agent 长任务通过 workspace claim、heartbeat、finish、fail 等命令处理任务租约与失败重试。每轮始终保存专利和论文索引、独立反证、工程方程和假设、权要支持矩阵、来源图谱和质量清单。
 
 专利只需在本地索引元数据和原文 URL 即能快速定位；有许可时可以归档公开 PDF 并记录哈希，但所有重要技术事实的最终核查应以已打开的原始公开 PDF 为准。GitHub 禁止提交未公开 CAD/BOM、内部原始资料、用户数据库及大体积 PDF。
+
+
+## 行业成熟能力与 Codex 自动发现（2026-11-18 增强）
+
+Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .agents/skills 同步。运行 CI 的 scripts/sync_skill_mirrors.py --check 以防两者不一致。任何用户克隆完整仓库后，Codex 应能自动识别 14 个简体中文技能，无须再配置一个语言模型服务。
+
+在全球专利检索阶段优先检查 skills/patent-industry-sources/SKILL.md，用户主动连接了 Patent Client Agents 等行业 MCP 时可直接调用其授权的结构化专利数据工具；外部数据写入 src/mechanical_patent/mcp_bridge.py 的统一契约，再保存到本地案卷。导入的文献必须经过原始 PDF/权利要求独立核验。结构化官方数据接口可以使用授权 SDK，网页 HTML 仅能通过 Crawl4AI 合规抓取。
+
+在论文/专利 PDF 核查阶段使用 skills/patent-pdf-evidence/SKILL.md：优先打开在线原始公开 PDF；许可允许本地归档时，可以选择本地 Docling 解析章节、页码、表格，但不能冒充人工核验和真实实验。此模块不得自动下载任何 AI 模型权重。
+
+每一轮候选创新与反证需要可衡量质量：使用 skills/patent-evaluation/SKILL.md 的检索评测工具，对具有企业合法授权的专业机械专利黄金标注集运行 Hit/Recall/MRR，同族去重、缺失样本计零。禁止将 CC BY-NC、许可证不明的数据集放入企业商业评测。第三方评测工具的样本版权与代码许可必须分开审批。
+
+新增上游源码位于 external/patent-client-agents、external/patentkit（均固定 Apache-2.0 源码）；Docling 与 PatentAgentBench 保持可选，分别核查模型权重与数据集许可。完整取舍记录见 docs/INDUSTRY_REUSE.md。
