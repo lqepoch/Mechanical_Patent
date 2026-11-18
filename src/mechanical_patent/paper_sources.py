@@ -248,6 +248,70 @@ class SemanticScholarProvider:
                 "next_cursor": next_cursor, "total_results": total}
 
 
+
+class SemanticScholarBulkProvider(SemanticScholarProvider):
+    """Official Academic Graph bulk API with opaque continuation token.
+
+    Bulk API returns up to 1000 records; use max_documents in multiples of 1000
+    to avoid dropping records and destroying exact checkpoint continuation.
+    """
+    name = "semantic-scholar-bulk"
+
+    def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        raise PatentWorkflowError("Bulk 供应商仅允许 literature harvest 使用完整1000条分页。")
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 1000) -> dict[str, Any]:
+        if not query.strip():
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if limit != 1000:
+            raise PatentWorkflowError("Semantic Scholar Bulk 每页必须保留全部1000条，防止游标丢失。")
+        if cursor not in (None, "*") and (not isinstance(cursor, str) or len(cursor) > 4096):
+            raise PatentWorkflowError("Semantic Scholar Bulk 游标无效。")
+        params = {
+            "query": query.strip()[:MAX_QUERY],
+            "fields": "title,year,publicationDate,url,externalIds,citationCount,isOpenAccess,openAccessPdf",
+        }
+        if cursor not in (None, "*"):
+            params["token"] = cursor
+        _pace(self.name, 1.05)
+        payload = self.fetch_json(
+            "https://api.semanticscholar.org/graph/v1/paper/search/bulk?"
+            + parse.urlencode(params),
+            headers={"x-api-key": self.key} if self.key else {},
+        )
+        rows = payload.get("data", [])
+        if not isinstance(rows, list) or len(rows) > 1000:
+            raise PatentWorkflowError("Semantic Scholar Bulk 返回了不合法的文献分页。")
+        out: list[Evidence] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ids = row.get("externalIds") or {}
+            if not isinstance(ids, dict):
+                ids = {}
+            oa_pdf = row.get("openAccessPdf") or {}
+            paper_id = str(row.get("paperId") or "")
+            item = _mk(
+                self.name, title=row.get("title"), identifier=paper_id,
+                doi=ids.get("DOI"),
+                url=row.get("url") or "https://www.semanticscholar.org/paper/" + paper_id,
+                abstract=row.get("abstract"),
+                date=row.get("publicationDate") or row.get("year"),
+                pdf=oa_pdf.get("url") if isinstance(oa_pdf, dict) else "",
+                cited=row.get("citationCount"), is_oa=row.get("isOpenAccess"),
+            )
+            if item:
+                out.append(item)
+        token = payload.get("token")
+        if token is not None and (not isinstance(token, str) or len(token) > 4096):
+            raise PatentWorkflowError("Semantic Scholar Bulk 返回不合法的后续游标。")
+        if not rows:
+            token = None
+        return {"records": merge_paper_records(out),
+                "next_cursor": token, "total_results": payload.get("total")}
+
+
 class ArxivProvider:
     name = "arxiv"
 
