@@ -29,13 +29,6 @@ user-invocable: true
 
 PDF 文件哈希、原始在线链接、解析器版本、页码、原文段落、可得文字坐标和待核对状态。若 PDF 加密、无可读文本、使用权限不足、模型依赖缺失或解析失败，立即标记为人工核对；不得把空白文字当成不存在技术。
 
+## 文献 PDF 自动化证据流水线（2026-11-19）
 
-## PDF 授权取证与长文档解析（2026-11-19）
-
-1. 为每篇论文核对 DOI 和来源所标注的 OA/许可；pdf_url 仅是候选，不允许凭一个链接直接认定可合法归档。
-2. 在项目私有环境执行 `literature pdf-fetch`，提供 case_id、workflow DB、已批准域名、合法版权依据和明确授权；下载使用 DNS 钉扎 HTTPS、SHA256 和 PDF 格式/大小校验，失败保存故障而不触碰既有分析。
-3. 配置经许可的本地 Docling artifacts，执行 `literature pdf-parse`；获得 JSON 页码/段落并自动更新单篇 Markdown 的机器区。全部输出保持 parsed_unverified。
-4. 通过 `patent_paper_pdf_status`、`patent_paper_pdf_page` 或 CLI pdf-pages 定位原文，再按页写入机理、工况、公式、证伪实验及与专利权利要求的差异；每段结论携带实际页码和文件 SHA256。
-5. 对于重新获取或换版本的 PDF，校验 SHA256；技术人员复核后再进入证据/发明审核阶段。文件不明、许可证无效、模型缺失、来源重定向或文件损坏时明确阻断。
-
-具体接口见 docs/PAPER_FULLTEXT.md。网页链接或自动结构化转换均不能代替人工核验原始公开 PDF。
+优先读取 `docs/FULLTEXT_PIPELINE.md` 与 `patent-fulltext-processing` Skill。通过项目出站审批和真实 OA 许可核查后，使用已有 pinned TLS 下载器与离线 Docling；保留 SHA256、供应商 URL、PDF 文件内容哈希、机器解析结果、页码/文本块，记录失败/重试/可恢复状态。来自 MCP 的页码检索均标为 awaiting_original_pdf_review。未知许可、私人 IP、重定向、非 PDF、重复超过次数、超额度需阻断并人工复核。
