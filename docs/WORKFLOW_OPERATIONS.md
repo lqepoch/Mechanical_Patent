@@ -84,3 +84,30 @@
 ## 生产级升级
 
 SQLite 支持单机并发事务和离线索引，但没有真正的组织权限认证。正式生产平台需将工作流事件、证据和签核迁至 PostgreSQL，采用受控对象存储、RLS、角色授权、任务队列/Outbox、分布式重试和跟踪链路。专利与论文全文需按使用许可和保密要求保存；费用按数据访问、AI 客户端、存储、工程求解和专家审核分项核算。
+
+
+## 工作流与检索结果绑定
+
+在已有案卷中执行检索时，研究程序应使用 --workflow-case-id <真实案卷编号> 和 --workspace-db <统一索引路径>；若任务涉及任何网络查询，系统将检查该案卷当前轮次的保密审批。当前轮次未获授权的查询被拒绝。
+
+    python -m mechanical_patent research \
+      --workflow-case-id PM-001 --workspace-db cases/index.sqlite3 \
+      --direction "高海拔消防泵结构创新" \
+      --patent-query "vacuum pump priming air separator" \
+      --paper-query "cavitation NPSH at altitude" \
+      --allow-search-exposure --case-dir cases/PM-001-r01
+
+长任务续租与显式失败：
+
+    python -m mechanical_patent workspace --db cases/index.sqlite3 heartbeat \
+      --task-id 1 --actor "实际执行人" --lease-seconds 2400
+
+    python -m mechanical_patent workspace --db cases/index.sqlite3 fail \
+      --task-id 1 --actor "实际执行人" --reason "检索服务不可用"
+
+    python -m mechanical_patent workspace --db cases/index.sqlite3 fail \
+      --task-id 1 --actor "实际执行人" --reason "数据外发审批被驳回" --no-retry
+
+可重试任务在次数未超过预算时回到待领取；人为终止或超过预算进入已阻断。正式系统必须绑定经过认证的执行人、审签身份、任务超时监控和业务审计，避免代理人随意代签。
+
+标准输出经过最小字段筛选：任务状态可见，未公开发明全文与内部审阅理由仅在受控案卷保存。研究系统不再将整个案卷 JSON 直接打印到不受控的 CI/终端日志。
