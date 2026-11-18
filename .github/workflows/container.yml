@@ -1,0 +1,121 @@
+name: Container CI and GHCR
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Docker startup and durable storage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: mechanical-patent:ci
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify Compose, health and bind-mount persistence
+        shell: bash
+        env:
+          PATENT_IMAGE: mechanical-patent:ci
+          PATENT_MCP_PROJECT_ID: PM80
+          PATENT_DATA_DIR: ${{ runner.temp }}/patent-persistent-data
+        run: |
+          set -euo pipefail
+          sudo install -d -m 0700 -o 10001 -g 10001 "$PATENT_DATA_DIR"
+          docker compose -f compose.yaml config --quiet
+          docker compose -p patent-ci -f compose.yaml up -d
+          trap 'docker compose -p patent-ci -f compose.yaml down --remove-orphans || true' EXIT
+          echo "Docker startup diagnostics:"
+          docker compose -p patent-ci -f compose.yaml ps -a
+          docker compose -p patent-ci -f compose.yaml logs --tail=120 patent-mcp
+          cid="$(docker compose -p patent-ci -f compose.yaml ps -a -q patent-mcp)"
+          test -n "$cid"
+          state=""
+          for n in $(seq 1 45); do
+            state="$(docker inspect --format '{{.State.Health.Status}}' "$cid")"
+            if [[ "$state" == "healthy" ]]; then break; fi
+            if [[ "$state" == "unhealthy" ]]; then break; fi
+            sleep 2
+          done
+          if [[ "$state" != "healthy" ]]; then
+            docker compose -p patent-ci -f compose.yaml logs --tail=70
+            exit 1
+          fi
+          docker exec "$cid" pandoc --version | head -n 1
+          echo "Persistent filesystem files:"
+          sudo find "$PATENT_DATA_DIR" -maxdepth 5 -type f -printf '%p %s bytes\n' | head -n 40
+          sudo test -s "$PATENT_DATA_DIR/projects/PM80/patents.sqlite3"
+          # ProjectStorage uses 0700 dirs / 0600 DB owned by UID 10001.
+          # Inspect SQLite as the actual container user, never weaken permissions.
+          docker exec "$cid" python -c 'import sqlite3; c=sqlite3.connect("/data/projects/PM80/patents.sqlite3"); result=c.execute("PRAGMA quick_check").fetchone()[0]; print("SQLite quick_check:",result); assert result=="ok"; c.close()'
+          docker compose -p patent-ci -f compose.yaml down
+          sudo test -s "$PATENT_DATA_DIR/projects/PM80/patents.sqlite3"
+          docker compose -p patent-ci -f compose.yaml up -d
+          sudo test -s "$PATENT_DATA_DIR/projects/PM80/patents.sqlite3"
+          echo "Persistent database survived container removal."
+  publish:
+    name: Publish multi-platform image
+    needs: verify
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Normalize GHCR image name
+        id: image
+        shell: bash
+        run: echo "value=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.value }}
+          flavor: latest=false
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - name: Authenticate using scoped GITHUB_TOKEN
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
