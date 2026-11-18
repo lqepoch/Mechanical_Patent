@@ -251,6 +251,16 @@ class PatentMCPService:
     def fission_frontier(self, case_id: str, run_id: str, top_k: int = 8) -> dict[str, Any]:
         return self._board(case_id, run_id).frontier(top_k)
 
+    def fission_crossovers(self, case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        return self._board(case_id, run_id).plan_crossovers(limit)
+
+    def fission_reject(self, case_id: str, run_id: str, candidate_id: str,
+                       reason: str, learned_constraints: list[str],
+                       source_ids: list[str] | None = None) -> dict[str, Any]:
+        return self._board(case_id, run_id).reject(
+            candidate_id, reason, learned_constraints, source_ids
+        )
+
     def fission_promote(self, case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         return self._board(case_id, run_id).promote(candidate_id)
 
@@ -448,7 +458,7 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.6",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
                 "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -585,6 +595,20 @@ def create_server(service: PatentMCPService):
         return service.fission_frontier(case_id, run_id, top_k)
 
     @server.tool()
+    def patent_idea_crossovers(case_id: str, run_id: str, limit: int = 6) -> dict[str, Any]:
+        """在不同技术轴间配对经评分的假说，要求跨结构/控制/流体接口与协同效应。"""
+        return service.fission_crossovers(case_id, run_id, limit)
+
+    @server.tool()
+    def patent_idea_reject(case_id: str, run_id: str, candidate_id: str,
+                           reason: str, learned_constraints: list[str],
+                           source_ids: list[str] | None = None) -> dict[str, Any]:
+        """归档失败技术路线，向后续裂变提供具体的禁区、反证和失败约束。"""
+        return service.fission_reject(
+            case_id, run_id, candidate_id, reason, learned_constraints, source_ids
+        )
+
+    @server.tool()
     def patent_idea_promote(case_id: str, run_id: str, candidate_id: str) -> dict[str, Any]:
         """将证据关联的候选交给反证/工程/撰写流程；不授予专利法律结论。"""
         return service.fission_promote(case_id, run_id, candidate_id)
@@ -665,7 +689,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
-            + "默认用 patent_brief_save 输出工程技术方案，可调用 patent_figure_prepare 生成可编辑 draw.io/Mermaid 源图，由企业隔离worker导出PDF后调用 patent_figure_sync；只有用户申请决定及企业验签通过才可写专利申请文本；"
+            + "默认用 patent_brief_save 输出工程技术方案，再调用 patent_figure_prepare 生成可编辑图源并由隔离工作器导出后使用 patent_figure_sync；只有用户申请决定及企业验签通过才可写专利申请文本；"
             + "执行 patent_brief_audit 审阅工程方案，双人签核可直接结案；独立批准后才可运行 patent_draft_save 与 patent_quality_audit。"
             + "模型推断须标记假说，未经授权不得发起外部查询或专利申请。"
         )

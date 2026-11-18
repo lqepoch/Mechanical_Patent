@@ -245,6 +245,7 @@ class FissionAndMCPTests(unittest.TestCase):
                 names = {x.name for x in (tools.tools if hasattr(tools, "tools") else tools)}
                 for name in ("patent_case_create", "patent_research", "patent_idea_plan",
                              "patent_idea_register", "patent_idea_evaluate", "patent_idea_frontier",
+                             "patent_idea_crossovers", "patent_idea_reject",
                              "patent_countersearch_record", "patent_engineering_record",
                              "patent_draft_save", "patent_brief_save", "patent_brief_audit", "patent_conversion_status",
                              "patent_figure_prepare", "patent_figure_source",

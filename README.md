@@ -317,6 +317,10 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 
 参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
 
+### 2026-11-19：跨技术轴的真实双亲构思与负面记忆
+
+在已有四代构思裂变上增添 `patent_idea_crossovers` 与 `patent_idea_reject`。两位已评价的不同技术轴父构思可以组合生成新方案，必须提供可制造的接口定义和机理耦合说明；技术上被否定的方向仍保存在 JSON 谱系中，其失败条件成为下一轮明确的设计约束。近似文字重复只预警，来源、反证、工程和人工批准的独立门禁继续生效。详见 `docs/IDEA_FISSION.md`。
+
 
 ## 工程方案自动配图流水线（2026-11-19）
 
