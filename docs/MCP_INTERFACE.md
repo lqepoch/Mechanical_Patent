@@ -100,3 +100,15 @@ draft 包含 title、abstract、claims、description（technical_field/backgroun
 ### 其他数据供应商接入
 
 已有 Patsnap、Patent Client Agents 等授权检索能力的客户端，调用 patent_run_create 生成本地 RUN，再用 patent_source_import 导入结构化文献（publication/title/url/source/kind/abstract/claims 等）。所有输入一律标记为未核验，自动记入本地来源索引、检索词记录及技术证据图谱；随后须打开真实公开 PDF、核验权利要求与公开日期，再进入正式反证。此工具适用于 Factrix 的供应商无关集成，生产级高并发事务需转 PostgreSQL。
+
+
+### 新增知识星图 MCP 工具
+
+| MCP tool | 输入 | 效果 |
+|---|---|---|
+| patent_knowledge_index | case_id, run_id, top_k, threshold | 离线建立当前运行隔离的 knowledge.sqlite3 与文献 Markdown 记忆 |
+| patent_knowledge_graph | case_id, run_id, scope, document_id, max_nodes, min_score | 输出单文献或单项目星图及 Cytoscape 元素；提供方法、分数、出处 |
+| patent_knowledge_record_fact | case_id, run_id, document_id, subject, predicate, object, quote, location | 候选技术三元组逐字引文校验并保存“AI待人工复核”，不代表工程/法律审核通过 |
+| patent_knowledge_global_public | max_nodes | 仅查询原工作流中已批准公开项目的最小著录关系，其他密级不可见 |
+
+跨项目私有查询没有绕过权限的 MCP 参数。完整 CLI、图谱本体、构建前端、性能与安全边界见 docs/KNOWLEDGE_ATLAS.md。
