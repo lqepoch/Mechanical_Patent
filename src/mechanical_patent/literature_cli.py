@@ -45,6 +45,31 @@ def add_literature_parser(subparsers: Any) -> None:
     ])
     note.add_argument("--source-position", action="append", default=[])
 
+    pdf_status = subs.add_parser("pdf-status", help="查询单篇学术 PDF 的许可、归档和解析状态")
+    pdf_status.add_argument("--doc-id", required=True)
+    pdf_pages = subs.add_parser("pdf-pages", help="按页阅读 Docling 机器段落，保留证据锚点")
+    pdf_pages.add_argument("--doc-id", required=True)
+    pdf_pages.add_argument("--page", required=True, type=int)
+    pdf_pages.add_argument("--limit", type=int, default=30)
+
+    pdf_fetch = subs.add_parser("pdf-fetch", help="仅在审批与合法使用证明齐全后下载候选 PDF")
+    pdf_fetch.add_argument("--doc-id", required=True)
+    pdf_fetch.add_argument("--allowed-host", action="append", required=True)
+    pdf_fetch.add_argument("--rights-basis", required=True,
+                           choices=["open_license", "public_domain", "rightsholder_permission"])
+    pdf_fetch.add_argument("--rights-reference", required=True)
+    pdf_fetch.add_argument("--max-bytes", type=int, default=40*1024*1024)
+    pdf_fetch.add_argument("--workflow-case-id", required=True)
+    pdf_fetch.add_argument("--workspace-db", required=True, type=Path)
+    pdf_fetch.add_argument("--allow-search-exposure", action="store_true")
+    pdf_fetch.add_argument("--authorized", action="store_true")
+
+    pdf_parse = subs.add_parser("pdf-parse", help="离线解析已经合法归档的单篇 PDF")
+    pdf_parse.add_argument("--doc-id", required=True)
+    pdf_parse.add_argument("--docling-artifacts", type=Path)
+    pdf_parse.add_argument("--max-pages", type=int, default=200)
+    pdf_parse.add_argument("--authorized", action="store_true")
+
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
                          choices=["openalex", "crossref", "epo-ops"])
@@ -95,6 +120,32 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
+    elif command in {"pdf-status", "pdf-pages", "pdf-fetch", "pdf-parse"}:
+        from .paper_fulltext import PaperFullTextService
+        service = PaperFullTextService(memory)
+        if command == "pdf-status":
+            result = service.status(args.doc_id)
+        elif command == "pdf-pages":
+            result = service.pages(args.doc_id, page=args.page, limit=args.limit)
+        elif command == "pdf-fetch":
+            if not args.authorized or not args.allow_search_exposure:
+                raise PatentWorkflowError("PDF 下载需要明确授权并通过检索词外发审批。")
+            if args.project_dir.name != args.workflow_case_id:
+                raise PatentWorkflowError("PDF 下载案卷编号与项目目录不匹配。")
+            from .local_workspace import LocalPatentWorkspace
+            workspace = LocalPatentWorkspace(args.workspace_db)
+            if not workspace.can_egress(args.workflow_case_id):
+                raise PatentWorkflowError("当前案卷缺少已登记的外发保密审批。")
+            result = service.download(
+                args.doc_id, authorized=True, allowed_hosts=set(args.allowed_host),
+                rights_basis=args.rights_basis, rights_reference=args.rights_reference,
+                max_bytes=args.max_bytes,
+            )
+        else:
+            result = service.parse(
+                args.doc_id, authorized=args.authorized,
+                artifacts=args.docling_artifacts, max_pages=args.max_pages,
+            )
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
