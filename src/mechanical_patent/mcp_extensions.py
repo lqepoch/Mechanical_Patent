@@ -7,6 +7,7 @@ from .core import PatentWorkflowError
 from .patent_index import PatentIndex
 from .frontier_radar import FrontierRadar
 from .latex_manuscript import ManuscriptWorkspace
+from .problem_sources import ProblemSourceRegistry
 
 
 def register_project_research_tools(server: Any, service: Any) -> None:
@@ -14,6 +15,7 @@ def register_project_research_tools(server: Any, service: Any) -> None:
     index = PatentIndex(service.workspace)
     radar = FrontierRadar(service.project)
     papers = ManuscriptWorkspace(service.project)
+    public_catalog = ProblemSourceRegistry(service.project.workspace_root)
 
     @server.tool()
     def patent_index_refresh(case_id: str, query: str, limit: int = 20) -> dict:
@@ -79,3 +81,76 @@ def register_project_research_tools(server: Any, service: Any) -> None:
                                  output_format: str = "docx") -> dict:
         """使用 Pandoc 转 DOCX/HTML/Markdown，服务端拒绝执行原始 TeX/PDF。"""
         return papers.export(case_id,manuscript_id,output_format)
+
+
+    @server.tool()
+    def patent_source_catalog(status: str = "approved", limit: int = 60) -> dict:
+        """默认先查长期共享的公开课题平台库，包括来源等级、监测方式与更新时间。"""
+        return {"sources": public_catalog.sources(status,limit),
+                "project_id": service.project.project_id,
+                "contains_confidential_project_data": False}
+
+    @server.tool()
+    def patent_topic_catalog(limit: int = 60) -> dict:
+        """检索沉淀的消防车机械研究题目，包括历史 AI 假说；未证明新颖性。"""
+        return {"topics": public_catalog.topics(limit),"novelty_certified":False}
+
+    @server.tool()
+    def patent_discovery_inbox(limit: int = 30) -> dict:
+        """读取新增公告、待审核平台和待独立核实的公开研究笔记。"""
+        return public_catalog.inbox(limit)
+
+    @server.tool()
+    def patent_source_propose(name: str, url: str, reason: str,
+                              discovered_from: str = "manual") -> dict:
+        """AI 发现新大平台后只能登记候选；禁止自动批准外网监测。"""
+        return public_catalog.propose(name,url,reason,discovered_from=discovered_from)
+
+    @server.tool()
+    def patent_public_observe(source_id: str, url: str, title: str,
+                              summary: str = "", published_at: str = "") -> dict:
+        """保存从已批准公开来源得到的公告元信息；内容仍待原文核验。"""
+        return public_catalog.observe(source_id,url,title,summary=summary,
+                                      published_at=published_at)
+
+    @server.tool()
+    def patent_topic_derive(observation_id: str, problem: str, hypothesis: str,
+                            falsification: str, domain: str = "mechanical") -> dict:
+        """根据真实公开来源观察提出新机械课题和可证伪实验，持久化但不认证专利性。"""
+        return public_catalog.derive_topic(observation_id,problem,hypothesis,
+                                          falsification,domain)
+
+    @server.tool()
+    def patent_topic_plan(topic_id: str) -> dict:
+        """创建查新、论文、机理迁移与实验评审的研究计划，优先复用原有文献。"""
+        return public_catalog.plan(topic_id)
+
+    @server.tool()
+    def patent_public_research_note(topic_id: str, agent: str, findings: str,
+                                    evidence_urls: list[str], public_only: bool = False) -> dict:
+        """公开资料研究笔记；默认拒绝保密信息，AI 结论永远待独立核验。"""
+        return public_catalog.record_research(topic_id,agent,findings,evidence_urls,
+                                              public_only=public_only)
+
+    @server.tool()
+    def patent_source_cycle(allow_public_network: bool = False,
+                            max_sources: int = 5) -> dict:
+        """执行一轮有界公开 RSS 巡检，需显式网络授权；持久计时、去重、退避。"""
+        return public_catalog.cycle(allow_network=allow_public_network,
+                                    max_sources=max_sources)
+
+    @server.tool()
+    def patent_topic_adopt(case_id: str, topic_id: str) -> dict:
+        """把公开课题转入当前项目私有案卷，保密审批后才允许对外检索。"""
+        plan=public_catalog.plan(topic_id)
+        result=service.create_case(case_id,plan["title"],confidentiality="秘密")
+        with service.workspace.connect(write=True) as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS project_topic_links
+                (case_id TEXT PRIMARY KEY REFERENCES cases(case_id),
+                 public_topic_id TEXT NOT NULL, linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+            db.execute("INSERT INTO project_topic_links(case_id,public_topic_id) VALUES(?,?)",
+                       (case_id,topic_id))
+        return {"case_id":result["case_id"],"topic_id":topic_id,
+                "research_project_id":service.project.project_id,
+                "outbound_approved":False,"filing_authorized":False,
+                "next_action":"项目保密审批后启动全球专利及论文检索。"}
