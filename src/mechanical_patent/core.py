@@ -1,7 +1,7 @@
 """Portable, auditable data contracts shared by search, innovation and drafting."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -33,6 +33,8 @@ class Evidence:
     jurisdiction: str = ""
     kind: str = "patent"
     verified: bool = False
+    pdf_url: str = ""
+    paper_metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.publication.strip() or not self.title.strip() or not self.source.strip():
@@ -42,6 +44,10 @@ class Evidence:
             raise ValueError("Evidence requires a publicly inspectable HTTPS source URL")
         if self.kind not in {"patent", "paper", "standard", "manual", "web"}:
             raise ValueError("Unsupported evidence kind")
+        if self.pdf_url and (urlparse(self.pdf_url).scheme != "https" or not urlparse(self.pdf_url).netloc):
+            raise ValueError("Discovered PDF URL must be HTTPS")
+        if not isinstance(self.paper_metadata, dict):
+            raise ValueError("Paper metadata must be a structured object")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], *, imported: bool = False) -> Evidence:

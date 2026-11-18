@@ -100,24 +100,29 @@ class OpenAlexProvider:
         items = payload.get("results", [])
         if not isinstance(items, list):
             raise PatentWorkflowError("OpenAlex results must be a list")
+        from .paper_sources import _mk, merge_paper_records
         out: list[Evidence] = []
         for item in items:
             if not isinstance(item, dict):
                 continue
-            doi = _doi(item.get("doi"))
             oa_url = str(item.get("id") or "")
-            publication = doi or oa_url.rsplit("/", 1)[-1]
-            title = str(item.get("display_name") or item.get("title") or "").strip()
-            canonical = _canonical_url(doi, oa_url)
-            if not publication or not title or not canonical.startswith("https://"):
-                continue
-            out.append(Evidence(
-                publication=publication, title=title, url=canonical, source=self.name,
-                retrieved_at=utc_now(), abstract=_abstract_from_inverted_index(item.get("abstract_inverted_index")),
-                publication_date=str(item.get("publication_date") or ""),
-                jurisdiction="", kind="paper", verified=True,
-            ))
-        return deduplicate(out)
+            location = item.get("best_oa_location") or {}
+            access = item.get("open_access") or {}
+            authorships = item.get("authorships") or []
+            e = _mk(
+                self.name, title=item.get("display_name") or item.get("title"),
+                identifier=oa_url.rsplit("/", 1)[-1], url=oa_url, doi=item.get("doi"),
+                abstract=_abstract_from_inverted_index(item.get("abstract_inverted_index")),
+                date=item.get("publication_date"), pdf=location.get("pdf_url"),
+                authors=[a["author"]["display_name"] for a in authorships
+                         if isinstance(a, dict) and isinstance(a.get("author"), dict)
+                         and a["author"].get("display_name")],
+                cited=item.get("cited_by_count"), is_oa=access.get("is_oa"),
+                oa_status=access.get("oa_status"), license=location.get("license"),
+            )
+            if e:
+                out.append(e)
+        return merge_paper_records(out)
 
 
 class CrossrefProvider:
@@ -139,6 +144,7 @@ class CrossrefProvider:
         items = payload.get("message", {}).get("items", [])
         if not isinstance(items, list):
             raise PatentWorkflowError("Crossref items must be a list")
+        from .paper_sources import _mk, merge_paper_records
         out: list[Evidence] = []
         for item in items:
             if not isinstance(item, dict):
@@ -148,12 +154,15 @@ class CrossrefProvider:
             title = str(title_list[0] if isinstance(title_list, list) and title_list else "").strip()
             if not doi or not title:
                 continue
-            out.append(Evidence(
-                publication=doi, title=title,
-                url=_canonical_url(doi, str(item.get("URL") or "")),
-                source=self.name, retrieved_at=utc_now(),
+            authors = item.get("author") or []
+            e = _mk(
+                self.name, title=title, identifier=doi, doi=doi,
+                url=item.get("URL") or _canonical_url(doi, ""),
                 abstract=_crossref_abstract(item.get("abstract")),
-                publication_date=_crossref_date(item),
-                jurisdiction="", kind="paper", verified=True,
-            ))
-        return deduplicate(out)
+                date=_crossref_date(item),
+                authors=[" ".join(str(a.get(x) or "") for x in ("given", "family")).strip()
+                         for a in authors if isinstance(a, dict)],
+            )
+            if e:
+                out.append(e)
+        return merge_paper_records(out)
