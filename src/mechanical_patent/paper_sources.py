@@ -484,6 +484,8 @@ class UnpaywallEnricher:
             best = {}
         pdf = _https(best.get("url_for_pdf"))
         meta = dict(paper.paper_metadata)
+        # 已知 DOI 的补全操作不能暗中提升 PDF/全文的核验级别。
+        meta["full_text_verified"] = False
         meta["sources"] = list(dict.fromkeys([*meta.get("sources", [paper.source]), self.name]))
         meta["is_open_access"] = payload.get("is_oa") if isinstance(payload.get("is_oa"), bool) else meta.get("is_open_access")
         meta["oa_status"] = str(payload.get("oa_status") or meta.get("oa_status") or "")
