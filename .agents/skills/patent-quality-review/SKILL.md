@@ -19,3 +19,7 @@ user-invocable: true
 
 ## 阶段 A 自动质量接口
 调用 MCP `patent_brief_audit` 检查单一发明方案，与正式 `patent_quality_audit` 的申请文稿质检分开。只有现有专利对照、工程验证计划及双人独立签名完整时，才记录 `technical_complete`。已结案技术方案无需继续生成权项。
+
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。

@@ -324,3 +324,8 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ## 论文合法 PDF 全文流水线（2026-11-19）
 
 针对每个项目独立的 `knowledge/literature.sqlite3`，新增逐篇开放许可确认、受控 HTTPS/TLS 固定公网 IP 下载、Docling 离线全文解析、页码证据 FTS5 索引、SHA256 哈希、任务租约与错误恢复。可通过 `mechanical-patent literature --project-dir ... fulltext-plan/fulltext-process/fulltext-status/fulltext-search/fulltext-pending` 操作。MCP 提供 `patent_literature_fulltext_status`、`patent_literature_fulltext_search`、`patent_literature_fulltext_pending` 三个只读工具。相关论文的机器解析产物始终标记待原文核验，开放许可与保密审批必须先行；受控 CLI 执行下载/解析。运行参数、安全要求、模型准备和容灾见 [docs/FULLTEXT_PIPELINE.md](docs/FULLTEXT_PIPELINE.md)。
+
+
+## 工程方案自动配图流水线（2026-11-19）
+
+研发案卷已保存 `08a_technical_brief.json` 后，调用 MCP `patent_figure_prepare` 生成可编辑 draw.io/Mermaid 原理图、流程图和时序图源；结构关系需明确的部件连线，避免用 AI 猜测机械几何。隔离工作器把图源转换为 PDF，`patent_figure_sync` 核对完整输出哈希并更新 LaTeX；可再用同一隔离工作器编译 PDF 方案书。真实 CAD 仍须通过 STEP/SolidWorks 专用模块取得。参见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节及 skills/patent-figure-cad/SKILL.md。

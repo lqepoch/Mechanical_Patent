@@ -41,3 +41,7 @@ user-invocable: true
 ## 合法开放全文的增量证据处理（2026-11-19）
 
 在获得论文标题/摘要、候选 PDF 地址之后，按专用 `patent-fulltext-processing` Skill 审查许可/项目保密状态，调用受控 CLI 构建 PDF 任务、固定 IP/TLS 下载、离线 Docling 解析，再用 MCP `patent_literature_fulltext_search` 查询页码证据。机器解析输出只表明已取得文本，仍需工程师核对原始 PDF 后才可用于创造性反证及工程参数判断。维护知识库每篇 Markdown、来源 SHA256、下载恢复点。详见 docs/FULLTEXT_PIPELINE.md。
+
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
