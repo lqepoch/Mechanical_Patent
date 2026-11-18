@@ -25,6 +25,13 @@ def add_literature_parser(subparsers: Any) -> None:
     read.add_argument("--doc-id", required=True)
 
     subs.add_parser("stats", help="显示知识库规模及研究进度")
+    pending = subs.add_parser("pending", help="列出未完成分析的文献队列")
+    pending.add_argument("--limit", type=int, default=30)
+    subs.add_parser("resume-read", help="读取项目研究恢复快照及SHA256")
+    resume = subs.add_parser("resume-save", help="带并发保护地更新项目研究恢复快照")
+    resume.add_argument("--input", required=True, type=Path)
+    resume.add_argument("--expected-sha256", required=True)
+    resume.add_argument("--analyst", required=True)
 
     imp = subs.add_parser("import", help="离线导入经过来源标识的专利/论文元数据")
     imp.add_argument("--input", required=True, type=Path)
@@ -64,6 +71,15 @@ def handle_literature(args: argparse.Namespace) -> int:
         result = memory.read(args.doc_id)
     elif command == "stats":
         result = memory.stats()
+    elif command == "pending":
+        result = {"pending": memory.pending_analysis(limit=args.limit)}
+    elif command == "resume-read":
+        result = memory.read_resume()
+    elif command == "resume-save":
+        result = memory.update_resume(
+            args.input.read_text(encoding="utf-8"),
+            expected_sha256=args.expected_sha256, analyst=args.analyst,
+        )
     elif command == "import":
         payload = json.loads(args.input.read_text(encoding="utf-8"))
         rows = payload.get("records", []) if isinstance(payload, dict) else payload
