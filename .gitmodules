@@ -17,3 +17,11 @@
 [submodule "external/trinno"]
 	path = external/trinno
 	url = https://github.com/open1s/trinno.git
+
+[submodule "external/patent-client-agents"]
+	path = external/patent-client-agents
+	url = https://github.com/parkerhancock/patent-client-agents.git
+
+[submodule "external/patentkit"]
+	path = external/patentkit
+	url = https://github.com/j-hedtke/patentkit.git
