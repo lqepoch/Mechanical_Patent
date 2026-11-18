@@ -36,3 +36,7 @@ user-invocable: true
 - 数据库和 Markdown 都属于保密研究资产；严禁提交到 Git 仓库，禁止公开检索词、原始 PDF、企业 BOM 和未申请技术方案。
 - 现阶段项目级文献库隔离，MCP 的工作流任务调度仍共用中心目录的 index.sqlite3。生产级企业隔离需要企业身份、权限和加密存储边界。
 - 来源元数据合法获取和开放全文版权许可需分别审查；EPO OPS 的公平使用限速不可通过增加并发绕过。
+
+## 已授权论文全文索引的增量合并（2026-11-19）
+
+项目级 `knowledge/literature.sqlite3` 在旧文献表增量保留 `pdf_url` 和 `metadata_json`；全新 `fulltext_jobs/fulltext_events/fulltext_blocks` 及全文 FTS5 只归属当前案例。工作流先 `fulltext-status`，再按公司版权记录及保密审批执行 `fulltext-plan` 和 `fulltext-process`，可使用 `fulltext-pending` 做恢复队列。机器解析记录以稳定 SHA 标记附加至原单篇 EV-*.md，重复导入保留人工批注与断点。MCP 通过 `patent_literature_fulltext_status/search/pending` 按需读取原文证据，不提供未经身份认证的外部下载工具。详见 docs/FULLTEXT_PIPELINE.md。
