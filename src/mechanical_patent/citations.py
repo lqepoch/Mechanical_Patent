@@ -59,13 +59,21 @@ def dois_in_pid_field(value: str) -> list[str]:
     return matches
 
 
+class _NoRedirect(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise PatentWorkflowError("开放引证 API 重定向未被授权，已终止请求。")
+
+
 def _http_fetch_json(url: str, *, timeout: int = 25) -> list[dict[str, Any]]:
-    """固定 HTTPS API 域名，限制响应大小；不调用浏览器、模型或爬虫。"""
+    """固定 HTTPS API 域名，拒绝跟随重定向、限制响应大小。"""
+    if not url.startswith(API_BASE + "/"):
+        raise PatentWorkflowError("禁止访问非 OpenCitations 官方 API 域名。")
     req = request.Request(url, headers={
         "User-Agent": USER_AGENT, "Accept": "application/json",
     })
+    opener = request.build_opener(_NoRedirect())
     try:
-        with request.urlopen(req, timeout=timeout) as response:
+        with opener.open(req, timeout=timeout) as response:
             if response.geturl() != url:
                 raise PatentWorkflowError("引证接口发生重定向，已终止请求。")
             body = response.read(MAX_REPLY_BYTES + 1)
