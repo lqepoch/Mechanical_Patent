@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,7 @@ NODE_TYPES = frozenset({
     "发明候选", "技术特征", "反证", "工程假设", "验证实验",
 })
 EDGE_TYPES = frozenset({
-    "来源于", "支持", "反驳", "包含", "采用", "验证", "触发",
+    "来源于", "支持", "反驳", "包含", "采用", "验证", "触发", "引用",
 })
 
 
@@ -85,6 +86,7 @@ def build_case_graph(case_dir: Path) -> dict[str, Any]:
     folder = Path(case_dir)
     evidence = _read_object(folder / "04_evidence.json").get("records", [])
     ideas = _read_object(folder / "05_inventions.json").get("candidates", [])
+    citation_graph = _read_object(folder / "04c_paper_citations.json")
     challenges = _read_object(folder / "06_countersearch.json").get("claim_charts", [])
     engineering = _read_object(folder / "07_engineering.json").get("assessments", [])
     graph = TechnologyGraph()
@@ -107,6 +109,41 @@ def build_case_graph(case_dir: Path) -> dict[str, Any]:
                 "verified": record.verified, "date": record.publication_date,
             },
         ))
+    # 对新发现的 DOI 只标记为引证元数据节点，不伪称读取过论文原文。
+    # 已实际取得论文题目/摘要的既有文献节点优先保留，不被外部 DOI 覆盖。
+    from .citations import normalize_doi
+    citation_nodes = citation_graph.get("nodes", [])
+    for node in citation_nodes if isinstance(citation_nodes, list) else []:
+        if not isinstance(node, dict):
+            continue
+        try:
+            doi = normalize_doi(str(node.get("doi") or ""))
+        except PatentWorkflowError:
+            continue
+        node_id = "EV-" + sha256(("paper|" + doi.upper()).encode("utf-8")).hexdigest()[:12].upper()
+        if node_id not in graph.nodes:
+            graph.add_node(GraphNode(
+                id=node_id, kind="论文文献", title="DOI：" + doi,
+                attributes={
+                    "publication": doi, "url": "https://doi.org/" + doi,
+                    "verified": False, "citation_metadata_only": True,
+                    "source": "opencitations-index-v2",
+                    "is_seed": bool(node.get("is_seed", False)),
+                },
+            ))
+    citation_edges = citation_graph.get("edges", [])
+    for edge in citation_edges if isinstance(citation_edges, list) else []:
+        if not isinstance(edge, dict):
+            continue
+        try:
+            from_doi = normalize_doi(str(edge.get("citing_doi") or ""))
+            to_doi = normalize_doi(str(edge.get("cited_doi") or ""))
+        except PatentWorkflowError:
+            continue
+        from_id = "EV-" + sha256(("paper|" + from_doi.upper()).encode("utf-8")).hexdigest()[:12].upper()
+        to_id = "EV-" + sha256(("paper|" + to_doi.upper()).encode("utf-8")).hexdigest()[:12].upper()
+        if from_id in graph.nodes and to_id in graph.nodes:
+            graph.add_edge(GraphEdge(from_id, to_id, "引用"))
     if not isinstance(ideas, list):
         ideas = []
     for i, idea in enumerate(ideas, 1):
