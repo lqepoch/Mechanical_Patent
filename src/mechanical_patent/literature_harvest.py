@@ -51,6 +51,8 @@ class LiteratureHarvester:
             limits.page_size != 1000 or limits.max_documents % 1000 != 0
         ):
             raise PatentWorkflowError("Semantic Scholar Bulk 需要每页1000条且总数为1000的整数倍。")
+        if getattr(provider, "name", "") != "semantic-scholar-bulk" and limits.page_size > 100:
+            raise PatentWorkflowError("常规数据源每页最多100条，请单独使用 Semantic Scholar Bulk。")
         if not query or len(query.strip()) > 240:
             raise PatentWorkflowError("检索词不能为空且不得超过240字符。")
         if not hasattr(provider, "search_page"):
