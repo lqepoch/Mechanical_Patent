@@ -166,3 +166,9 @@ Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开
 ## 多 Agent 科研循环调度层（2026-11-19）
 
 新增 src/mechanical_patent/research_cycle.py，将科研发现—并行专利/论文检索—证据整合—假设生成—逐候选反证—独立裁决—技术验证—成果分流—监测规划串成可恢复的项目级图。每个循环绑定当前项目专属 SQLite 和原有案卷 revision，原子领取任务、限次重试、结果哈希、追加审计及版本化迭代。设计参考 DeepMind Co-Scientist 的假设反思/竞争思想及 LangGraph 的状态检查点理念，但未引入其模型服务或部署 Temporal；不宣称已实现无人值守科研、联网自动轮询、真实仿真或审签。具体状态、输出 JSON 契约、CLI/MCP 与故障边界见 docs/RESEARCH_CYCLE.md。
+
+## 2026-11-18 三级知识星图增量架构
+
+原案卷 04b_technology_graph.json 与 04c_paper_citations.json 继续保留真实来源和记录。新增 src/mechanical_patent/knowledge_atlas.py，在每次研究运行下以独立 knowledge.sqlite3 物化节点/边、来源、方法、置信度和 SHA256 内容指纹；文本相似算法使用倒排候选的 TF-IDF，AI 三元组须与本地原文引句逐字匹配且状态保持待人工复核。每个文档生成独立 generated MD，人工记忆在 manual MD 中保护。
+
+跨项目 global_public 仅汇总 LocalPatentWorkspace 中 confidentiality='公开' 的项目及文献最小著录字段；其他密级不可访问。商业组织横向权限模型仍需 OIDC/Keycloak、逐请求 ABAC、逐边过滤、审计及合规外发审批。新增 MCP/CLI 与 atlas-web (Cytoscape.js) 本地 Web 可视化，不依赖强制外部 LLM。生产增强候选：sqlite-vec、Microsoft GraphRAG、LightRAG、Sigma.js；须经许可证、性能和数据治理审批。完整设计见 docs/KNOWLEDGE_ATLAS.md。

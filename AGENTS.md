@@ -190,3 +190,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 新增研究编排协议：长周期科研循环（2026-11-19）
 
 当用户需要完整多 Agent 课题/专利/论文研究时，读取 skills/patent-research-cycle/SKILL.md 和 docs/RESEARCH_CYCLE.md。新案卷应先创建保密审批，不允许通过科研循环假装获得外发权限。当前项目的专利与论文检索可以并行，但后续证据必须先在项目案卷里经真实来源核验。构思必须包含可证伪实验，反证须覆盖全部候选；独立裁决 Agent 必须与构思和反证执行者不同，且生产环境要靠真实身份认证约束其独立性。计算/仿真/实验级别的验证需实际项目附件和 SHA256；模型自报级别不能替代人工认证。研究循环产出可以转为技术交底、论文初稿、待审专利候选或新研究任务，不能直接视为已发表、已授权或已完成正式递交。每一轮独立数据保存在项目专属 SQLite；出错后保留审计链及历史记录。MCP 工具见 patent_cycle_*，CLI 见 mechanical-patent cycle。现阶段运行仍依赖宿主 AI，定时巡检及分布式队列是后续独立建设事项。
+
+## 所有专利项目必执行知识星图
+
+检索或导入新专利/论文后读取 skills/patent-knowledge-atlas/SKILL.md，运行 atlas-index / patent_knowledge_index，维护文档、项目、公开全局三级图谱。每篇文献自动生成独立 generated MD 记忆，技术人员注释保存在 manual MD。AI 从原文中提取的机械结构、作用效果、控制关系必须附存在于本地存档的 quote，且一律待人工复核；词频相似度只用于召回补充检索，绝不可用作创造性证明。跨项目检索严格按 confidentiality 区分，只有“公开”项目可进入 global_public 投影；未实现真实 OIDC+ABAC 之前，禁止以共享知识图谱展示秘密项目间联系。详见 docs/KNOWLEDGE_ATLAS.md。

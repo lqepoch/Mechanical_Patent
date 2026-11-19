@@ -356,3 +356,13 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ### 多 Agent 科研循环（2026-11-19）
 
 已有项目案卷可通过 python -m mechanical_patent cycle --project-id PM80 --storage-root /data create --case-id CASE-001 启动科研任务图；用 cycle status 查看当前可领取的角色，通过 cycle claim/finish 写入可检查的阶段 JSON；通过 MCP 的 patent_cycle_* 工具可由 ChatGPT/Codex 等宿主执行多 Agent 协作。支持并行专利/论文检索、分支假设反证、独立裁决、理论/实际附件分级、失败重试和历史迭代。保密审批、数据源授权、实际实验和成果递交仍需要真实授权。完整命令与字段示例见 docs/RESEARCH_CYCLE.md。
+
+## 🔭 三级知识星图与文献记忆
+
+新增可审计的文献知识星图，覆盖单份专利/论文、单个研发案卷、仅获批准公开的跨项目研究网络。单研究运行独立保存 knowledge.sqlite3，自动记录文献关键词、引用、TF-IDF 候选相似关系、已有技术谱系与逐字校验后仍待人工复核的技术三元组；每个文档创建 document_memory/generated/EV-*.md，人工维护的 manual/ 文件不被覆盖。
+
+    python -m mechanical_patent atlas-index --case-dir cases/已有研究运行
+    python -m mechanical_patent atlas-export --case-dir cases/已有研究运行 --scope project --output ./project-graph.json
+    python -m mechanical_patent atlas-global --workspace ./private_patent_workspace --output ./global-public.json
+
+本地打包的 atlas-web 使用 Cytoscape.js 浏览生成的 JSON：cd atlas-web && npm install && npm run dev。MCP 新增 patent_knowledge_index、patent_knowledge_graph、patent_knowledge_record_fact 与 patent_knowledge_global_public；内网/未申请项目绝不进入公开全局投影。相似度及待复核技术关系不能代替真实权要核查、人工审查和法律判断。详情：docs/KNOWLEDGE_ATLAS.md、skills/patent-knowledge-atlas/SKILL.md。

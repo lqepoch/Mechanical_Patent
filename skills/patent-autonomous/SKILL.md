@@ -69,3 +69,6 @@ user-invocable: true
 ## 跨课题科研循环编排（2026-11-19）
 
 在用户需要长周期研究、并行 Agent、独立科学验证、专利和论文成果分流时，读取 patent-research-cycle/SKILL.md 及 docs/RESEARCH_CYCLE.md。先建立项目隔离案卷，再用 patent_cycle_create / patent_cycle_status / patent_cycle_claim / patent_cycle_finish 实施有依赖的任务分工；双源检索完成后才进入证据整合和构思，独立评委与构思/反证执行人须不同。若裁决为 iterate，调用 patent_cycle_iterate 开启下一轮，旧记录不可覆写；真实计算与仿真证据须使用项目内附件的 SHA256 校验。科研循环仅保留模型无关的调度记录，当前宿主 AI 执行专业工作；专利申请审批、科学发表和真人实验核验始终走原有独立授权。
+
+## 知识星图闭环：单文献、单项目、跨项目
+开展双源检索后，必须读取 skills/patent-knowledge-atlas/SKILL.md。每批真实专利/论文入库后执行 atlas-index 或 MCP patent_knowledge_index；根据 patent_knowledge_graph 的单文献/单项目关联，追查相似专利原始权利要求、跨领域原理与尚未验证的假设。单文献自动记忆在 document_memory/generated/，工程与权要复核写在 document_memory/manual/，任何自动重建不得覆盖人工记忆。对已存正文的 AI 技术三元组使用 patent_knowledge_record_fact 并附可复核原文引句，标记待人工核实；引用数和文本相似不代表法律新颖性或创造性。跨项目图只能调用 global_public 公开投影；保密项目不得写入全局公开索引。可视化采用本地打包 Cytoscape.js，导出 JSON 由浏览器本地加载，禁止外部 CDN 上传案卷数据。

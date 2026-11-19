@@ -229,3 +229,14 @@ MCP 的 patent_source_catalog(status,limit) 和 patent_topic_catalog(limit) 现�
 ## 科研循环 MCP 工具（2026-11-19）
 
 新增 patent_cycle_create / status / claim / finish / fail / iterate / audit，可在当前 project_id 的同一 SQLite 案卷上运行。工具只返回任务调度摘要；研究结果存储于当前项目的 research_tasks.result_json，并通过 SHA256 保存内容摘要。十个任务的输出字段、门禁、迭代和安全边界见 docs/RESEARCH_CYCLE.md。MCP 不运行外部 LLM；actor 是调用端登记字段，真实身份与审批来源必须由可信接入网关负责。
+
+### 新增知识星图 MCP 工具
+
+| MCP tool | 输入 | 效果 |
+|---|---|---|
+| patent_knowledge_index | case_id, run_id, top_k, threshold | 离线建立当前运行隔离的 knowledge.sqlite3 与文献 Markdown 记忆 |
+| patent_knowledge_graph | case_id, run_id, scope, document_id, max_nodes, min_score | 输出单文献或单项目星图及 Cytoscape 元素；提供方法、分数、出处 |
+| patent_knowledge_record_fact | case_id, run_id, document_id, subject, predicate, object, quote, location | 候选技术三元组逐字引文校验并保存“AI待人工复核”，不代表工程/法律审核通过 |
+| patent_knowledge_global_public | max_nodes | 仅查询原工作流中已批准公开项目的最小著录关系，其他密级不可见 |
+
+跨项目私有查询没有绕过权限的 MCP 参数。完整 CLI、图谱本体、构建前端、性能与安全边界见 docs/KNOWLEDGE_ATLAS.md。
