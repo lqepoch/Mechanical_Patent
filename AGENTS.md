@@ -194,3 +194,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 所有专利项目必执行知识星图
 
 检索或导入新专利/论文后读取 skills/patent-knowledge-atlas/SKILL.md，运行 atlas-index / patent_knowledge_index，维护文档、项目、公开全局三级图谱。每篇文献自动生成独立 generated MD 记忆，技术人员注释保存在 manual MD。AI 从原文中提取的机械结构、作用效果、控制关系必须附存在于本地存档的 quote，且一律待人工复核；词频相似度只用于召回补充检索，绝不可用作创造性证明。跨项目检索严格按 confidentiality 区分，只有“公开”项目可进入 global_public 投影；未实现真实 OIDC+ABAC 之前，禁止以共享知识图谱展示秘密项目间联系。详见 docs/KNOWLEDGE_ATLAS.md。
+
+## 机械结构先交付与证据分层（2026-11-19）
+
+机械设计及机电液混合任务读取 skills/patent-engineering-review、skills/patent-figure-cad、skills/patent-technical-brief，按 docs/TECHNICAL_BRIEF_STANDARD.md 第11节先交可读剖面、传动支承及适用的阀位、密封、泄压冲洗图，再细化算法。核验连续全行程的干涉、导向/啮合与实际通流最小开口；缺少真实 CAD、运动计算或流体参数时保留明确待验项。几何、静力与系统性能分别绑定既有 L0–L5 证据等级，动态图注明示意、计算、求解器或实测来源。公共仓库只保存通用规则，具体结构、图纸、尺寸和试验材料留在获授权案卷；本规范不增加软件自动物理验真或审批能力。
