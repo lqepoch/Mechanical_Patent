@@ -498,7 +498,7 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.8",
                 "paper_sources": paper_source_catalog(),
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
@@ -758,6 +758,8 @@ def create_server(service: PatentMCPService):
         )
     from .mcp_extensions import register_project_research_tools
     register_project_research_tools(server, service)
+    from .research_cycle import register_research_cycle_tools
+    register_research_cycle_tools(server, service)
     return server
 
 

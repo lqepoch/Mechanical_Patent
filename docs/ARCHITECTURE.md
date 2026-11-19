@@ -157,3 +157,12 @@ Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开
     python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 oa-enrich --doc-id EV-XXXXXXXXXXXX --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --authorized
 
 检索到的论文只代表该平台当前查询结果，不能证明全球无现有技术。PDF 候选位置及自动抽取文本不得擅自标记为已核实科学结论。
+
+## 全机械行业的共性物理机理发现层（2026-11-19）
+
+对所有机械装备提供行业×物理机理双维索引：行业可包括工业制造、机床、工程机械、消防、航空、航天、船舶、轨道、机器人、能源、矿山、农业、医疗、材料、环境等，可持续增补新领域；机理可包含流体、汽蚀、疲劳、磨损、摩擦、传动、热、冲击、密封、制造和多物理耦合。公共目录合计37个来源和40个课题假说，消防专题完整保留。系统新数据字段 industry_tags_json 和 mechanism_tags_json 经增量迁移保存，跨行业类比通过纯只读 MCP/CLI 查询，默认仍为待证伪假说。完整细节在 docs/PROBLEM_DISCOVERY.md。
+
+
+## 多 Agent 科研循环调度层（2026-11-19）
+
+新增 src/mechanical_patent/research_cycle.py，将科研发现—并行专利/论文检索—证据整合—假设生成—逐候选反证—独立裁决—技术验证—成果分流—监测规划串成可恢复的项目级图。每个循环绑定当前项目专属 SQLite 和原有案卷 revision，原子领取任务、限次重试、结果哈希、追加审计及版本化迭代。设计参考 DeepMind Co-Scientist 的假设反思/竞争思想及 LangGraph 的状态检查点理念，但未引入其模型服务或部署 Temporal；不宣称已实现无人值守科研、联网自动轮询、真实仿真或审签。具体状态、输出 JSON 契约、CLI/MCP 与故障边界见 docs/RESEARCH_CYCLE.md。

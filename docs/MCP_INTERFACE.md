@@ -220,3 +220,12 @@ patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF �
 ## 论文批量接口（2026-11-19）
 
 patent_literature_harvest 扩充了可选 provider 和 page_size。普通 Semantic Scholar 使用 offset，Bulk 使用 token 每页1000条，arXiv、Europe PMC 和 PubMed 按各自官方 API 分页；仍强制执行项目保密外发门禁。无网、来源限流或许可缺失应保留错误而不伪造全局查全。原有 patent_literature_fulltext_status/search/pending 保持只读，下载与解析继续由本地批准的 FulltextPipeline 执行。
+
+## 全机械行业来源检索与技术机理类比（2026-11-19）
+
+MCP 的 patent_source_catalog(status,limit) 和 patent_topic_catalog(limit) 现新增可选 industry 与 mechanism；patent_source_propose 与 patent_topic_derive 新增 industry_tags 与 mechanism_tags 可选参数。新增 patent_mechanical_taxonomy() 返回18个初始行业/19个初始物理机理；patent_mechanical_analogies(target_industry,mechanism,limit=20) 返回其他行业具有同一物理机理的待验证研究假说。标签可继续扩展，未分类机械研究标记 unclassified。匹配分数与物理相似仅用于检索创新方向，不构成专利新颖性、工程可行性或可实施许可证明；需要独立查新、实验、技术负责人和专利人员审核。旧项目 SQLite 增量迁移保留全部人工审批与历史记录。CLI 入口为 source-catalog taxonomy/sources/topics/analogies。
+
+
+## 科研循环 MCP 工具（2026-11-19）
+
+新增 patent_cycle_create / status / claim / finish / fail / iterate / audit，可在当前 project_id 的同一 SQLite 案卷上运行。工具只返回任务调度摘要；研究结果存储于当前项目的 research_tasks.result_json，并通过 SHA256 保存内容摘要。十个任务的输出字段、门禁、迭代和安全边界见 docs/RESEARCH_CYCLE.md。MCP 不运行外部 LLM；actor 是调用端登记字段，真实身份与审批来源必须由可信接入网关负责。

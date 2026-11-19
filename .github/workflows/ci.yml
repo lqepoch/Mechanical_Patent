@@ -21,6 +21,7 @@ jobs:
           - test_paper_integration.py
           - test_paper_paging.py
           - test_workflow.py
+          - test_research_cycle.py
           - test_web_crawler.py
           - test_local_workspace.py
           - test_pdf_archive.py
