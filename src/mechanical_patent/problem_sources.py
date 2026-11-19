@@ -443,7 +443,8 @@ class ProblemSourceRegistry:
                 "patent_novelty_certified":False}
 
     def propose(self, name: str, url: str, reason: str, *,
-                discovered_from: str = "manual") -> dict:
+                discovered_from: str = "manual", industry_tags: list[str] | None = None,
+                mechanism_tags: list[str] | None = None) -> dict:
         if not isinstance(name, str) or not 3 <= len(name.strip()) <= 160:
             raise PatentWorkflowError("请提供新平台的明确名称。")
         if not isinstance(reason, str) or not 8 <= len(reason.strip()) <= 1200:
@@ -462,6 +463,9 @@ class ProblemSourceRegistry:
                   'pending','unknown',?,?,?)""",
                 (ident, name.strip(), norm, _json({"why": reason.strip(),
                  "discovered_from": provenance}), "", _now()))
+            db.execute("UPDATE sources SET industry_tags_json=?,mechanism_tags_json=? WHERE id=?",
+                       (_json(_tags(industry_tags,"unclassified")),
+                        _json(_tags(mechanism_tags,"general")),ident))
             self._event(db, "source_proposed", ident, {"url": norm, "discovered_from": provenance})
         return {"source_id": ident, "status": "pending", "created": True,
                 "requires_human_source_approval": True}
@@ -567,11 +571,16 @@ class ProblemSourceRegistry:
                              "patent_brief_audit"],
                 "patent_novelty_certified":False,
                 "experimental_validation_done":False,
+                "industry_tags":(json.loads(topic["industry_tags_json"]) if topic else []),
+                "mechanism_tags":(json.loads(topic["mechanism_tags_json"]) if topic else []),
+                "cross_industry_analysis_required":True,
                 "outbound_search_requires_project_approval":True}
 
 
     def derive_topic(self, observation_id: str, problem: str, hypothesis: str,
-                     falsification: str, domain: str = "mechanical") -> dict:
+                     falsification: str, domain: str = "mechanical",
+                     industry_tags: list[str] | None = None,
+                     mechanism_tags: list[str] | None = None) -> dict:
         """AI may register a research hypothesis; it cannot attest patent novelty."""
         for field, value in (("problem",problem),("hypothesis",hypothesis),
                              ("falsification",falsification),("domain",domain)):
@@ -582,6 +591,14 @@ class ProblemSourceRegistry:
                                    (observation_id,)).fetchone()
             if not observation:
                 raise PatentWorkflowError("新的课题须关联真实且已入库的来源观察记录。")
+            src=db.execute("SELECT industry_tags_json,mechanism_tags_json FROM sources WHERE id=?",
+                           (observation["source_id"],)).fetchone()
+            inherited=json.loads(src["industry_tags_json"]) if src else []
+            if inherited==["all"] or not inherited:
+                inherited=["unclassified"]
+            chosen_industries=_tags(industry_tags,"unclassified") if industry_tags is not None else inherited
+            chosen_mechanisms=(_tags(mechanism_tags,"general") if mechanism_tags is not None
+                               else (json.loads(src["mechanism_tags_json"]) if src else ["general"]))
             topic_id="IDEA-"+sha256((observation_id+"|"+hypothesis.strip().casefold())
                                    .encode()).hexdigest()[:20].upper()
             result=db.execute("""INSERT OR IGNORE INTO topics
@@ -591,6 +608,8 @@ class ProblemSourceRegistry:
                  hypothesis.strip(),falsification.strip(),
                  "public_observation:"+observation_id,_now()))
             if result.rowcount:
+                db.execute("UPDATE topics SET industry_tags_json=?,mechanism_tags_json=? WHERE id=?",
+                           (_json(chosen_industries),_json(chosen_mechanisms),topic_id))
                 db.execute("UPDATE observations SET status='research_pending' WHERE id=?",
                            (observation_id,))
                 self._event(db,"topic_derived",topic_id,{"observation_id":observation_id,
