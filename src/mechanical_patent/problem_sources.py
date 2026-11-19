@@ -373,24 +373,74 @@ class ProblemSourceRegistry:
                                                               "topics_added": count_t})
         return {"sources_added": count_s, "topics_added": count_t}
 
-    def sources(self, status: str = "approved", limit: int = 100) -> list[dict]:
+    def sources(self, status: str = "approved", limit: int = 100,
+                industry: str = "", mechanism: str = "") -> list[dict]:
+        """Search registered domains; all/general sources remain eligible."""
         if status not in ("approved", "pending", "disabled", "rejected", "all"):
             raise PatentWorkflowError("平台状态无效。")
-        query = "SELECT * FROM sources"
-        params: tuple = ()
+        industry, mechanism = self._filters(industry, mechanism)
+        checks: list[str] = []
+        params: list[Any] = []
         if status != "all":
-            query += " WHERE status=?"
-            params = (status,)
+            checks.append("status=?")
+            params.append(status)
+        if industry and industry != "all":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(sources.industry_tags_json) t
+                            WHERE t.value=? OR t.value='all')""")
+            params.append(industry)
+        if mechanism and mechanism != "general":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(sources.mechanism_tags_json) t
+                            WHERE t.value=? OR t.value='general')""")
+            params.append(mechanism)
+        query = "SELECT * FROM sources"
+        if checks:
+            query += " WHERE " + " AND ".join(checks)
         query += " ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END,name LIMIT ?"
         with self.connect() as db:
             rows = db.execute(query, (*params, max(1, min(int(limit), 200)))).fetchall()
-        return [dict(row) for row in rows]
+        return [_decoded(row) for row in rows]
 
-    def topics(self, limit: int = 100) -> list[dict]:
+    @staticmethod
+    def _filters(industry: str, mechanism: str) -> tuple[str, str]:
+        for label,value in (("行业",industry),("机理",mechanism)):
+            if value and (not isinstance(value,str) or not _TAG_ID.fullmatch(value)):
+                raise PatentWorkflowError(f"{label}筛选参数须为安全的小写技术标签。")
+        return industry or "", mechanism or ""
+
+    def topics(self, limit: int = 100, industry: str = "",
+               mechanism: str = "") -> list[dict]:
+        industry, mechanism = self._filters(industry, mechanism)
+        checks: list[str] = []
+        params: list[Any] = []
+        if industry and industry != "all":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(topics.industry_tags_json) t
+                            WHERE t.value=? OR t.value='all')""")
+            params.append(industry)
+        if mechanism and mechanism != "general":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(topics.mechanism_tags_json) t
+                            WHERE t.value=? OR t.value='general')""")
+            params.append(mechanism)
+        query="SELECT * FROM topics"
+        if checks:
+            query+=" WHERE "+" AND ".join(checks)
+        query+=" ORDER BY id LIMIT ?"
         with self.connect() as db:
-            rows = db.execute("SELECT * FROM topics ORDER BY id LIMIT ?",
-                              (max(1, min(int(limit), 200)),)).fetchall()
-        return [dict(row) for row in rows]
+            rows=db.execute(query,(*params,max(1,min(int(limit),200)))).fetchall()
+        return [_decoded(row) for row in rows]
+
+    def analogies(self, target_industry: str, mechanism: str, limit: int = 20) -> dict:
+        """Other-industry hypotheses on the same physical principle, not proof."""
+        target_industry, mechanism = self._filters(target_industry, mechanism)
+        if not target_industry or not mechanism or mechanism == "general":
+            raise PatentWorkflowError("类比必须指定目标行业及具体物理机理。")
+        ideas=self.topics(limit=200,mechanism=mechanism)
+        external=[item for item in ideas if target_industry not in item["industry_tags"]
+                  and "all" not in item["industry_tags"]]
+        take=max(1,min(int(limit),50))
+        return {"target_industry":target_industry, "mechanism":mechanism,
+                "analogies":external[:take], "count":min(len(external),take),
+                "interpretation":"仅为跨行业研究假说，需重新验证工况、尺寸、物理约束和专利权利要求。",
+                "patent_novelty_certified":False}
 
     def propose(self, name: str, url: str, reason: str, *,
                 discovered_from: str = "manual") -> dict:
