@@ -113,7 +113,11 @@ python -m mechanical_patent literature --project-dir /secure/projects/P1/cases/C
   --docling-artifacts /secure/docling-models --max-documents 100 \
   --max-seconds 900 --max-total-bytes 2147483648 --max-attempts 3
 python -m mechanical_patent literature --project-dir /secure/projects/P1/cases/CASE01 fulltext-batch-status \
-  --batch-id FTB-实际20位十六进制
+  --batch-id FTB-实际20位十六进制 --state failed --limit 100
 ```
 
-同一份规范化清单返回确定性的 FTB 标识；重试会复用已核验的原始 PDF 与检查点，完成条目通常跳过。达到重试上限须重新审批后显式 `--refresh`。每轮通过文献数、运行秒数、总字节数和逐篇尝试次数限制工作，单篇 HTTPS 仍遵守公网 IP、固定 TLS/域名白名单、禁止重定向和 PDF magic 校验。批次状态为 complete/partial，不能据此宣称真实全文技术结论已被人工核实。MCP 仅提供 `patent_literature_fulltext_batch_status(case_id,batch_id,limit)` 查询进度，不开放批量远程下载。
+同一份规范化清单返回确定性的 FTB 标识。断点恢复跳过与原文管线仍匹配的完成条目，常规解析重试复用已归档且哈希校验通过的 PDF。达到本批逐篇重试上限须重新审批后显式 `--refresh`；批次汇总区分失败总数、可重试数和已达本轮上限数。刷新重试不会重跑仍匹配的完成条目。
+
+`--max-total-bytes` 统计本轮下载器成功返回的 PDF 字节，即使后续解析失败也计入；读取缓存不计为新下载，不等同于传输中断时的网络流量计费。`--max-seconds` 在两篇之间检查，不会强行取消已开始的单篇下载或解析。批次 complete/partial 不能证明全文技术结论已由人工核验。
+
+状态查询每页最多 200 条，默认不筛选；可用 `--state pending|done|failed`，或将返回的 `next_cursor` 传给 `--cursor` 继续扫描同一筛选条件。`counts` 始终为整批计数，`matched_total` 为查询时符合筛选条件的条目数；`next_cursor=null` 表示没有下一页。执行中的条目状态可能变化，排查最终失败前可重新从第一页查询。MCP 只读工具 `patent_literature_fulltext_batch_status` 也支持 `state`、`cursor`，不开放批量远程下载。
