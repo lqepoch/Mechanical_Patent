@@ -131,3 +131,15 @@ CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --pape
 ## 2026-11-19 图示工厂扩展
 技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
 真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。
+
+## 自我发现课题来源平台库（2026-11-19）
+
+系统新增 **可增量复用的公开工程问题来源目录**。首批预置20个公开平台来源和20项消防车结构研究假说，包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+
+每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
+
+公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检，也可显式启用 Compose discovery 服务自动轮询公开 RSS；此进程不执行 LLM 深度研究或认证专利。
+
+完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
+
+企业生产的公网访问需网络出口 allowlist、禁止 DNS rebinding 的代理层、身份/权限审批、外部不可变审计和站点版权授权；AI 不能以自身结论完成工程或法律认证。

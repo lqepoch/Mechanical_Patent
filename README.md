@@ -333,3 +333,13 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ## 全文证据逐字核验与长期记忆（2026-11-19）
 
 在原有合法论文 PDF 下载、Docling 解析、项目 SQLite/Markdown 文献库基础上，增加 CLI fulltext-quote 和 MCP patent_literature_fulltext_quote，可按 p2:b1 真实页码段落核对短引，返回 PDF/解析版本 SHA256。AI 以 full_text 依据保存技术机理时程序会拒绝错误页码或过期 PDF，单篇 Markdown 保存对应解析版本。引用检查仅验证机器提取文本，真实论文和专利中的公式/技术效果仍需独立人员核对原始 PDF。详见 docs/FULLTEXT_PIPELINE.md。
+
+## 自我发现课题来源平台库（2026-11-19）
+
+系统新增 **可增量复用的公开工程问题来源目录**。首批预置20个公开平台来源和20项消防车结构研究假说，包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+
+每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
+
+公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；也提供 Compose 的 discovery 可选后台服务自动轮询已审批公共 RSS。AI 深度研究仍需已授权的 Agent 运行器，保密外发须审批。
+
+完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
