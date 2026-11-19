@@ -91,6 +91,11 @@ def add_literature_parser(subparsers: Any) -> None:
     passages = subs.add_parser("fulltext-search", help="从已解析 PDF 中检索页码级技术证据")
     passages.add_argument("--query", required=True)
     passages.add_argument("--limit", type=int, default=20)
+    quote = subs.add_parser("fulltext-quote", help="逐字验证已解析 PDF 页码段落中的原文短引")
+    quote.add_argument("--doc-id", required=True)
+    quote.add_argument("--anchor", required=True, help="例如 p2:b7")
+    quote.add_argument("--verbatim", required=True)
+
     pending_files = subs.add_parser("fulltext-pending", help="查看需要重试或继续解析的论文任务")
     pending_files.add_argument("--limit", type=int, default=30)
 
@@ -149,13 +154,15 @@ def handle_literature(args: argparse.Namespace) -> int:
         from .literature_oa import enrich_unpaywall
         _assert_fulltext_approval(args)
         if not args.authorized or not args.allow_search_exposure:
-            raise PatentWorkflowError("DOI 查询必须经过本轮外发审批并明确获得用户授权。")
+            raise PatentWorkflowError("DOI 外部查询需要案卷保密审批和明确用户授权。")
         result = enrich_unpaywall(memory, args.doc_id, authorized=True)
     elif command in {"fulltext-plan", "fulltext-process", "fulltext-status",
-                     "fulltext-search", "fulltext-pending"}:
+                     "fulltext-search", "fulltext-pending", "fulltext-quote"}:
         from .literature_fulltext import FulltextPipeline
         pipeline = FulltextPipeline(memory)
-        if command == "fulltext-status":
+        if command == "fulltext-quote":
+            result = pipeline.quote(args.doc_id, args.anchor, args.verbatim)
+        elif command == "fulltext-status":
             result = pipeline.status(args.doc_id)
         elif command == "fulltext-search":
             result = {"records": pipeline.search(args.query, limit=args.limit),
