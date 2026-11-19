@@ -38,13 +38,37 @@ user-invocable: true
 
 多轮研究时调用 `paper-sources` 或 MCP capabilities，按任务配置 OpenAlex/Crossref/Semantic Scholar/arXiv/Europe PMC/PubMed/CORE/Lens；通过 Unpaywall 补 DOI 合法 OA PDF。所有检索仍受审批、许可和预算约束；输出跨平台 DOI 归并记录和逐篇 `03_paper_memory/EV-*.md`。每一轮需要加载上轮 Markdown 与来源索引，防止上下文裁剪造成重复检索。存档本地并经哈希检查，全文核验与专利实质对照单独推进。详见 docs/PAPER_SOURCES.md。
 
-## 论文 PDF 的授权采集与全文证据索引（2026-11-19）
+## 合法开放全文的增量证据处理（2026-11-19）
 
-1. 检索只发现 DOI/摘要/PDF 候选，AI 必须记录来源、版权条件和是否已读原文。未经真实批准的 PDF 既不可下载，也不可将全文推断记作已核验。
-2. 调用 literature fulltext-import 或 fulltext-fetch：仅在合法许可、资料使用授权和必要网络外发审批通过后执行；下载还要求明确的站点白名单。源 PDF 按 SHA256 内容寻址保存在单项目隔离目录。
-3. 模型资源在本地预置且批准后，执行 literature fulltext-parse 使用离线 Docling 提取页码、label、bbox 和原文块；解析后 status=parsed_unreviewed。原始文件哈希用于避免 AI 伪造、错用旧版本原文。
-4. 调用 literature fulltext-search / fulltext-page，或 MCP patent_literature_fulltext_search / patent_literature_fulltext_page 按 DOI 证据编号检索精准段落；再由研究者打开原始 PDF 完成文字、公式、图表和工况核对。
-5. 长上下文中，正式持久记忆仍存入 LiteratureMemoryStore 的每篇 Markdown、统一数据库和研究恢复文件；多次检索和重分析保留人工批注；不得把摘要/解析文本视为已证明的创造性、法律结论或仿真值。
-6. 若 PDF 不可达、付费访问、无授权许可证、Docling 依赖缺失或页码匹配失败，保留原始元数据和错误信息并返回给工作流；不得跳过审批或覆盖上一轮已完成的研究证据。
+在获得论文标题/摘要、候选 PDF 地址之后，按专用 `patent-fulltext-processing` Skill 审查许可/项目保密状态，调用受控 CLI 构建 PDF 任务、固定 IP/TLS 下载、离线 Docling 解析，再用 MCP `patent_literature_fulltext_search` 查询页码证据。机器解析输出只表明已取得文本，仍需工程师核对原始 PDF 后才可用于创造性反证及工程参数判断。维护知识库每篇 Markdown、来源 SHA256、下载恢复点。详见 docs/FULLTEXT_PIPELINE.md。
 
-结构、CLI、MCP、许可门禁与恢复机制参见 docs/FULLTEXT_PIPELINE.md。
+
+## 自动图源与隔离渲染（2026-11-19）
+根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
+
+## 自动研究的可核查短引（2026-11-19）
+
+先使用 patent_literature_fulltext_search 查询与机械问题对应的真实页码，再用 patent_literature_fulltext_quote 检查原文短引是否逐字匹配。仅当引用属于当前案卷、当前 PDF SHA256 且来源已解析，才通过 patent_literature_note(basis=full_text) 持久化工程事实。模型推断与专业复核分层保存，文本匹配不等同法律和工程结论已核验。未解析、缺页码及已变更 PDF 的证据要写入待补清单。
+
+## 长期课题来源发现优先级（2026-11-19执行协议）
+
+用户要求“自己找题目/研究方向”、跟踪最新行业问题或开始任何消防机械方向查新时，必须先执行：
+1. 使用 MCP patent_source_catalog（approved）、patent_topic_catalog、patent_discovery_inbox 读取已有20个来源种子、20个机械课题和增量公告。CLI 可用 mechanical-patent source-catalog sources/topics/inbox。
+2. 优先核实来源官网发布日期和更新频率；过期项目保留历史研究价值但不能视为开放申报。平台新增时通过 patent_source_propose 入 pending，AI 不具备 source approve 权限。
+3. 对来源观察执行 patent_public_observe，再以专利/论文/跨行业机制、FMEA、TRIZ 导出具体零部件/可测技术效果。通过 patent_topic_derive 形成可回溯的研究假说，并关联可证伪实验。保密研发信息禁止写入公共目录。
+4. 对候选先复用 project 文献记忆，然后调用 patent_topic_plan 与既有多源检索、想法裂变、独立反证、工程审查工具；研究笔记必须标明原始 URL、证据缺口、发生时间和可信度，保存为未独立核验状态。
+5. 用户选择课题后使用 patent_topic_adopt 转为单项目 SQLite 案卷，保密审批通过后方可对外发送新检索词。未真实执行工程试验时禁止宣称工程已验证或具备专利授权条件。
+6. 只批准和处理有明确版权/访问权的公共数据。独立管理员通过本地 CLI 审批新源；AI 可提议但不能自我认证。
+详细工作流参见 docs/PROBLEM_DISCOVERY.md，源码 src/mechanical_patent/problem_sources.py，平台和课题种子存于 src/mechanical_patent/data/。
+
+## 全机械行业通用范围（2026-11-19）
+
+本技能适用于任何机械平台、结构、机构、机电液系统和制造工艺。消防装备仅是一种应用场景，新增来源应覆盖制造/机床、机器人、工程机械、航空航天、海工、轨道、能源、矿山、农机、医疗、精密仪器等。每轮最先调用 patent_mechanical_taxonomy、patent_source_catalog、patent_topic_catalog、patent_discovery_inbox，依据行业×失效物理机理进行检索。使用 patent_mechanical_analogies(target_industry,mechanism) 从其他行业提出真正有连接关系和可证伪指标的迁移构想。任何未列行业可标 unclassified，再登记扩充；不得以消防行业为默认检索范围。已有37个来源与40项假说是初始数据，全部支持持久化与后续扩展。结果需独立权利要求反证与工程验证，禁止 AI 自行标记专利新颖性或实验通过。详见 docs/PROBLEM_DISCOVERY.md。
+
+
+## 跨课题科研循环编排（2026-11-19）
+
+在用户需要长周期研究、并行 Agent、独立科学验证、专利和论文成果分流时，读取 patent-research-cycle/SKILL.md 及 docs/RESEARCH_CYCLE.md。先建立项目隔离案卷，再用 patent_cycle_create / patent_cycle_status / patent_cycle_claim / patent_cycle_finish 实施有依赖的任务分工；双源检索完成后才进入证据整合和构思，独立评委与构思/反证执行人须不同。若裁决为 iterate，调用 patent_cycle_iterate 开启下一轮，旧记录不可覆写；真实计算与仿真证据须使用项目内附件的 SHA256 校验。科研循环仅保留模型无关的调度记录，当前宿主 AI 执行专业工作；专利申请审批、科学发表和真人实验核验始终走原有独立授权。
+
+## 知识星图闭环：单文献、单项目、跨项目
+开展双源检索后，必须读取 skills/patent-knowledge-atlas/SKILL.md。每批真实专利/论文入库后执行 atlas-index 或 MCP patent_knowledge_index；根据 patent_knowledge_graph 的单文献/单项目关联，追查相似专利原始权利要求、跨领域原理与尚未验证的假设。单文献自动记忆在 document_memory/generated/，工程与权要复核写在 document_memory/manual/，任何自动重建不得覆盖人工记忆。对已存正文的 AI 技术三元组使用 patent_knowledge_record_fact 并附可复核原文引句，标记待人工核实；引用数和文本相似不代表法律新颖性或创造性。跨项目图只能调用 global_public 公开投影；保密项目不得写入全局公开索引。可视化采用本地打包 Cytoscape.js，导出 JSON 由浏览器本地加载，禁止外部 CDN 上传案卷数据。

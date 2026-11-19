@@ -29,13 +29,9 @@ user-invocable: true
 
 PDF 文件哈希、原始在线链接、解析器版本、页码、原文段落、可得文字坐标和待核对状态。若 PDF 加密、无可读文本、使用权限不足、模型依赖缺失或解析失败，立即标记为人工核对；不得把空白文字当成不存在技术。
 
-## 论文 PDF 的授权采集与全文证据索引（2026-11-19）
+## 文献 PDF 自动化证据流水线（2026-11-19）
 
-1. 检索只发现 DOI/摘要/PDF 候选，AI 必须记录来源、版权条件和是否已读原文。未经真实批准的 PDF 既不可下载，也不可将全文推断记作已核验。
-2. 调用 literature fulltext-import 或 fulltext-fetch：仅在合法许可、资料使用授权和必要网络外发审批通过后执行；下载还要求明确的站点白名单。源 PDF 按 SHA256 内容寻址保存在单项目隔离目录。
-3. 模型资源在本地预置且批准后，执行 literature fulltext-parse 使用离线 Docling 提取页码、label、bbox 和原文块；解析后 status=parsed_unreviewed。原始文件哈希用于避免 AI 伪造、错用旧版本原文。
-4. 调用 literature fulltext-search / fulltext-page，或 MCP patent_literature_fulltext_search / patent_literature_fulltext_page 按 DOI 证据编号检索精准段落；再由研究者打开原始 PDF 完成文字、公式、图表和工况核对。
-5. 长上下文中，正式持久记忆仍存入 LiteratureMemoryStore 的每篇 Markdown、统一数据库和研究恢复文件；多次检索和重分析保留人工批注；不得把摘要/解析文本视为已证明的创造性、法律结论或仿真值。
-6. 若 PDF 不可达、付费访问、无授权许可证、Docling 依赖缺失或页码匹配失败，保留原始元数据和错误信息并返回给工作流；不得跳过审批或覆盖上一轮已完成的研究证据。
+优先读取 `docs/FULLTEXT_PIPELINE.md` 与 `patent-fulltext-processing` Skill。通过项目出站审批和真实 OA 许可核查后，使用已有 pinned TLS 下载器与离线 Docling；保留 SHA256、供应商 URL、PDF 文件内容哈希、机器解析结果、页码/文本块，记录失败/重试/可恢复状态。来自 MCP 的页码检索均标为 awaiting_original_pdf_review。未知许可、私人 IP、重定向、非 PDF、重复超过次数、超额度需阻断并人工复核。
 
-结构、CLI、MCP、许可门禁与恢复机制参见 docs/FULLTEXT_PIPELINE.md。
+## 批量论文 PDF 的核验与失败恢复（2026-11-19）
+多篇 PDF 统一经 FulltextPipeline 的已批准来源、URL 白名单、安全 HTTPS 下载和离线 Docling；FullTextBatchRunner 仅增加 manifest 逐篇 rights_actor/rights_reference、处理预算、状态检查点、重试与 SHA256 复核，不形成第二套全文索引。授权 CLI 运行 literature fulltext-batch，查询由 fulltext-batch-status 或 MCP patent_literature_fulltext_batch_status 完成。批次完成仅证明处理阶段完成，自动页码与内容抽取依然需要原件逐项复核，技术证据级别维持 parsed_unreviewed。详见 docs/FULLTEXT_PIPELINE.md。

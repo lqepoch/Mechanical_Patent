@@ -33,3 +33,7 @@ user-invocable: true
 - 数据盘未挂载、权限不符或检出 .env/私有资料进入镜像时立即停止发布。
 - 确认镜像问题后回退到已验证 digest；若存在不可逆数据迁移，停服恢复完整案卷快照并复核事件链。
 - 不要在容器或 CI 中执行未授权专利检索、上传内部图纸、公开企业秘密或伪造研究结果。
+
+## 论文全文安全处理与 GHCR 生产分工（2026-11-19）
+
+原有镜像仍保持轻量 MCP 服务，项目卷新增 `knowledge/fulltext`，随 patents.sqlite3、literature.sqlite3、Markdown 一并备份/恢复。下载和 Docling 解析采用有身份审批的受控本机 CLI 或后续隔离 Worker，模型权重必须在离线目录准备，禁止由公网 MCP 请求触发未知来源 PDF 下载。主容器通过只读 MCP 提供任务状态和页码检索；权限、出站防火墙、日志与许可证审计以及 PDF 防毒沙箱在正式生产前验收。具体见 docs/FULLTEXT_PIPELINE.md。

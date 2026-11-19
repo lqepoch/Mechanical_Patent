@@ -157,10 +157,90 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 
 `patent_capabilities` 返回 `paper_sources` 清单，包括平台能力、是否需机构许可和是否配置。统一结果位于 `03_papers.json`，单篇记忆落在 `03_paper_memory/EV-*.md`；原有 `patent_case_artifact` 仍按受控白名单读取标准 JSON，不提供任意 Markdown 路径遍历。每份记录保留 DOI、PDF 候选链接、来源、OA、引用与许可元数据，仅当逐篇完成合法全文下载、实际 PDF 解析与证据复核后才能标记为全文已核验。标准接口、故障降级和示例见 [PAPER_SOURCES.md](PAPER_SOURCES.md)。
 
-## 论文全文段落检索扩展（2026-11-19）
+## 1.7：创新裂变的跨技术轴交叉与否定记忆
 
-MCP 新增 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,doc_id?,limit?)`、`patent_literature_fulltext_page(case_id,doc_id,page,limit?)`，均仅读取已经归档的本项目论文 PDF 和经 Docling 提取的文本块。数据返回包含原始 PDF SHA、页号、块号、可得坐标及 `awaiting_original_pdf_review` 标记。PDF 获取及解析通过有许可审批的本地 CLI 执行；MCP 没有任意路径读写或无授权网络抓取权限。完整接口、权限、许可证、可恢复索引见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+| MCP 工具 | 输入 | 返回及边界 |
+|---|---|---|
+| `patent_idea_crossovers` | case_id、run_id、limit | 已评价且不同技术轴的双亲配对任务，必须由 AI 再提出可实施耦合方案 |
+| `patent_idea_reject` | case_id、run_id、candidate_id、reason、learned_constraints、source_ids（可选） | 保留原构思，记录反证与工程失败约束；禁止被否定构思直接晋级申请 |
 
-## 全文批次状态查询（2026-11-19）
+`patent_idea_register` 新增可选 `parent_ids`（2–3个），该字段存在时 `inventive_method` 必须为 `组合创新`，并提交 `synergy` 和 `interface_definition`。服务端核查父节点、技术轴差异、最大裂变代数、父子谱系和证据编号。历史 `parent_id` 单亲本请求继续兼容。生成结果还包括 `text_overlap_neighbors` 供人工识别重复方案；这只是文本相似预警。
 
-新增 MCP 工具 patent_literature_fulltext_batch_status(case_id,batch_id,limit=100)，返回当前项目批次的完成/失败/待处理数量及文献级重试记录，不触发任何网络、付费 API 或文件处理。本地 CLI fulltext-batch 从拥有明确授权的文献清单执行，详见 FULLTEXT_PIPELINE.md。
+反证记录如果仅有标题/摘要或未核验原始权利要求，不得写成排除授权风险、侵权风险或已实现效果。负面记忆会进入下一轮 `patent_idea_plan` 的 `avoid_failed_constraints`。
+
+### 失败子案修复与可信检索门禁
+
+已归档为 `rejected_research_route` 的候选可以作为单亲本“修复来源”，但新构思必须使用新的 ID，并显式提交 `parent_id`、`repair_of_failed_route=true` 和 `repair_rationale`，描述如何具体消除原来的失败约束。原失败假说持续留档，不允许直接重评或晋级；失败路线也不能参加多亲本交叉。
+
+`patent_idea_promote` 现在额外要求案卷真实存在一份 `verified=true` 且带原文权利要求的专利来源，同时该来源必须出现在构思的 `evidence_ids` 与评审 `countersearch_refs` 中。导入的第三方检索结果默认 `verified=false`，无法通过这一安全门禁。此状态只证明来源被核验，并不代表权利要求反证已通过法律审查。
+
+## 正文页码搜索的 MCP 接口（2026-11-19）
+
+提供 `patent_literature_fulltext_status(case_id,doc_id)`、`patent_literature_fulltext_search(case_id,query,limit=20)`、`patent_literature_fulltext_pending(case_id,limit=30)`；直接使用项目级全文 SQLite，提供可追溯 PDF SHA256、页码及解析状态，不返回文件系统任意读取能力。原文获取、许可审批和本地离线 Docling 由受控 CLI 运行；当前缺少请求级真实企业身份和签名的 MCP 外部写入不提供此能力。见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+
+## 工程图示生产流水线 / v1.4 (2026-11-19)
+
+- patent_figure_prepare(case_id,run_id,candidate_id,wanted?): 生成不超过三类内容证据驱动的可编辑 .drawio/.mmd 图源，记录源哈希、图类型和建议落点；不运行外部二进制。
+- patent_figure_source(case_id,run_id,figure_id): 只读取该案卷白名单中图源内容与 SHA256，可交由人工编辑器接收。
+- patent_figure_status(case_id,run_id): 读取已登记计划及隔离渲染结果的概要。
+- patent_figure_sync(case_id,run_id,candidate_id): 校验外部工作器完整 PDF 及 SHA256，再把图加入工程技术方案 JSON/TEX，失效之前的签名审批。
+- 独立工作器 `python -m mechanical_patent.figure_worker render-figures|compile-brief-pdf --case-dir <案例>`；MCP 不提供执行系统进程的接口。draw.io/Mermaid 的生成源是功能关系示意，真实 CAD 必须另经专用工具确认。
+
+独立工作器必须运行在已配置的企业安全隔离容器中，真实渲染版本需验收；本仓库 CI 对生成、源数据约束、失败关闭、伪造输出和 MCP 合同做离线验证。具体合同见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
+
+## 文献短引核验增量 MCP（2026-11-19）
+
+新增 patent_literature_fulltext_quote(case_id, doc_id, anchor, verbatim)：依托当前项目绑定的 FulltextPipeline，检查证据位置形如 p2:b1、文献当前已解析 PDF 的哈希和段落文本是否含指定原文短引。响应 exact_match 与 SHA256、来源 URL、verification_level=parsed_text_match_only 和 full_text_verified=false；错误页码、其他项目来源和旧版 PDF 返回确定性拒绝。此工具只读，依赖已有合法 OA 下载、离线 Docling 和单项目案卷授权机制；没有任意路径或远程文献读取权限。
+
+patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF 段落锚点真实性校验，记录分析使用的 PDF/解析版本 SHA256 以供历史审计。旧版 metadata/abstract 记忆可以保留，不自动升级证据可信等级。
+
+
+## 公共课题来源和自循环发现 MCP（2026-11-19）
+
+下列工具在每个 MCP 项目实例中复用同一个公共来源目录，保密案卷仍只限当前独立项目：
+
+| 工具 | 用途 |
+| --- | --- |
+| patent_source_catalog(status,limit) | 先读取已批准/待审来源目录与更新状态 |
+| patent_topic_catalog(limit) | 读取历次工程课题与技术假说 |
+| patent_discovery_inbox(limit) | 读取公开来源新增观察与待审批的大平台 |
+| patent_source_propose(name,url,reason,discovered_from) | AI 自动发现新大平台后进入 pending；绝不自动授权 |
+| patent_public_observe(source_id,url,title,summary,published_at) | 保存公开问题来源及原始链接元数据，内容未自动核验 |
+| patent_topic_derive(observation_id,problem,hypothesis,falsification,domain) | 提出与真实公开观察绑定的待验证机械研究课题 |
+| patent_topic_plan(topic_id) | 获取阶段化研究、反证及可证伪实验计划 |
+| patent_public_research_note(topic_id,agent,findings,evidence_urls,public_only) | 留下 AI 研究笔记，状态 unverified_ai_assessment |
+| patent_source_cycle(allow_public_network,max_sources) | 显式授权时执行已批准公开 RSS 的一次有限巡检 |
+| patent_topic_adopt(case_id,topic_id) | 在当前项目 SQLite 新建保密案卷，不能直接外发检索 |
+
+**数据治理**：共享公开目录保存在 `/data/public_source_catalog/sources.sqlite3`；各项目 SQLite 仍在 `/data/projects/<project-id>/patents.sqlite3`。20个来源和20个假说种子随 Python wheel/GHCR 镜像打包。新来源需管理员在 CLI `source-catalog approve` 批准：MCP 不提供 approve，不允许 AI 自行提高来源信任等级。管理员字符串尚未绑定身份认证，正式企业部署需要可信 OIDC、权限、可回滚审批和独立审计。
+
+**调度**：Docker Compose 可选 `COMPOSE_PROFILES=discovery` 启动 `source-radar`，只对批准公开 RSS 执行增量巡检，支持版本、去重、失败重试、持久化和停机恢复。尚不具备自动唤起 LLM 研究、第三方网站全文采集或实验认证，自动研究需要后续具备身份/预算与审签的独立 Agent 运行平台。详细边界见 `docs/PROBLEM_DISCOVERY.md` 与 Issues #58–#62。
+
+## 论文批量接口（2026-11-19）
+
+patent_literature_harvest 扩充了可选 provider 和 page_size。普通 Semantic Scholar 使用 offset，Bulk 使用 token 每页1000条，arXiv、Europe PMC 和 PubMed 按各自官方 API 分页；仍强制执行项目保密外发门禁。无网、来源限流或许可缺失应保留错误而不伪造全局查全。原有 patent_literature_fulltext_status/search/pending 保持只读，下载与解析继续由本地批准的 FulltextPipeline 执行。
+
+## 全机械行业来源检索与技术机理类比（2026-11-19）
+
+MCP 的 patent_source_catalog(status,limit) 和 patent_topic_catalog(limit) 现新增可选 industry 与 mechanism；patent_source_propose 与 patent_topic_derive 新增 industry_tags 与 mechanism_tags 可选参数。新增 patent_mechanical_taxonomy() 返回18个初始行业/19个初始物理机理；patent_mechanical_analogies(target_industry,mechanism,limit=20) 返回其他行业具有同一物理机理的待验证研究假说。标签可继续扩展，未分类机械研究标记 unclassified。匹配分数与物理相似仅用于检索创新方向，不构成专利新颖性、工程可行性或可实施许可证明；需要独立查新、实验、技术负责人和专利人员审核。旧项目 SQLite 增量迁移保留全部人工审批与历史记录。CLI 入口为 source-catalog taxonomy/sources/topics/analogies。
+
+
+## 科研循环 MCP 工具（2026-11-19）
+
+新增 patent_cycle_create / status / claim / finish / fail / iterate / audit，可在当前 project_id 的同一 SQLite 案卷上运行。工具只返回任务调度摘要；研究结果存储于当前项目的 research_tasks.result_json，并通过 SHA256 保存内容摘要。十个任务的输出字段、门禁、迭代和安全边界见 docs/RESEARCH_CYCLE.md。MCP 不运行外部 LLM；actor 是调用端登记字段，真实身份与审批来源必须由可信接入网关负责。
+
+### 新增知识星图 MCP 工具
+
+| MCP tool | 输入 | 效果 |
+|---|---|---|
+| patent_knowledge_index | case_id, run_id, top_k, threshold | 离线建立当前运行隔离的 knowledge.sqlite3 与文献 Markdown 记忆 |
+| patent_knowledge_graph | case_id, run_id, scope, document_id, max_nodes, min_score | 输出单文献或单项目星图及 Cytoscape 元素；提供方法、分数、出处 |
+| patent_knowledge_record_fact | case_id, run_id, document_id, subject, predicate, object, quote, location | 候选技术三元组逐字引文校验并保存“AI待人工复核”，不代表工程/法律审核通过 |
+| patent_knowledge_global_public | max_nodes | 仅查询原工作流中已批准公开项目的最小著录关系，其他密级不可见 |
+
+跨项目私有查询没有绕过权限的 MCP 参数。完整 CLI、图谱本体、构建前端、性能与安全边界见 docs/KNOWLEDGE_ATLAS.md。
+
+## 合规 PDF 全文批次只读状态（2026-11-19）
+
+`patent_literature_fulltext_batch_status(case_id,batch_id,limit=100)` 在当前 project_id/case_id 下读取 `FullTextBatchRunner` 的批次总量、已完成、待处理、失败重试和截断的单篇检查点。MCP 不启动网络请求、PDF 下载或用户授权流程；批次创建与执行仅允许完成真实版权许可及项目外发审批的本地 CLI `literature fulltext-batch`。已有 `FulltextPipeline` 是唯一原文下载/解析状态机，解释见 docs/FULLTEXT_PIPELINE.md。

@@ -114,6 +114,8 @@ class OpenAlexProvider:
         if not term:
             return {"records": [], "next_cursor": None, "total_results": 0}
         params = {"search": term, "per_page": max(1, min(limit, 100))}
+        if cursor not in (None, "", "*") and not self.api_key:
+            raise PatentWorkflowError("OpenAlex 深分页从第二页开始需要 OPENALEX_API_KEY。")
         if cursor is not None:
             params["cursor"] = cursor or "*"
         headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}

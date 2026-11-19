@@ -197,10 +197,20 @@ class SemanticScholarProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 5):
+            raise PatentWorkflowError("Semantic Scholar 搜索页偏移量无效。")
+        offset = int(cursor) if cursor not in (None, "*") else 0
+        if offset >= 1000:
+            return {"records": [], "next_cursor": None, "total_results": 1000}
+        size = max(1, min(int(limit), 100, 1000-offset))
         params = {
-            "query": query.strip()[:MAX_QUERY], "limit": max(1, min(limit, 25)),
+            "query": query.strip()[:MAX_QUERY], "limit": size, "offset": offset,
             "fields": "title,abstract,year,publicationDate,authors,url,externalIds,citationCount,isOpenAccess,openAccessPdf",
         }
         _pace(self.name, 1.05)
@@ -228,7 +238,79 @@ class SemanticScholarProvider:
                        cited=row.get("citationCount"), is_oa=row.get("isOpenAccess"))
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        total = payload.get("total")
+        end = offset + len(rows)
+        next_cursor = str(end) if (
+            len(rows) == size and end < 1000
+            and (not isinstance(total, int) or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
+
+
+
+class SemanticScholarBulkProvider(SemanticScholarProvider):
+    """Official Academic Graph bulk API with opaque continuation token.
+
+    Bulk API returns up to 1000 records; use max_documents in multiples of 1000
+    to avoid dropping records and destroying exact checkpoint continuation.
+    """
+    name = "semantic-scholar-bulk"
+
+    def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        raise PatentWorkflowError("Bulk 供应商仅允许 literature harvest 使用完整1000条分页。")
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 1000) -> dict[str, Any]:
+        if not query.strip():
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if limit != 1000:
+            raise PatentWorkflowError("Semantic Scholar Bulk 每页必须保留全部1000条，防止游标丢失。")
+        if cursor not in (None, "*") and (not isinstance(cursor, str) or len(cursor) > 4096):
+            raise PatentWorkflowError("Semantic Scholar Bulk 游标无效。")
+        params = {
+            "query": query.strip()[:MAX_QUERY],
+            "fields": "title,year,publicationDate,url,externalIds,citationCount,isOpenAccess,openAccessPdf",
+        }
+        if cursor not in (None, "*"):
+            params["token"] = cursor
+        _pace(self.name, 1.05)
+        payload = self.fetch_json(
+            "https://api.semanticscholar.org/graph/v1/paper/search/bulk?"
+            + parse.urlencode(params),
+            headers={"x-api-key": self.key} if self.key else {},
+        )
+        rows = payload.get("data", [])
+        if not isinstance(rows, list) or len(rows) > 1000:
+            raise PatentWorkflowError("Semantic Scholar Bulk 返回了不合法的文献分页。")
+        out: list[Evidence] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ids = row.get("externalIds") or {}
+            if not isinstance(ids, dict):
+                ids = {}
+            oa_pdf = row.get("openAccessPdf") or {}
+            paper_id = str(row.get("paperId") or "")
+            item = _mk(
+                self.name, title=row.get("title"), identifier=paper_id,
+                doi=ids.get("DOI"),
+                url=row.get("url") or "https://www.semanticscholar.org/paper/" + paper_id,
+                abstract=row.get("abstract"),
+                date=row.get("publicationDate") or row.get("year"),
+                pdf=oa_pdf.get("url") if isinstance(oa_pdf, dict) else "",
+                cited=row.get("citationCount"), is_oa=row.get("isOpenAccess"),
+            )
+            if item:
+                out.append(item)
+        token = payload.get("token")
+        if token is not None and (not isinstance(token, str) or len(token) > 4096):
+            raise PatentWorkflowError("Semantic Scholar Bulk 返回不合法的后续游标。")
+        if not rows:
+            token = None
+        return {"records": merge_paper_records(out),
+                "next_cursor": token, "total_results": payload.get("total"),
+                "consumed_records": len(rows)}
 
 
 class ArxivProvider:
@@ -238,11 +320,18 @@ class ArxivProvider:
         self.fetch_xml = fetch_xml or _fetch_xml
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
-        # arXiv Atom API, search_query uses explicit all: prefix.
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 9):
+            raise PatentWorkflowError("arXiv 分页起点无效。")
+        start = int(cursor) if cursor not in (None, "*") else 0
+        size = max(1, min(int(limit), 100))
         params = {"search_query": "all:" + query.strip()[:MAX_QUERY],
-                  "start": 0, "max_results": max(1, min(limit, 25))}
+                  "start": start, "max_results": size}
         _pace(self.name, 3.1)
         raw = self.fetch_xml("https://export.arxiv.org/api/query?" + parse.urlencode(params))
         try:
@@ -270,7 +359,15 @@ class ArxivProvider:
                        pdf=pdf, authors=authors, is_oa=True)
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        namespace = "{http://a9.com/-/spec/opensearch/1.1/}"
+        total_raw = _text(root.find(namespace + "totalResults"))
+        total = int(total_raw) if total_raw.isdecimal() else None
+        end = start + len(root.findall(atom + "entry"))
+        next_cursor = str(end) if (
+            len(out) == size and (total is None or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
 
 
 class EuropePMCProvider:
@@ -280,10 +377,16 @@ class EuropePMCProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        size = max(1, min(int(limit), 100))
         params = {"query": query.strip()[:MAX_QUERY], "format": "json",
-                  "resultType": "core", "pageSize": max(1, min(limit, 25))}
+                  "resultType": "core", "pageSize": size,
+                  "cursorMark": cursor if cursor not in (None, "") else "*"}
         payload = self.fetch_json("https://www.ebi.ac.uk/europepmc/webservices/rest/search?"
                                   + parse.urlencode(params))
         rows = (payload.get("resultList") or {}).get("result", [])
@@ -309,7 +412,13 @@ class EuropePMCProvider:
                        license=row.get("license"))
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        next_cursor = payload.get("nextCursorMark")
+        if not isinstance(next_cursor, str) or len(next_cursor) > 4096:
+            next_cursor = None
+        if len(rows) < size or next_cursor == params["cursorMark"]:
+            next_cursor = None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": payload.get("hitCount")}
 
 
 class PubMedProvider:
@@ -324,24 +433,35 @@ class PubMedProvider:
         self.fetch_xml = fetch_xml or _fetch_xml
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(self, query: str, *, cursor: str | None = None,
+                    limit: int = 100) -> dict[str, Any]:
         if not query.strip():
-            return []
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        if cursor not in (None, "*") and (not cursor.isdecimal() or len(cursor) > 9):
+            raise PatentWorkflowError("PubMed 检索页偏移量无效。")
+        start = int(cursor) if cursor not in (None, "*") else 0
+        size = max(1, min(int(limit), 100))
         base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         params = {"db": "pubmed", "term": query.strip()[:MAX_QUERY],
-                  "retmode": "json", "retmax": max(1, min(limit, 25))}
+                  "retmode": "json", "retstart": start, "retmax": size}
         if self.key:
             params["api_key"] = self.key
         if self.contact_email:
             params["email"] = self.contact_email
         # NCBI 官方单 IP 访问率限制；单进程内保守限速。
         _pace(self.name, 0.4 if not self.key else 0.12)
-        ids = (self.fetch_json(base + "esearch.fcgi?" + parse.urlencode(params))
-               .get("esearchresult") or {}).get("idlist", [])
+        discovery = (self.fetch_json(base + "esearch.fcgi?" + parse.urlencode(params))
+                     .get("esearchresult") or {})
+        ids = discovery.get("idlist", [])
+        count_raw = discovery.get("count")
+        total = int(count_raw) if str(count_raw).isdigit() else None
         if not isinstance(ids, list) or not ids:
-            return []
-        identifiers = [str(x) for x in ids[:25] if str(x).isdigit()]
+            return {"records": [], "next_cursor": None, "total_results": total}
+        identifiers = [str(x) for x in ids[:size] if str(x).isdigit()]
         if not identifiers:
-            return []
+            return {"records": [], "next_cursor": None, "total_results": total}
         detail = {"db": "pubmed", "id": ",".join(identifiers), "retmode": "xml"}
         if self.key:
             detail["api_key"] = self.key
@@ -376,7 +496,12 @@ class PubMedProvider:
                        doi=doi, abstract=abstr, date=date, authors=authors)
             if item:
                 out.append(item)
-        return merge_paper_records(out)
+        end = start + len(identifiers)
+        next_cursor = str(end) if (
+            len(identifiers) == size and (total is None or end < total)
+        ) else None
+        return {"records": merge_paper_records(out),
+                "next_cursor": next_cursor, "total_results": total}
 
 
 class COREProvider:
@@ -475,7 +600,7 @@ class UnpaywallEnricher:
 
     def enrich(self, paper: Evidence) -> Evidence:
         doi = _doi(paper.paper_metadata.get("doi") or paper.publication)
-        if paper.kind != "paper" or not doi or doi.startswith(("arxiv:", "pmid:", "core:", "lens:")):
+        if paper.kind != "paper" or not doi.startswith("10.") or "/" not in doi:
             return paper
         url = "https://api.unpaywall.org/v2/" + parse.quote(doi, safe="/") + "?" + parse.urlencode({"email": self.email})
         payload = self.fetch_json(url)
@@ -535,6 +660,11 @@ def paper_source_catalog() -> list[dict[str, Any]]:
             "commercial_license_gate": name in PAID_OR_LICENSED,
             "configured": (bool(os.getenv(required)) if required else True),
         })
+    sources.append({
+        "id": "semantic-scholar-bulk", "capability": "deep_search",
+        "description": "Semantic Scholar 官方 Bulk Search，按1000条完整页与 token 深分页，属于 literature harvest 通道",
+        "commercial_license_gate": False, "configured": True,
+    })
     sources.append({
         "id": "unpaywall", "capability": "doi_enrich",
         "description": SOURCE_DESCRIPTIONS["unpaywall"],

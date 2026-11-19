@@ -1,0 +1,369 @@
+{
+  "version": 2,
+  "kind": "research_topic_hypotheses",
+  "topics": [
+    {
+      "id": "FIRE-01",
+      "title": "消防水罐变液位动态抑晃",
+      "problem": "液体晃动冲击车体稳定性",
+      "hypothesis": "多腔节流与动态阻尼隔板",
+      "falsification": "同液位蛇形工况加速度与压力峰值对比",
+      "domain": "罐体",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "dynamics"
+      ]
+    },
+    {
+      "id": "FIRE-02",
+      "title": "消防炮射流反作用力补偿",
+      "problem": "炮架承受瞬变反力振动",
+      "hypothesis": "机械阻尼与反力平衡底座",
+      "falsification": "射流切换下炮架振动与落点误差",
+      "domain": "消防炮",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "dynamics",
+        "actuation"
+      ]
+    },
+    {
+      "id": "FIRE-03",
+      "title": "变黏度泡沫比例混合器",
+      "problem": "温度黏度变化导致混比偏差",
+      "hypothesis": "机械可变容积计量与反馈",
+      "falsification": "黏度温度流量矩阵混比误差",
+      "domain": "泡沫系统",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "sealing"
+      ]
+    },
+    {
+      "id": "FIRE-04",
+      "title": "高压水路多级防水锤",
+      "problem": "阀门快关诱发超压冲击",
+      "hypothesis": "旁通蓄能缓冲组合阀",
+      "falsification": "峰值压力与响应延迟",
+      "domain": "管路",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "hydraulics"
+      ]
+    },
+    {
+      "id": "FIRE-05",
+      "title": "消防泵连续运转多热源管理",
+      "problem": "泵传动发动机热负荷相互干扰",
+      "hypothesis": "分区换热和隔离冷却回路",
+      "falsification": "6h热平衡与单点故障降额",
+      "domain": "消防泵",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "thermodynamics"
+      ]
+    },
+    {
+      "id": "FIRE-06",
+      "title": "行车打水多动力协同",
+      "problem": "行车和打水同时运行峰值动力竞争",
+      "hypothesis": "传动保护与功率分流",
+      "falsification": "加速和泵额定供水联合试验",
+      "domain": "动力",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "powertrain",
+        "control"
+      ]
+    },
+    {
+      "id": "FIRE-07",
+      "title": "应力解耦模块化副车架",
+      "problem": "多底盘扭转与装配公差导致疲劳",
+      "hypothesis": "浮动支座与可检验锁止",
+      "falsification": "扭转疲劳与重复安装公差",
+      "domain": "副车架",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fatigue",
+        "dynamics"
+      ]
+    },
+    {
+      "id": "FIRE-08",
+      "title": "消防泵吸入气液主动分离",
+      "problem": "间歇吸气易造成断流",
+      "hypothesis": "流道分离与持续排气机构",
+      "falsification": "含气率阶跃与再引水时间",
+      "domain": "消防泵",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "thermodynamics"
+      ]
+    },
+    {
+      "id": "FIRE-09",
+      "title": "双消防泵无冲击切换",
+      "problem": "泵组切换流量压力不连续",
+      "hypothesis": "双泵缓冲并联流路",
+      "falsification": "切换压差流量及泄漏",
+      "domain": "消防泵",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "thermodynamics"
+      ]
+    },
+    {
+      "id": "FIRE-10",
+      "title": "泡沫系统介质隔离切换",
+      "problem": "不同介质残留混入及环保风险",
+      "hypothesis": "隔离阀组与可验证排净",
+      "falsification": "残留浓度与清洗耗水",
+      "domain": "泡沫系统",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "sealing"
+      ]
+    },
+    {
+      "id": "FIRE-11",
+      "title": "狭窄空间自适应展开",
+      "problem": "支腿器材和障碍物空间冲突",
+      "hypothesis": "多机构互锁避让",
+      "falsification": "典型受限场景可展开比例",
+      "domain": "整车结构",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fatigue",
+        "kinematics"
+      ]
+    },
+    {
+      "id": "FIRE-12",
+      "title": "消防管路防误接快速维修",
+      "problem": "管路维护误接和高压泄漏风险",
+      "hypothesis": "自密封防错快换接口",
+      "falsification": "压力循环与拆装寿命",
+      "domain": "管路",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "hydraulics"
+      ]
+    },
+    {
+      "id": "FIRE-13",
+      "title": "车载机器人可靠收放",
+      "problem": "振动偏载和失电导致收放失败",
+      "hypothesis": "减振导轨与失电释放",
+      "falsification": "坡度冲击偏载释放试验",
+      "domain": "机器人",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "interaction"
+      ]
+    },
+    {
+      "id": "FIRE-14",
+      "title": "大流量水带无损自动收卷",
+      "problem": "水带积水扭结张力难控制",
+      "hypothesis": "排水张力闭环收卷机",
+      "falsification": "损伤率与收卷耗时",
+      "domain": "器材",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "actuation"
+      ]
+    },
+    {
+      "id": "FIRE-15",
+      "title": "器材箱低功耗辅助承载",
+      "problem": "重型器材人工取放安全",
+      "hypothesis": "载荷辅助升降与机械锁止",
+      "falsification": "操作力和失电保持",
+      "domain": "器材",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "actuation"
+      ]
+    },
+    {
+      "id": "FIRE-16",
+      "title": "消防炮自适应连续喷嘴",
+      "problem": "射流形态随供压需求变化",
+      "hypothesis": "可变截面流道与机械同步",
+      "falsification": "喷距雾化功耗矩阵",
+      "domain": "消防炮",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "dynamics",
+        "actuation"
+      ]
+    },
+    {
+      "id": "FIRE-17",
+      "title": "消防车多区隔热舱",
+      "problem": "火场及泵房高温影响乘员电控",
+      "hypothesis": "可维修隔热和导热转移",
+      "falsification": "高温浸泡与热传导",
+      "domain": "整车结构",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fatigue",
+        "kinematics"
+      ]
+    },
+    {
+      "id": "FIRE-18",
+      "title": "消防机器人自动供水接驳",
+      "problem": "机器人难以可靠自主水带连接",
+      "hypothesis": "对准捕获锁止脱离机构",
+      "falsification": "多角度接驳成功率和超载断开",
+      "domain": "机器人",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "interaction"
+      ]
+    },
+    {
+      "id": "FIRE-19",
+      "title": "模块化跨任务应急车体",
+      "problem": "单一车辆任务变化配置复杂",
+      "hypothesis": "水泵排涝供能模块共用接口",
+      "falsification": "模块切换时间和载荷边界",
+      "domain": "整车结构",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "fatigue",
+        "kinematics"
+      ]
+    },
+    {
+      "id": "FIRE-20",
+      "title": "自诊断机械消防系统",
+      "problem": "磨损堵塞泄漏难以提前发现",
+      "hypothesis": "状态敏感机械结构与传感接口",
+      "falsification": "故障注入检出率和误报率",
+      "domain": "可靠性",
+      "status": "hypothesis_only",
+      "origin": "2026-11-18_mechanical_patent_brainstorm",
+      "novelty_checked": false,
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "reliability",
+        "inspection"
+      ]
+    }
+  ],
+  "scope": "fire_rescue_vertical_examples"
+}

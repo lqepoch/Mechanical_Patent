@@ -123,6 +123,56 @@ GitHub CI 构建 amd64/arm64 镜像并发布 GHCR。Ubuntu 26.04 Docker Compose 
 
 CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
 
-## 正版论文 PDF 处理层（2026-11-19）
+## 论文 PDF 证据流水线（2026-11-19）
 
-`paper_sources` 负责来源发现 → `LiteratureMemoryStore` 在项目目录保存元数据与原文候选 → `LiteratureFullText` 经许可审核、本地导入或 hardened HTTPS 下载 → SHA256 原文对象 → 离线 Docling → 项目 SQLite 的页码/坐标全文块及 FTS5 搜索 → MCP 只读原文定位。原始文件与 AI 推断明确隔离，`parsed_unreviewed` 不可代替人工专业核查。恢复与操作细节见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+已有 `literature_memory.py` 的项目独立 SQLite + Markdown 与论文 API 归一化继续保留。新增 `literature_fulltext.py` 管理全文任务的 license/oa/url/rights、downloaded/parsed 状态、内容 SHA256、租约和页码索引，复用 `pdf_archive.py` 的固定公网 IP TLS PDF 下载与 `pdf_extraction.py` 的 Docling 离线解析。MCP 只读暴露 fulltext status/search/pending；CLI 对外网文件获取继续调用项目身份与案卷出站审批。所有全文结论需要人工针对真实 PDF 独立复核。详细设计见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+
+## 2026-11-19 图示工厂扩展
+技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
+真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。
+
+## 自我发现课题来源平台库（2026-11-19）
+
+系统新增 **可增量复用的公开工程问题来源目录**。首批预置20个公开平台来源和20项消防车结构研究假说，包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+
+每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
+
+公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检，也可显式启用 Compose discovery 服务自动轮询公开 RSS；此进程不执行 LLM 深度研究或认证专利。
+
+完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
+
+企业生产的公网访问需网络出口 allowlist、禁止 DNS rebinding 的代理层、身份/权限审批、外部不可变审计和站点版权授权；AI 不能以自身结论完成工程或法律认证。
+
+## 批量论文分页与 DOI 公共全文候选（2026-11-19）
+
+此扩展为项目内现有的 OpenAlex/Crossref 深分页增加 Semantic Scholar 普通偏移分页（每检索词最多1000条）、Semantic Scholar Bulk token 深分页（每页1000条）、arXiv Atom start、Europe PMC cursorMark、PubMed retstart。现有 literature harvest 的 SQLite 游标、错误状态和单篇 Markdown 记忆继续复用。OpenAlex 第二页需要 API Key。Bulk 模式要求 page_size=1000 且 max_documents 是1000整数倍；更小的页要使用普通来源。
+
+Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开许可和原始提供方谱系，严格检查案卷审批并保存到文献库。它不自动下载论文。真正获取 PDF、离线 Docling 解析、机器段落 FTS、权限签核、哈希与审计沿用主干唯一 FulltextPipeline，CLI 命令 fulltext-plan 和 fulltext-process。任何许可证冲突都进入人工复核并阻断旧许可继续授权。
+
+示例（需真实独立项目和工作流许可）：
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 harvest --provider semantic-scholar-bulk --query "centrifugal pump" --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --page-size 1000 --max-documents 3000 --max-pages 3
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 oa-enrich --doc-id EV-XXXXXXXXXXXX --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --authorized
+
+检索到的论文只代表该平台当前查询结果，不能证明全球无现有技术。PDF 候选位置及自动抽取文本不得擅自标记为已核实科学结论。
+
+## 全机械行业的共性物理机理发现层（2026-11-19）
+
+对所有机械装备提供行业×物理机理双维索引：行业可包括工业制造、机床、工程机械、消防、航空、航天、船舶、轨道、机器人、能源、矿山、农业、医疗、材料、环境等，可持续增补新领域；机理可包含流体、汽蚀、疲劳、磨损、摩擦、传动、热、冲击、密封、制造和多物理耦合。公共目录合计37个来源和40个课题假说，消防专题完整保留。系统新数据字段 industry_tags_json 和 mechanism_tags_json 经增量迁移保存，跨行业类比通过纯只读 MCP/CLI 查询，默认仍为待证伪假说。完整细节在 docs/PROBLEM_DISCOVERY.md。
+
+
+## 多 Agent 科研循环调度层（2026-11-19）
+
+新增 src/mechanical_patent/research_cycle.py，将科研发现—并行专利/论文检索—证据整合—假设生成—逐候选反证—独立裁决—技术验证—成果分流—监测规划串成可恢复的项目级图。每个循环绑定当前项目专属 SQLite 和原有案卷 revision，原子领取任务、限次重试、结果哈希、追加审计及版本化迭代。设计参考 DeepMind Co-Scientist 的假设反思/竞争思想及 LangGraph 的状态检查点理念，但未引入其模型服务或部署 Temporal；不宣称已实现无人值守科研、联网自动轮询、真实仿真或审签。具体状态、输出 JSON 契约、CLI/MCP 与故障边界见 docs/RESEARCH_CYCLE.md。
+
+## 2026-11-18 三级知识星图增量架构
+
+原案卷 04b_technology_graph.json 与 04c_paper_citations.json 继续保留真实来源和记录。新增 src/mechanical_patent/knowledge_atlas.py，在每次研究运行下以独立 knowledge.sqlite3 物化节点/边、来源、方法、置信度和 SHA256 内容指纹；文本相似算法使用倒排候选的 TF-IDF，AI 三元组须与本地原文引句逐字匹配且状态保持待人工复核。每个文档生成独立 generated MD，人工记忆在 manual MD 中保护。
+
+跨项目 global_public 仅汇总 LocalPatentWorkspace 中 confidentiality='公开' 的项目及文献最小著录字段；其他密级不可访问。商业组织横向权限模型仍需 OIDC/Keycloak、逐请求 ABAC、逐边过滤、审计及合规外发审批。新增 MCP/CLI 与 atlas-web (Cytoscape.js) 本地 Web 可视化，不依赖强制外部 LLM。生产增强候选：sqlite-vec、Microsoft GraphRAG、LightRAG、Sigma.js；须经许可证、性能和数据治理审批。完整设计见 docs/KNOWLEDGE_ATLAS.md。
+
+## 合规论文全文批次层（2026-11-19）
+
+`literature_fulltext_batch.FullTextBatchRunner` 复用已上线 `FulltextPipeline`，通过确定性 manifest SHA256、`fulltext_batches` 和 `fulltext_batch_items` 在单项目文献数据库中实现逐篇权利审核记录、失败隔离、有界重试和可恢复检查点；原文 PDF SHA256、许可证、下载 TLS 和离线 Docling 仍由原执行器维护。权限由本地 CLI 的真实工作流审批、完整 `case_id`/数据库路径匹配及逐项 allowlist 联合控制，外部模型仅使用只读 MCP 查询进度。处理完成不等于专业审核完成。企业扩展需将任务执行器迁移到具有租约/幂等、配额、审批签名、统一审计的后台队列，并引入真实 PDF 回归金标准。

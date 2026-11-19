@@ -54,13 +54,12 @@ user-invocable: true
 
 接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
 
-## 论文 PDF 的授权采集与全文证据索引（2026-11-19）
+## 论文原始全文与页码证据（2026-11-19）
 
-1. 检索只发现 DOI/摘要/PDF 候选，AI 必须记录来源、版权条件和是否已读原文。未经真实批准的 PDF 既不可下载，也不可将全文推断记作已核验。
-2. 调用 literature fulltext-import 或 fulltext-fetch：仅在合法许可、资料使用授权和必要网络外发审批通过后执行；下载还要求明确的站点白名单。源 PDF 按 SHA256 内容寻址保存在单项目隔离目录。
-3. 模型资源在本地预置且批准后，执行 literature fulltext-parse 使用离线 Docling 提取页码、label、bbox 和原文块；解析后 status=parsed_unreviewed。原始文件哈希用于避免 AI 伪造、错用旧版本原文。
-4. 调用 literature fulltext-search / fulltext-page，或 MCP patent_literature_fulltext_search / patent_literature_fulltext_page 按 DOI 证据编号检索精准段落；再由研究者打开原始 PDF 完成文字、公式、图表和工况核对。
-5. 长上下文中，正式持久记忆仍存入 LiteratureMemoryStore 的每篇 Markdown、统一数据库和研究恢复文件；多次检索和重分析保留人工批注；不得把摘要/解析文本视为已证明的创造性、法律结论或仿真值。
-6. 若 PDF 不可达、付费访问、无授权许可证、Docling 依赖缺失或页码匹配失败，保留原始元数据和错误信息并返回给工作流；不得跳过审批或覆盖上一轮已完成的研究证据。
+不同来源统一 DOI 后，只在纸面许可已确认、OA PDF 来源真实、企业外发审批通过时安排 `patent-fulltext-processing` 任务。Unpaywall 和 OpenAlex 的 PDF URL 先视为候选，未知许可/NC/ND 等不进入自动下载。通过受控 CLI 调用 `fulltext-plan`、`fulltext-process`，失败留存任务与 PDF SHA，利用 `patent_literature_fulltext_search` 获取页码证据。技术综述、创造性反证须以原始文献核验结果为据，切勿将 Docling 解析等同于论文结论核实。
 
-结构、CLI、MCP、许可门禁与恢复机制参见 docs/FULLTEXT_PIPELINE.md。
+## 批量多平台检索、恢复与 DOI 授权发现（2026-11-19）
+
+当项目目标涉及数百上千篇论文，优先使用 literature harvest 选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC 或 PubMed 的官方分页通道，按实际源配额、费用、公开日期和许可分流，逐页保留当前案卷 SQLite 游标与单篇 MD。Semantic Scholar 普通检索 offset 上限每词1000篇，Bulk 使用 token，每页1000篇、max_documents 必须为1000整数倍；OpenAlex 第二页需要 API Key。出现网络失败时保留 partial/failed checkpoint，后续经审批恢复。
+
+用单独的 oa-enrich 在核准的同项目目录按 DOI 查询 Unpaywall 公开候选 PDF；不得自动下载。跨平台同 DOI 元数据应合并 authors/source_ids/sources，许可证或 OA 权属冲突按失效优先；保留原有分析笔记。PDF 获取、离线 Docling、页码块及版权审计采用已有 FulltextPipeline 的 fulltext-plan/fulltext-process，机器全文结果始终待核验。详细示例见 docs/PAPER_SOURCES.md。

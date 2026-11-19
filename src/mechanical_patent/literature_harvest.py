@@ -25,8 +25,8 @@ class HarvestBudget:
     def __post_init__(self) -> None:
         if not 1 <= self.max_documents <= 10000:
             raise PatentWorkflowError("每个检索词的文献预算须在1至10000条之间。")
-        if not 1 <= self.page_size <= 100:
-            raise PatentWorkflowError("每次请求最多100条文献。")
+        if not 1 <= self.page_size <= 1000:
+            raise PatentWorkflowError("每次请求最多1000条文献；大页仅用于 Bulk 检索。")
         if not 1 <= self.max_pages <= 200:
             raise PatentWorkflowError("每个检索词最多200页。")
         if not 10 <= self.max_seconds <= 3600:
@@ -47,6 +47,12 @@ class LiteratureHarvester:
     ) -> dict[str, Any]:
         """恢复已保存游标；Crossref 老游标失效后通过幂等去重从第一页重检。"""
         limits = budget or HarvestBudget()
+        if getattr(provider, "name", "") == "semantic-scholar-bulk" and (
+            limits.page_size != 1000 or limits.max_documents % 1000 != 0
+        ):
+            raise PatentWorkflowError("Semantic Scholar Bulk 需要每页1000条且总数为1000的整数倍。")
+        if getattr(provider, "name", "") != "semantic-scholar-bulk" and limits.page_size > 100:
+            raise PatentWorkflowError("常规数据源每页最多100条，请单独使用 Semantic Scholar Bulk。")
         if not query or len(query.strip()) > 240:
             raise PatentWorkflowError("检索词不能为空且不得超过240字符。")
         if not hasattr(provider, "search_page"):
@@ -71,7 +77,7 @@ class LiteratureHarvester:
                     "records_seen": checkpoint["records"], "new": 0,
                     "updated": 0, "unchanged": 0, "resumed": False,
                 }
-            if checkpoint["state"] == "partial" and age < 240:
+            if checkpoint["state"] in {"partial", "failed"} and age < 604800:
                 cursor = checkpoint["cursor"] or "*"
                 pages, records = checkpoint["pages"], checkpoint["records"]
                 resumed = True
@@ -86,7 +92,10 @@ class LiteratureHarvester:
             and local_pages < limits.max_pages
             and time.monotonic() - started < limits.max_seconds
         ):
-            requested = min(limits.page_size, limits.max_documents - records)
+            requested = (
+                1000 if name == "semantic-scholar-bulk" else
+                min(limits.page_size, limits.max_documents - records)
+            )
             # EPO OPS 官方对检索请求有更严格的公平使用限制：单页≤20。
             if name == "epo-ops":
                 requested = min(requested, 20)
@@ -99,21 +108,25 @@ class LiteratureHarvester:
                     not isinstance(item, Evidence) for item in incoming
                 ):
                     raise PatentWorkflowError("供应商返回无效文献列表。")
-                if len(incoming) > requested:
-                    raise PatentWorkflowError("供应商超出单页采集预算。")
+                consumed = page.get("consumed_records", len(incoming))
+                if (type(consumed) is not int or consumed < len(incoming)
+                        or consumed > requested):
+                    raise PatentWorkflowError("供应商返回的原始分页数量与请求不一致。")
+                if records + consumed > limits.max_documents:
+                    raise PatentWorkflowError("整页实际文献数量超过预算：保留原游标，调整预算后再继续。")
                 counts = self.memory.ingest_many(incoming)
                 new += counts["new"]
                 updated += counts["updated"]
                 unchanged += counts["unchanged"]
                 local_pages += 1
                 pages += 1
-                records += len(incoming)
+                records += consumed
                 next_cursor = page.get("next_cursor")
                 if next_cursor is not None and (
                     not isinstance(next_cursor, str) or len(next_cursor) > 4096
                 ):
                     raise PatentWorkflowError("供应商返回的游标无效。")
-                if not incoming or not next_cursor:
+                if not consumed or not next_cursor:
                     state, cursor = "complete", None
                 else:
                     if next_cursor in {previous, cursor}:

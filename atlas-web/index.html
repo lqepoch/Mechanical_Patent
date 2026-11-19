@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <title>Mechanical Patent · 专利知识星图</title>
+</head>
+<body>
+  <main class="app">
+    <aside class="panel">
+      <header><span class="eyebrow">MECHANICAL PATENT / ATLAS</span>
+        <h1>专利知识星图</h1>
+        <p>可追溯的文献关联、技术词项与研究路径</p></header>
+      <label class="file-label" for="graph-file">导入本地图谱 JSON</label>
+      <input type="file" id="graph-file" accept=".json,application/json" />
+      <div id="file-status" class="notice">在命令行执行 atlas-export 后，将生成的 JSON 导入此处；页面不会上传数据。</div>
+      <section>
+        <h2>图谱筛选</h2>
+        <label class="control">文献或关系关键词<input id="search" type="search" placeholder="技术词、专利号、DOI、节点编号" /></label>
+        <label class="control">最低文本相似度 <output id="threshold-value">0.00</output>
+          <input id="threshold" type="range" min="0" max="1" step="0.05" value="0" /></label>
+        <label class="check"><input id="show-terms" type="checkbox" checked /> 显示词项与技术节点</label>
+        <label class="check"><input id="show-predicted" type="checkbox" checked /> 显示算法推测关联</label>
+      </section>
+      <section><h2>选中节点</h2><div id="detail" class="detail">点击节点查看文献编号、验证状态、原始出处及相邻关系。</div></section>
+      <p class="disclaimer">算法相似不代表新颖性、创造性、侵权、因果关系或工程可行性。未核验文献仍需原文复核。</p>
+    </aside>
+    <section class="canvas-panel">
+      <div class="toolbar"><span id="graph-count">尚无图谱数据</span><div class="buttons">
+        <button id="fit" type="button">适应视图</button>
+        <button id="layout" type="button">重新布局</button>
+      </div></div>
+      <div id="graph" role="img" aria-label="可以缩放、移动和选择节点的知识星图"></div>
+      <div class="legend"><span>● 专利</span><span>● 论文</span><span>● 发明候选</span><span>● 技术词项</span><span>── 引证与显式证据</span><span>┄┄ 算法相关性</span></div>
+    </section>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

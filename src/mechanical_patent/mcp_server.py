@@ -147,6 +147,13 @@ class PatentMCPService:
         return {"case_id": case_id, "query": query[:160], "matches": rows,
                 "count": len(rows), "full_text_verified": False}
 
+    def literature_fulltext_quote(
+        self, case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        """依据项目独立的当前 PDF 解析版本校验逐字短引。"""
+        from .literature_fulltext import FulltextPipeline
+        return FulltextPipeline(self._memory(case_id)).quote(doc_id, anchor, verbatim)
+
     def literature_fulltext_batch_status(
         self, case_id: str, batch_id: str, limit: int = 100,
     ) -> dict[str, Any]:
@@ -176,24 +183,31 @@ class PatentMCPService:
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
-        allow_search_exposure: bool = False,
+        allow_search_exposure: bool = False, page_size: int = 100,
     ) -> dict[str, Any]:
         """同步受控批量检索；更大规模由带预算的 CLI 持续分批调用。"""
         self._case(case_id)
         if not allow_search_exposure or not self.workspace.can_egress(case_id):
             raise PatentWorkflowError("未同时取得显式外发授权和案卷保密批准。")
         from .papers import CrossrefProvider, OpenAlexProvider
+        from .paper_sources import (
+            SemanticScholarProvider, SemanticScholarBulkProvider,
+            ArxivProvider, EuropePMCProvider, PubMedProvider,
+        )
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         options = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
-            "epo-ops": EPOOPSProvider,
+            "semantic-scholar": SemanticScholarProvider,
+            "semantic-scholar-bulk": SemanticScholarBulkProvider,
+            "arxiv": ArxivProvider, "europe-pmc": EuropePMCProvider,
+            "pubmed": PubMedProvider, "epo-ops": EPOOPSProvider,
         }
         if provider not in options:
             raise PatentWorkflowError("不支持的文献数据源。")
         budget = HarvestBudget(
-            max_documents=max(1, min(int(max_documents), 1000)),
-            page_size=20 if provider == "epo-ops" else 100,
+            max_documents=max(1, min(int(max_documents), 10000)),
+            page_size=20 if provider == "epo-ops" else int(page_size),
             max_pages=max(1, min(int(max_pages), 20)),
             max_seconds=120,
         )
@@ -479,6 +493,37 @@ class PatentMCPService:
         return audit_research_case(folder) if persist else inspect_research_case(folder)
 
 
+    def knowledge_index(self, case_id: str, run_id: str, top_k: int = 8,
+                        threshold: float = 0.15) -> dict[str, Any]:
+        """在本案卷物理隔离的 SQLite 中重建可重复图谱和文献记忆。"""
+        from .knowledge_atlas import index_case_atlas
+        return index_case_atlas(self._folder(case_id, run_id), top_k=top_k,
+                                threshold=threshold)
+
+    def knowledge_graph(self, case_id: str, run_id: str, scope: str = "project",
+                        document_id: str = "", max_nodes: int = 250,
+                        min_score: float = 0.0) -> dict[str, Any]:
+        """读取项目或单文献邻域，并附每条边的证据性质与计算方法。"""
+        from .knowledge_atlas import case_atlas
+        return case_atlas(self._folder(case_id, run_id), scope=scope,
+                          document_id=document_id, max_nodes=max_nodes,
+                          min_score=min_score)
+
+    def knowledge_record_fact(self, case_id: str, run_id: str, document_id: str,
+                              subject: str, predicate: str, object: str,
+                              quote: str, location: str = "") -> dict[str, Any]:
+        """AI 从已存文字中提出可定位候选关系，记录待人工复核状态。"""
+        from .knowledge_atlas import record_document_fact
+        return record_document_fact(self._folder(case_id, run_id), document_id,
+                                    subject=subject, predicate=predicate, object=object,
+                                    quote=quote, location=location)
+
+    def knowledge_global_public(self, max_nodes: int = 250) -> dict[str, Any]:
+        """仅汇总已正式标记为公开的项目；保密案卷一律不输出。"""
+        from .knowledge_atlas import global_public_atlas
+        return global_public_atlas(self.project.workspace_root, max_nodes=max_nodes)
+
+
 def create_server(service: PatentMCPService):
     """由 MCP SDK 生成正式 tools/list、JSON Schema、资源与提示词。"""
     try:
@@ -494,8 +539,9 @@ def create_server(service: PatentMCPService):
     def patent_capabilities() -> dict[str, Any]:
         """获取支持的研究能力、技术轴、评价字段和法律限制。"""
         from .paper_sources import paper_source_catalog
-        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.7",
+        return {"service": "Mechanical_Patent", "project_id": service.project.project_id, "contract_version": "1.8",
                 "paper_sources": paper_source_catalog(),
+                "knowledge_atlas": {"scopes": ["document", "project", "global_public"], "offline": True},
                 "methods": list(METHODS), "axes": list(AXES), "scores": list(SCORE_FIELDS),
                 "agent_llm_api_required": False, "transports": ["stdio", "streamable-http"],
                 "submit_to_patent_office": False,
@@ -574,6 +620,13 @@ def create_server(service: PatentMCPService):
         return service.literature_fulltext_search(case_id, query, limit)
 
     @server.tool()
+    def patent_literature_fulltext_quote(
+        case_id: str, doc_id: str, anchor: str, verbatim: str,
+    ) -> dict[str, Any]:
+        """逐字核对当前文献已解析 PDF 的 p2:b7 短引，仍须人工原文复核。"""
+        return service.literature_fulltext_quote(case_id, doc_id, anchor, verbatim)
+
+    @server.tool()
     def patent_literature_fulltext_batch_status(
         case_id: str, batch_id: str, limit: int = 100,
     ) -> dict[str, Any]:
@@ -603,12 +656,12 @@ def create_server(service: PatentMCPService):
     def patent_literature_harvest(
         case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
-        allow_search_exposure: bool = False,
+        allow_search_exposure: bool = False, page_size: int = 100,
     ) -> dict[str, Any]:
         """已获保密许可才按官方 API 分页查询，增量生成每篇 MD。"""
         return service.literature_harvest(
             case_id, provider, query, max_documents, max_pages,
-            allow_search_exposure,
+            allow_search_exposure, page_size,
         )
 
     @server.tool()
@@ -627,6 +680,33 @@ def create_server(service: PatentMCPService):
     def patent_case_artifact(case_id: str, run_id: str, artifact: str) -> dict[str, Any]:
         """在白名单内读取结构化案卷证据、研究报告与申请底稿。"""
         return service.read_artifact(case_id, run_id, artifact)
+
+    @server.tool()
+    def patent_knowledge_index(case_id: str, run_id: str, top_k: int = 8,
+                               threshold: float = 0.15) -> dict[str, Any]:
+        """离线建立单文献/单项目知识星图及每文献 Markdown 记忆；不调用外部 AI。"""
+        return service.knowledge_index(case_id, run_id, top_k, threshold)
+
+    @server.tool()
+    def patent_knowledge_graph(case_id: str, run_id: str, scope: str = "project",
+                               document_id: str = "", max_nodes: int = 250,
+                               min_score: float = 0.0) -> dict[str, Any]:
+        """提取有证据属性的项目星图或单文献邻域，兼容 Cytoscape.js。"""
+        return service.knowledge_graph(case_id, run_id, scope, document_id,
+                                       max_nodes, min_score)
+
+    @server.tool()
+    def patent_knowledge_record_fact(case_id: str, run_id: str, document_id: str,
+                                     subject: str, predicate: str, object: str,
+                                     quote: str, location: str = "") -> dict[str, Any]:
+        """为单文档登记带已存原文引句的机械技术三元组，状态固定为AI待复核。"""
+        return service.knowledge_record_fact(case_id, run_id, document_id,
+                                             subject, predicate, object, quote, location)
+
+    @server.tool()
+    def patent_knowledge_global_public(max_nodes: int = 250) -> dict[str, Any]:
+        """只读已公开项目的全球投影；无法查看秘密、内部或受控案卷。"""
+        return service.knowledge_global_public(max_nodes)
 
     @server.tool()
     def patent_idea_plan(case_id: str, run_id: str, parent_id: str = "",
@@ -746,6 +826,7 @@ def create_server(service: PatentMCPService):
             + "利用 patent_research 获取实际专利及论文记录；若缺 EPO 凭证，调用 patent_run_create 并使用宿主授权检索工具获取真实文献，随后通过 patent_source_import 导入待核验资料。"
             + "调用 patent_index_refresh 保持项目索引可追溯，patent_frontier_scan 发现公开前沿，并通过 patent_variant_plan 研究已公开专利的变种；"
             + "利用 patent_manuscript_create/edit 保存分节 LaTeX 技术论文，引用写入真实 BibTeX；"
+            + "先调用 patent_knowledge_index 和 patent_knowledge_graph 追溯文献关联及反证；"
             + "按 patent_idea_plan 执行多方法、多代候选裂变，调用 register/evaluate/frontier；"
             + "针对候选用专利权利要求全文逐特征反证，记录理论计算与失效模式；"
             + "默认用 patent_brief_save 输出工程技术方案，允许 patent_figure_prepare 生成可编辑图源，隔离worker导出后用 patent_figure_sync 校验；只有用户申请决定及企业验签通过才可写专利申请文本；"
@@ -754,6 +835,8 @@ def create_server(service: PatentMCPService):
         )
     from .mcp_extensions import register_project_research_tools
     register_project_research_tools(server, service)
+    from .research_cycle import register_research_cycle_tools
+    register_research_cycle_tools(server, service)
     return server
 
 

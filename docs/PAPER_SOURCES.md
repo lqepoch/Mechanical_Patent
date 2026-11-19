@@ -81,6 +81,20 @@ SQLite documents 表新增 paper_metadata_json；启动时检查列并执行向�
 - Lens https://docs.api.lens.org/request-scholar.html
 - Unpaywall https://unpaywall.org/products/api
 
-## 全文环节扩展（2026-11-19）
+## OA 全文处理流水线（2026-11-19）
 
-合法论文 PDF 获取和 Docling 离线索引已通过新的 `LiteratureFullText` 与原有项目 SQLite 直接串联。已有 DOI 及各类论文元数据均可成为候选，实际复制和缓存须记录许可证/合同凭证，另需明确项目审批、域名白名单，解析后保留 SHA256+页码+bbox 和待核验状态。参见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+论文平台返回的 `pdf_url`、`paper_metadata.is_open_access`、`license` 将归入同项目 `knowledge/literature.sqlite3` 的 pdf_url / metadata_json；原文须满足许可白名单、保密外发批准与逐篇审批后，才由受控 CLI 下载、通过 Docling 离线解析并生成页码证据索引。上千篇元数据已有 OpenAlex/Crossref 的游标分页断点，新增 PDF 处理使用单文献队列、租约、错误与完整性校验，绝不自动采集缺乏授权的内容。详见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。
+
+## 批量论文分页与 DOI 公共全文候选（2026-11-19）
+
+此扩展为项目内现有的 OpenAlex/Crossref 深分页增加 Semantic Scholar 普通偏移分页（每检索词最多1000条）、Semantic Scholar Bulk token 深分页（每页1000条）、arXiv Atom start、Europe PMC cursorMark、PubMed retstart。现有 literature harvest 的 SQLite 游标、错误状态和单篇 Markdown 记忆继续复用。OpenAlex 第二页需要 API Key。Bulk 模式要求 page_size=1000 且 max_documents 是1000整数倍；更小的页要使用普通来源。
+
+Unpaywall 按 DOI 查询的 oa-enrich 命令仅补充 OA PDF 候选 URL、公开许可和原始提供方谱系，严格检查案卷审批并保存到文献库。它不自动下载论文。真正获取 PDF、离线 Docling 解析、机器段落 FTS、权限签核、哈希与审计沿用主干唯一 FulltextPipeline，CLI 命令 fulltext-plan 和 fulltext-process。任何许可证冲突都进入人工复核并阻断旧许可继续授权。
+
+示例（需真实独立项目和工作流许可）：
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 harvest --provider semantic-scholar-bulk --query "centrifugal pump" --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --page-size 1000 --max-documents 3000 --max-pages 3
+
+    python -m mechanical_patent literature --project-dir /data/projects/ENG-001/cases/PUMP-01 oa-enrich --doc-id EV-XXXXXXXXXXXX --workflow-case-id PUMP-01 --workspace-db /data/projects/ENG-001/patents.sqlite3 --allow-search-exposure --authorized
+
+检索到的论文只代表该平台当前查询结果，不能证明全球无现有技术。PDF 候选位置及自动抽取文本不得擅自标记为已核实科学结论。

@@ -71,5 +71,43 @@
       "asset": ""
     }
   ],
-  "profile": "auto"
+  "profile": "auto",
+  "diagram_relations": [
+    {
+      "source": "101",
+      "target": "102",
+      "kind": "hydraulic",
+      "label": "主进水通路"
+    },
+    {
+      "source": "103",
+      "target": "101",
+      "kind": "hydraulic",
+      "label": "排气旁通"
+    },
+    {
+      "source": "104",
+      "target": "102",
+      "kind": "signal",
+      "label": "压力反馈"
+    }
+  ],
+  "sequence_messages": [
+    {
+      "sender": "压力传感器",
+      "receiver": "控制器",
+      "message": "发送当前入口压力"
+    },
+    {
+      "sender": "控制器",
+      "receiver": "排气阀",
+      "message": "请求开启排气支路"
+    },
+    {
+      "sender": "排气阀",
+      "receiver": "控制器",
+      "message": "反馈阀位",
+      "type": "reply"
+    }
+  ]
 }

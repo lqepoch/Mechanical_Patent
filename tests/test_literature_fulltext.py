@@ -1,279 +1,263 @@
-"""合法论文全文处理：授权门禁、归档幂等、项目隔离与页码搜索。"""
+"""离线验收 PDF 权利门禁、真实流转、可恢复解析与知识检索；无外网或模型权重。"""
 from __future__ import annotations
 
 from hashlib import sha256
 import json
 from pathlib import Path
-import sqlite3
 import tempfile
 import unittest
-from types import SimpleNamespace
-from unittest.mock import patch
 
 from mechanical_patent.core import Evidence, PatentWorkflowError, evidence_id
-from mechanical_patent.literature_fulltext import LiteratureFullText, RIGHTS_BASES
+from mechanical_patent.literature_fulltext import FulltextPipeline
 from mechanical_patent.literature_memory import LiteratureMemoryStore
 from mechanical_patent.mcp_server import PatentMCPService
 
 
-PDF_ONE = b"%PDF-1.7\n" + b"A" * 1500 + b"\n%%EOF"
-PDF_TWO = b"%PDF-1.7\n" + b"B" * 1510 + b"\n%%EOF"
-
-
-class Converter:
-    def __init__(self):
-        self.calls = 0
-
-    def convert(self, filename, **kwargs):
-        self.calls += 1
-        assert Path(filename).is_file()
-        assert kwargs["max_num_pages"] == 200
-        box = SimpleNamespace(l=1.0, t=2.0, r=300.0, b=40.0)
-        blocks = [
-            SimpleNamespace(
-                text="The NPSH inlet threshold is reduced at high altitude.",
-                label="paragraph", prov=[SimpleNamespace(page_no=1, bbox=box)],
-            ),
-            SimpleNamespace(
-                text="A second page compares cavitation and air separation.",
-                label="paragraph", prov=[SimpleNamespace(page_no=2, bbox=box)],
-            ),
-        ]
-        doc = SimpleNamespace(
-            iterate_items=lambda: ((block, 0) for block in blocks),
-            pages={1: {}, 2: {}},
-        )
-        return SimpleNamespace(document=doc)
-
-
-class FullTextTests(unittest.TestCase):
+class FulltextTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.project = Path(self.temp.name) / "case-test"
-        self.memory = LiteratureMemoryStore(self.project)
-        self.publication = "10.1234/cavitation.test"
-        self.paper = Evidence(
-            publication=self.publication, title="High altitude cavitation",
-            url="https://doi.org/" + self.publication,
-            source="openalex", retrieved_at="2026-11-19T00:00:00Z",
-            kind="paper", abstract="Cavitation mechanics", verified=True,
-            pdf_url="https://repository.example.org/accepted.pdf",
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.case_root = Path(self.folder.name) / "cases" / "paper-case"
+        self.memory = LiteratureMemoryStore(self.case_root)
+        self.document = Evidence(
+            publication="10.1234/oa-pump",
+            title="Experimental Cavitation in High Altitude Fire Pumps",
+            url="https://doi.org/10.1234/oa-pump",
+            source="openalex", retrieved_at="2026-11-19T00:00:00+00:00",
+            kind="paper", abstract="Bubble dynamics and cavitation threshold",
+            verified=True, pdf_url="https://repository.example.edu/paper.pdf",
             paper_metadata={
-                "doi": self.publication, "license": "cc-by",
-                "sources": ["openalex"], "authors": ["Scientist"],
-                "full_text_verified": False,
+                "doi": "10.1234/oa-pump", "license": "cc-by-4.0",
+                "is_open_access": True, "sources": ["openalex"],
             },
         )
-        self.memory.ingest_many([self.paper])
-        self.doc_id = evidence_id(self.paper)
-        self.pipeline = LiteratureFullText(self.memory)
-        self.pdf = Path(self.temp.name) / "source.pdf"
-        self.pdf.write_bytes(PDF_ONE)
+        self.memory.ingest_many([self.document])
+        self.doc_id = evidence_id(self.document)
+        self.pipeline = FulltextPipeline(self.memory)
 
-    def import_pdf(self, source=None):
-        return self.pipeline.import_local(
-            self.doc_id, source or self.pdf, authorized=True,
-            rights_basis="cc-by", rights_reference="https://creativecommons.org/licenses/by/4.0/",
+    def _queue(self):
+        return self.pipeline.queue(
+            self.doc_id, rights_actor="authorized-law-reviewer",
+            rights_reference="IPR-LIC-2026-0001", authorized=True,
         )
 
-    def test_staged_pdf_and_explicit_rights(self):
-        result = self.import_pdf()
-        self.assertEqual(result["state"], "staged")
-        self.assertFalse(result["full_text_verified"])
-        self.assertEqual(result["pdf_sha256"], sha256(PDF_ONE).hexdigest())
-        archived = self.pipeline.root / result["pdf_relpath"]
-        self.assertTrue(archived.is_file())
-        self.assertEqual(archived.read_bytes(), PDF_ONE)
-        self.assertEqual(result["rights_basis"], "cc-by")
-        self.assertEqual(result["source_url"], self.paper.url)
-        self.assertNotIn(str(self.temp.name), result["pdf_relpath"])
-
-    def test_unapproved_or_unknown_license_blocks_ingestion(self):
-        with self.assertRaises(PatentWorkflowError):
-            self.pipeline.import_local(
-                self.doc_id, self.pdf, authorized=False, rights_basis="cc-by",
-                rights_reference="https://creativecommons.org/licenses/by/4.0/",
-            )
-        with self.assertRaises(PatentWorkflowError):
-            self.pipeline.import_local(
-                self.doc_id, self.pdf, authorized=True, rights_basis="cc-by-nc",
-                rights_reference="https://creativecommons.org/licenses/by-nc/4.0/",
-            )
-        with self.assertRaises(PatentWorkflowError):
-            self.pipeline.import_local(
-                self.doc_id, self.pdf, authorized=True, rights_basis="cc-by",
-                rights_reference="x",
-            )
-        self.assertEqual(self.pipeline.status(self.doc_id)["state"], "not_available")
-        self.assertNotIn("cc-by-nc", RIGHTS_BASES)
-
-    def test_wrong_file_or_symlink_rejected(self):
-        invalid = Path(self.temp.name) / "fake.pdf"
-        invalid.write_bytes(b"PDF incorrect content")
-        with self.assertRaises(PatentWorkflowError):
-            self.import_pdf(invalid)
-        link = Path(self.temp.name) / "link.pdf"
-        try:
-            link.symlink_to(self.pdf)
-        except OSError:
-            self.skipTest("symlinks not available")
-        with self.assertRaises(PatentWorkflowError):
-            self.import_pdf(link)
-
-    def test_parse_search_page_and_pdf_hash_links(self):
-        self.import_pdf()
-        converter = Converter()
-        result = self.pipeline.parse(
-            self.doc_id, authorized=True, converter=converter,
-        )
-        self.assertEqual(converter.calls, 1)
-        self.assertEqual(result["state"], "parsed_unreviewed")
-        self.assertEqual(result["block_count"], 2)
-        self.assertFalse(result["full_text_verified"])
-        self.assertEqual(result["page_count"], 2)
-        hits = self.pipeline.search("NPSH", doc_id=self.doc_id)
-        self.assertEqual(len(hits), 1)
-        self.assertEqual(hits[0]["page"], 1)
-        self.assertEqual(hits[0]["bbox"]["l"], 1.0)
-        self.assertEqual(hits[0]["pdf_sha256"], result["pdf_sha256"])
-        page = self.pipeline.page(self.doc_id, 2)
-        self.assertEqual(len(page["blocks"]), 1)
-        self.assertIn("cavitation", page["blocks"][0]["text"])
-        self.assertEqual(self.pipeline.search("unrelated"), [])
-
-    def test_reparse_idempotent_and_reingest_preserves_notes(self):
-        self.import_pdf()
-        self.pipeline.parse(self.doc_id, authorized=True, converter=Converter())
-        self.import_pdf()
-        self.assertEqual(self.pipeline.status(self.doc_id)["state"], "parsed_unreviewed")
-        self.memory.write_analysis(
-            self.doc_id, analyst="researcher", basis="abstract",
-            analysis={"plain_summary": "Need new inlet NPSH design"},
-        )
-        before = self.memory.read(self.doc_id)["markdown"]
-        self.memory.ingest_many([self.paper])
-        after = self.memory.read(self.doc_id)["markdown"]
-        self.assertIn("Need new inlet NPSH design", before)
-        self.assertIn("Need new inlet NPSH design", after)
-        self.assertEqual(self.pipeline.status(self.doc_id)["block_count"], 2)
-
-    def test_new_pdf_revision_invalidates_old_index(self):
-        self.import_pdf()
-        self.pipeline.parse(self.doc_id, authorized=True, converter=Converter())
-        other = Path(self.temp.name) / "updated.pdf"
-        other.write_bytes(PDF_TWO)
-        self.import_pdf(other)
-        self.assertEqual(self.pipeline.status(self.doc_id)["state"], "staged")
-        self.assertEqual(self.pipeline.search("NPSH"), [])
-        self.pipeline.parse(self.doc_id, authorized=True, converter=Converter())
-        self.assertEqual(len(self.pipeline.search("NPSH")), 1)
-
-    def test_pdf_mutation_fails_closed(self):
-        archived = self.import_pdf()
-        file = self.pipeline.root / archived["pdf_relpath"]
-        file.write_bytes(PDF_TWO)
-        with self.assertRaises(PatentWorkflowError):
-            self.pipeline.parse(self.doc_id, authorized=True, converter=Converter())
-        self.assertEqual(self.pipeline.status(self.doc_id)["state"], "staged")
-
-    def test_fetch_only_uses_stored_pdf_candidate_and_approved_host(self):
-        requests = []
-        def fake_downloader(url, destination_dir, *, allowed_hosts, max_bytes):
-            requests.append((url, allowed_hosts, max_bytes))
-            self.assertEqual(url, "https://repository.example.org/accepted.pdf")
-            self.assertEqual(allowed_hosts, {"repository.example.org"})
-            output = Path(destination_dir) / (sha256(PDF_ONE).hexdigest() + ".pdf")
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(PDF_ONE)
+    def _downloader(self, calls):
+        def download(url, dest, *, allowed_hosts, max_bytes):
+            calls.append((url, allowed_hosts))
+            dest.mkdir(parents=True, exist_ok=True)
+            raw = b"%PDF-1.4\n%offline-test\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF"
+            digest = sha256(raw).hexdigest()
+            path = dest / (digest + ".pdf")
+            path.write_bytes(raw)
             return {
-                "local_pdf_path": str(output), "sha256": sha256(PDF_ONE).hexdigest(),
-                "bytes": len(PDF_ONE),
+                "online_url": url, "local_pdf_path": str(path),
+                "sha256": digest, "bytes": len(raw),
             }
-        args = dict(
-            allowed_hosts={"repository.example.org"}, authorized=True,
-            rights_basis="cc-by", rights_reference="https://creativecommons.org/licenses/by/4.0/",
-            download=fake_downloader,
-        )
-        with self.assertRaises(PatentWorkflowError):
-            self.pipeline.fetch(self.doc_id, outbound_approved=False, **args)
-        self.assertEqual(requests, [])
-        result = self.pipeline.fetch(self.doc_id, outbound_approved=True, **args)
-        self.assertEqual(len(requests), 1)
-        self.assertEqual(result["state"], "staged")
-        self.assertEqual(result["source_url"], self.paper.pdf_url)
+        return download
 
-    def test_metadata_refresh_keeps_pdf_url_and_cross_source_ids(self):
-        alternate = Evidence(
-            publication=self.publication, title="High altitude cavitation",
-            url="https://doi.org/" + self.publication,
-            source="crossref", retrieved_at="2026-11-20T00:00:00Z",
-            kind="paper", abstract="Newer metadata, no PDF link", verified=True,
-            paper_metadata={
-                "doi": self.publication, "sources": ["crossref"],
-                "source_ids": {"crossref": self.publication},
-            },
-        )
-        self.memory.ingest_many([alternate])
-        with self.memory.connect() as db:
-            row = db.execute(
-                "SELECT pdf_url,paper_metadata_json FROM documents WHERE doc_id=?",
-                (self.doc_id,),
-            ).fetchone()
-        self.assertEqual(row["pdf_url"], self.paper.pdf_url)
-        meta = json.loads(row["paper_metadata_json"])
-        self.assertEqual(meta["sources"], ["openalex", "crossref"])
-        self.assertIn("crossref", meta["source_ids"])
-        self.assertIn(self.paper.pdf_url, self.memory.read(self.doc_id)["markdown"])
+    def _parser(self, calls):
+        def parse(path, output, *, authorized, source_url, artifacts, converter):
+            calls.append((path, source_url))
+            payload = {
+                "source_pdf_sha256": sha256(path.read_bytes()).hexdigest(),
+                "parser": "docling", "parser_version": "offline-test",
+                "review_status": "awaiting_original_pdf_review",
+                "blocks": [
+                    {"page": 3, "block": 1, "label": "paragraph",
+                     "text": "Cavitation inception is affected by NPSH and atmospheric pressure."},
+                    {"page": 4, "block": 2, "label": "formula",
+                     "text": "High-altitude water inlet physics and vapor pressure limits."},
+                ],
+            }
+            output.write_text(json.dumps(payload), encoding="utf-8")
+            return {"sha256": payload["source_pdf_sha256"], "blocks": 2}
+        return parse
 
-    def test_no_pdf_url_forbids_remote_fetch(self):
-        other = Evidence(
-            publication="10.1234/no.pdf", title="No PDF",
-            url="https://doi.org/10.1234/no.pdf", source="crossref",
-            retrieved_at="2026-01-01", kind="paper",
-        )
-        self.memory.ingest_many([other])
+    def test_queue_needs_license_and_explicit_review(self):
         with self.assertRaises(PatentWorkflowError):
-            self.pipeline.fetch(
-                evidence_id(other), allowed_hosts={"example.org"},
-                authorized=True, rights_basis="written-permission",
-                rights_reference="INTERNAL-AUTH-CASE123",
-                outbound_approved=True,
+            self.pipeline.queue(self.doc_id, rights_actor="AA",
+                                rights_reference="IPR-2026", authorized=False)
+        self.assertEqual(self.pipeline.status(self.doc_id)["status"], "not_planned")
+        planned = self._queue()
+        self.assertEqual(planned["status"], "queued")
+        self.assertEqual(planned["source_license"], "cc-by-4.0")
+
+    def test_unknown_or_noncommercial_license_blocked(self):
+        for bad in ("", "cc-by-nc-4.0", "cc-by-nd", "all-rights-reserved"):
+            entry = Evidence.from_dict({
+                **self.document.to_dict(), "paper_metadata": {
+                    "is_open_access": True, "license": bad
+                }
+            })
+            self.memory.ingest_many([entry])
+            with self.assertRaises(PatentWorkflowError, msg=bad):
+                self.pipeline.queue(
+                    self.doc_id, rights_actor="reviewer-1",
+                    rights_reference="IPR-2026-001", authorized=True,
+                )
+
+    def test_oa_flag_missing_is_blocked(self):
+        paper = Evidence.from_dict({
+            **self.document.to_dict(), "paper_metadata": {
+                "is_open_access": None, "license": "cc-by-4.0"
+            }
+        })
+        self.memory.ingest_many([paper])
+        with self.assertRaises(PatentWorkflowError):
+            self._queue()
+
+    def test_license_revocation_invalidates_existing_queue(self):
+        self._queue()
+        revoked = Evidence.from_dict({
+            **self.document.to_dict(),
+            "paper_metadata": {"is_open_access": False, "license": "all-rights-reserved"},
+        })
+        self.memory.ingest_many([revoked])
+        download_calls = []
+        with self.assertRaises(PatentWorkflowError):
+            self.pipeline.process(
+                self.doc_id, allowed_hosts={"repository.example.edu"},
+                authorized=True, downloader=self._downloader(download_calls),
+                parse=False,
             )
+        self.assertEqual(download_calls, [])
+        self.assertEqual(self.pipeline.status(self.doc_id)["status"], "queued")
 
-    def test_invalid_doc_id_and_cross_project_isolation(self):
+    def test_process_blocks_unapproved_host_and_records_failure(self):
+        self._queue()
         with self.assertRaises(PatentWorkflowError):
-            self.pipeline.status("../../private")
-        independent = LiteratureFullText(LiteratureMemoryStore(Path(self.temp.name) / "other"))
+            self.pipeline.process(
+                self.doc_id, allowed_hosts={"evil.example.com"}, authorized=True,
+                downloader=self._downloader([]), parse=False,
+            )
+        status = self.pipeline.status(self.doc_id)
+        self.assertEqual(status["status"], "failed")
+        self.assertEqual(status["attempts"], 1)
+        self.assertIn("白名单", status["error"])
+
+    def test_full_pipeline_records_page_index_and_machine_note(self):
+        self._queue()
+        download_calls, parser_calls = [], []
+        result = self.pipeline.process(
+            self.doc_id, allowed_hosts={"repository.example.edu"},
+            authorized=True, downloader=self._downloader(download_calls),
+            parser=self._parser(parser_calls), converter=object(),
+        )
+        self.assertEqual(result["status"], "parsed")
+        self.assertEqual(result["extracted_blocks"], 2)
+        self.assertFalse(result["full_text_verified"])
+        self.assertEqual(len(download_calls), 1)
+        self.assertEqual(len(parser_calls), 1)
+        hits = self.pipeline.search("Cavitation")
+        self.assertEqual(hits[0]["page_no"], 3)
+        self.assertEqual(hits[0]["source_pdf_sha256"], result["pdf_sha256"])
+        self.assertEqual(hits[0]["review_status"], "awaiting_original_pdf_review")
+        note = self.memory.read(self.doc_id)["markdown"]
+        self.assertIn("## 机器 PDF 解析索引（未作人工核验）", note)
+        self.assertIn(result["parse_sha256"], note)
+        self.assertEqual(self.pipeline.pending(), [])
+        # 重复执行不能重新下载或反复生成研究记忆。
+        again = self.pipeline.process(
+            self.doc_id, allowed_hosts={"repository.example.edu"},
+            authorized=True, downloader=self._downloader(download_calls),
+            parser=self._parser(parser_calls), converter=object(),
+        )
+        self.assertEqual(again["parse_sha256"], result["parse_sha256"])
+        self.assertEqual(len(download_calls), 1)
+        self.assertEqual(note, self.memory.read(self.doc_id)["markdown"])
+
+    def test_parse_failure_retains_verified_pdf_for_resume(self):
+        self._queue()
+        download_calls, parser_calls = [], []
+        def failing(*_args, **_kwargs):
+            raise PatentWorkflowError("offline model resources invalid")
         with self.assertRaises(PatentWorkflowError):
-            independent.status(self.doc_id)
-        self.assertEqual(independent.search("NPSH"), [])
-
-    def test_existing_metadata_migration(self):
-        with self.memory.connect() as db:
-            columns = {r["name"] for r in db.execute("PRAGMA table_info(documents)")}
-        self.assertIn("pdf_url", columns)
-        self.assertIn("paper_metadata_json", columns)
-        again = LiteratureMemoryStore(self.project)
-        self.assertEqual(
-            again.read(self.doc_id)["doc_id"], self.doc_id,
+            self.pipeline.process(
+                self.doc_id, allowed_hosts={"repository.example.edu"},
+                authorized=True, downloader=self._downloader(download_calls),
+                parser=failing, converter=object(),
+            )
+        self.assertEqual(self.pipeline.status(self.doc_id)["status"], "downloaded")
+        finished = self.pipeline.process(
+            self.doc_id, allowed_hosts={"repository.example.edu"},
+            authorized=True, downloader=self._downloader(download_calls),
+            parser=self._parser(parser_calls), converter=object(),
         )
-        self.assertEqual(
-            LiteratureFullText(again).status(self.doc_id)["state"], "not_available",
-        )
+        self.assertEqual(finished["status"], "parsed")
+        self.assertEqual(len(download_calls), 1)
 
-    def test_mcp_read_tools_use_bound_case(self):
-        service = PatentMCPService(Path(self.temp.name) / "mcp", project_id="tenant-a")
-        service.create_case("MCP-1", "hydraulics")
-        store = service._memory("MCP-1")
-        store.ingest_many([self.paper])
+    def test_download_only_state_is_resumeable(self):
+        self._queue()
+        downloaded = self.pipeline.process(
+            self.doc_id, allowed_hosts={"repository.example.edu"},
+            authorized=True, downloader=self._downloader([]), parse=False,
+        )
+        self.assertEqual(downloaded["status"], "downloaded")
+        self.assertTrue(downloaded["pdf_sha256"])
+        self.assertEqual(downloaded["parse_sha256"], "")
+
+    def test_paper_metadata_survives_reingest_and_keeps_notes(self):
+        self._queue()
+        self.pipeline.process(self.doc_id, allowed_hosts={"repository.example.edu"},
+                              authorized=True, downloader=self._downloader([]),
+                              parser=self._parser([]), converter=object())
+        before = self.memory.read(self.doc_id)["markdown"]
+        changed = Evidence.from_dict({
+            **self.document.to_dict(),
+            "abstract": "Longer metadata abstract updated after new search",
+            "retrieved_at": "2026-11-19T04:00:00+00:00",
+        })
+        self.memory.ingest_many([changed])
+        note = self.memory.read(self.doc_id)["markdown"]
+        self.assertIn("Longer metadata abstract", note)
+        self.assertIn("机器 PDF 解析索引", note)
+        self.assertIn("PDF-PARSE:", note)
+        self.assertNotEqual(before, note)
+
+    def test_resume_never_accepts_wrong_hash(self):
+        self._queue()
+        self.pipeline.process(self.doc_id, allowed_hosts={"repository.example.edu"},
+                              authorized=True, downloader=self._downloader([]), parse=False)
+        with self.memory.connect(write=True) as db:
+            db.execute(
+                "UPDATE fulltext_jobs SET pdf_sha256=? WHERE doc_id=?",
+                ("0" * 64, self.doc_id),
+            )
+        with self.assertRaises(PatentWorkflowError):
+            self.pipeline.process(self.doc_id, allowed_hosts={"repository.example.edu"},
+                                  authorized=True, parse=False)
+
+    def test_mcp_read_only_provenance_tools_are_project_scoped(self):
+        service = PatentMCPService(Path(self.folder.name) / "mcp-storage", project_id="project-A")
+        service.create_case("case-A", "Pump Research")
+        self.assertEqual(service.literature_fulltext_status("case-A", self.doc_id)["status"],
+                         "not_planned")
         with self.assertRaises(PatentWorkflowError):
             service.literature_fulltext_status("unknown", self.doc_id)
-        status = service.literature_fulltext_status("MCP-1", self.doc_id)
-        self.assertEqual(status["state"], "not_available")
-        self.assertEqual(
-            service.literature_fulltext_search("MCP-1", "cavitation")["count"], 0,
-        )
+        self.assertEqual(service.literature_fulltext_pending("case-A")["jobs"], [])
+        self.assertEqual(service.literature_fulltext_search("case-A", "NPSH")["matches"], [])
+
+    def test_legacy_project_migration_is_idempotent(self):
+        with self.memory.connect() as db:
+            cols = {x["name"] for x in db.execute("PRAGMA table_info(documents)")}
+            self.assertTrue({"pdf_url", "metadata_json"}.issubset(cols))
+        restarted = LiteratureMemoryStore(self.case_root)
+        with restarted.connect() as db:
+            entry = db.execute(
+                "SELECT pdf_url,metadata_json FROM documents WHERE doc_id=?",
+                (self.doc_id,),
+            ).fetchone()
+            self.assertEqual(entry["pdf_url"], "https://repository.example.edu/paper.pdf")
+            self.assertEqual(json.loads(entry["metadata_json"])["license"], "cc-by-4.0")
+
+    def test_short_chinese_phrase_search_falls_back_without_fts(self):
+        self._queue()
+        self.pipeline.process(self.doc_id, allowed_hosts={"repository.example.edu"},
+                              authorized=True, downloader=self._downloader([]),
+                              parser=self._parser([]), converter=object())
+        hits = self.pipeline.search("高原", limit=5)
+        self.assertEqual(hits, [])
+        self.assertEqual(len(self.pipeline.search("NPSH", limit=5)), 1)
 
 
 if __name__ == "__main__":
