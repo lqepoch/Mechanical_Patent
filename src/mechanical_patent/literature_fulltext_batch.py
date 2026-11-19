@@ -19,6 +19,7 @@ from .pdf_extraction import parse_local_pdf
 
 _ID = re.compile(r"EV-[0-9A-F]{12}\Z")
 _BATCH_ID = re.compile(r"FTB-[0-9A-F]{20}\Z")
+_BATCH_STATES = ("pending", "done", "failed")
 
 
 class FullTextBatchRunner:
@@ -129,6 +130,13 @@ class FullTextBatchRunner:
         done, skipped, failed, processed, processed_bytes = 0, 0, 0, 0, 0
         errors: list[dict[str, str]] = []
         started = time.monotonic()
+
+        def counted_download(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            nonlocal processed_bytes
+            data = downloader(*args, **kwargs)
+            processed_bytes += data["bytes"]
+            return data
+
         for item in items:
             if processed >= max_documents or time.monotonic() - started > max_seconds:
                 break
@@ -138,24 +146,30 @@ class FullTextBatchRunner:
                     "SELECT state,attempts,pdf_sha256 FROM fulltext_batch_items "
                     "WHERE batch_id=? AND doc_id=?", (batch_id, doc_id),
                 ).fetchone()
-            job = self.pipeline.status(doc_id)
-            job_stage = job.get("status", "not_planned")
-            if not refresh and entry["state"] == "done":
-                if (job.get("pdf_sha256") == entry["pdf_sha256"] and
-                    ((item["parse"] and job_stage == "parsed")
-                     or (not item["parse"] and job_stage in {"downloaded", "parsed"}))):
-                    skipped += 1
-                    continue
-            if not refresh and entry["attempts"] >= max_attempts:
-                skipped += 1
-                continue
             if processed_bytes + 1000 > max_total_bytes:
                 break
-            processed += 1
+            if not refresh and entry["state"] == "failed" and entry["attempts"] >= max_attempts:
+                skipped += 1
+                continue
+            counted = False
             try:
-                # 首次任务先登记可追查的版权批准；已经在处理中或
-                # 已下载可复用的同版 PDF，直接沿用原租约状态机。
-                if refresh or job_stage == "not_planned":
+                job = self.pipeline.status(doc_id)
+                job_stage = job.get("status", "not_planned")
+                expected_stages = {"parsed"} if item["parse"] else {"downloaded", "parsed"}
+                if entry["state"] == "done":
+                    if job.get("pdf_sha256") == entry["pdf_sha256"] and job_stage in expected_stages:
+                        skipped += 1
+                        continue
+                    # A new canonical revision must not inherit a previous revision's attempt count.
+                    with self.pipeline.memory.connect(write=True) as db:
+                        db.execute(
+                            "UPDATE fulltext_batch_items SET state='pending',attempts=0,"
+                            "pdf_sha256='',last_error='',updated_at=? WHERE batch_id=? AND doc_id=?",
+                            (utc_now(), batch_id, doc_id),
+                        )
+                processed += 1
+                counted = True
+                if (refresh and entry["state"] == "failed") or job_stage == "not_planned":
                     self.pipeline.queue(
                         doc_id, rights_actor=item["rights_actor"],
                         rights_reference=item["rights_reference"], authorized=True,
@@ -166,17 +180,10 @@ class FullTextBatchRunner:
                     authorized=True, artifacts=artifacts,
                     parse=item["parse"],
                     max_bytes=min(MAX_PDF_BYTES, remaining),
-                    downloader=downloader, parser=parser, converter=converter,
+                    downloader=counted_download, parser=parser, converter=converter,
                 )
-                if output.get("status") not in {"downloaded", "parsed"}:
+                if output.get("status") not in expected_stages:
                     raise PatentWorkflowError("本轮全文工作尚未完成获准的阶段。")
-                local_length = 0
-                if output.get("pdf_path"):
-                    local = self.pipeline._safe_local(
-                        output["pdf_path"], output["pdf_sha256"]
-                    )
-                    local_length = local.stat().st_size
-                processed_bytes += local_length
                 with self.pipeline.memory.connect(write=True) as db:
                     db.execute(
                         "UPDATE fulltext_batch_items SET state='done',attempts=attempts+1,"
@@ -185,6 +192,8 @@ class FullTextBatchRunner:
                     )
                 done += 1
             except Exception as exc:
+                if not counted:
+                    processed += 1
                 with self.pipeline.memory.connect(write=True) as db:
                     db.execute(
                         "UPDATE fulltext_batch_items SET state='failed',attempts=attempts+1,"
@@ -199,24 +208,41 @@ class FullTextBatchRunner:
                 "SELECT state,COUNT(*) AS n FROM fulltext_batch_items "
                 "WHERE batch_id=? GROUP BY state", (batch_id,),
             ).fetchall()
+            exhausted = db.execute(
+                "SELECT COUNT(*) FROM fulltext_batch_items "
+                "WHERE batch_id=? AND state='failed' AND attempts>=?",
+                (batch_id, max_attempts),
+            ).fetchone()[0]
         counts = {row["state"]: row["n"] for row in states}
         return {
             "batch_id": batch_id,
             "status": "complete" if counts.get("done", 0) == len(items) else "partial",
             "total": len(items), "completed_total": counts.get("done", 0),
             "pending": counts.get("pending", 0),
-            "failed_pending_retry": counts.get("failed", 0),
+            "failed_total": counts.get("failed", 0),
+            "failed_pending_retry": counts.get("failed", 0) - exhausted,
+            "failed_retry_exhausted": exhausted,
             "processed_this_run": processed, "done_this_run": done,
             "skipped_this_run": skipped, "failed_this_run": failed,
             "bytes_processed_this_run": processed_bytes,
-            "errors": errors[:50], "full_text_verified": False,
+            "errors": errors[:50], "errors_truncated": len(errors) > 50,
+            "full_text_verified": False,
         }
 
-    def status(self, batch_id: str, *, limit: int = 100) -> dict[str, Any]:
+    def status(
+        self, batch_id: str, *, limit: int = 100, cursor: int | None = None,
+        state: str | None = None,
+    ) -> dict[str, Any]:
         if not isinstance(batch_id, str) or not _BATCH_ID.fullmatch(batch_id):
             raise PatentWorkflowError("全文批次编号无效。")
+        if cursor is not None and (type(cursor) is not int or not 0 <= cursor < 1000):
+            raise PatentWorkflowError("全文批次分页游标无效。")
+        if state is not None and state not in _BATCH_STATES:
+            raise PatentWorkflowError("全文批次状态筛选无效。")
         limit = max(1, min(int(limit), 200))
+        after = -1 if cursor is None else cursor
         with self.pipeline.memory.connect() as db:
+            db.execute("BEGIN")  # Keep counts and page in the same SQLite snapshot.
             batch = db.execute(
                 "SELECT batch_id,total,created_at,updated_at FROM fulltext_batches "
                 "WHERE batch_id=?", (batch_id,),
@@ -227,15 +253,23 @@ class FullTextBatchRunner:
                 "SELECT state,COUNT(*) AS n FROM fulltext_batch_items "
                 "WHERE batch_id=? GROUP BY state", (batch_id,),
             ).fetchall()
-            rows = db.execute(
-                "SELECT doc_id,state,attempts,pdf_sha256,last_error FROM fulltext_batch_items "
-                "WHERE batch_id=? ORDER BY ordinal LIMIT ?", (batch_id, limit),
-            ).fetchall()
+            sql = ("SELECT ordinal,doc_id,state,attempts,pdf_sha256,last_error "
+                   "FROM fulltext_batch_items WHERE batch_id=? AND ordinal>?")
+            params = (batch_id, after)
+            if state is not None:
+                sql += " AND state=?"
+                params += (state,)
+            rows = db.execute(sql + " ORDER BY ordinal LIMIT ?", (*params, limit + 1)).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
         tally = {r["state"]: r["n"] for r in counts}
         return {
             "batch_id": batch_id, "total": batch["total"],
             "created_at": batch["created_at"], "updated_at": batch["updated_at"],
             "counts": tally, "complete": tally.get("done", 0) == batch["total"],
             "items": [dict(r) for r in rows],
-            "truncated": len(rows) < batch["total"],
+            "state_filter": state,
+            "matched_total": batch["total"] if state is None else tally.get(state, 0),
+            "next_cursor": rows[-1]["ordinal"] if has_more else None,
+            "truncated": has_more,
         }
