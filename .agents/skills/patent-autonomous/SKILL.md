@@ -45,3 +45,7 @@ user-invocable: true
 
 ## 自动图源与隔离渲染（2026-11-19）
 根据真实工程事实选择图表：diagram_relations 只表达 components[].number 已明确给出的机械/液压/信号连接；process_steps >= 2 生成顺序流程；sequence_messages 显式给出交互双方及消息时生成时序图。没有对应事实时省略图，不补造几何、尺寸、测量曲线、参与者。调用 patent_figure_prepare 生成以 SHA 命名的可编辑 .drawio/.mmd，MCP 可用 patent_figure_source 读取。渲染只能由运营方隔离 figure_worker 运行，输出正式 PDF 和 08e_figure_render.json，经 patent_figure_sync 验证哈希后更新 LaTeX。任何变更触发已签核方案版本失效；工程质量复核必须针对最新版本。详见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
+
+## 自动研究的可核查短引（2026-11-19）
+
+先使用 patent_literature_fulltext_search 查询与机械问题对应的真实页码，再用 patent_literature_fulltext_quote 检查原文短引是否逐字匹配。仅当引用属于当前案卷、当前 PDF SHA256 且来源已解析，才通过 patent_literature_note(basis=full_text) 持久化工程事实。模型推断与专业复核分层保存，文本匹配不等同法律和工程结论已核验。未解析、缺页码及已变更 PDF 的证据要写入待补清单。

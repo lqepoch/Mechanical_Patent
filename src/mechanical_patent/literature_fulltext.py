@@ -433,6 +433,76 @@ class FulltextPipeline:
             ).fetchall()
         return [dict(row) for row in rows]
 
+
+    def validate_positions(
+        self, doc_id: str, positions: list[str],
+    ) -> dict[str, Any]:
+        """确认每个页码/块都属于此案卷当前完成的 PDF 解析版本。
+
+        只验证结构化解析索引，不代表原始 PDF 已经人工核对。
+        不允许没有页码的块作为 full_text 研究批注依据。
+        """
+        if not isinstance(doc_id, str) or not _PDF_DOC.fullmatch(doc_id):
+            raise PatentWorkflowError("文献 ID 无效。")
+        if not isinstance(positions, list) or not 1 <= len(positions) <= 30:
+            raise PatentWorkflowError("全文研究批注必须提供1至30个页码段落锚点。")
+        anchors = []
+        for anchor in positions:
+            match = re.fullmatch(r"p([1-9][0-9]{0,3}):b([1-9][0-9]{0,6})", anchor) if isinstance(anchor, str) else None
+            if match is None:
+                raise PatentWorkflowError("引用必须使用当前文献真实的 p2:b7 页码和段落编号。")
+            anchors.append((int(match.group(1)), int(match.group(2))))
+        with self.memory.connect() as db:
+            job = db.execute(
+                "SELECT status,pdf_sha256,parse_sha256,pdf_url FROM fulltext_jobs "
+                "WHERE doc_id=?", (doc_id,),
+            ).fetchone()
+            if (job is None or job["status"] != "parsed"
+                    or not _HASH.fullmatch(job["pdf_sha256"])
+                    or not _HASH.fullmatch(job["parse_sha256"])):
+                raise PatentWorkflowError("当前文献尚无完成的真实 PDF 解析版本。")
+            for page, block in anchors:
+                row = db.execute(
+                    "SELECT page_no,source_pdf_sha256 FROM fulltext_blocks "
+                    "WHERE doc_id=? AND block_no=?",
+                    (doc_id, block),
+                ).fetchone()
+                if (row is None or row["page_no"] != page
+                        or row["source_pdf_sha256"] != job["pdf_sha256"]):
+                    raise PatentWorkflowError("引用页码或段落在当前 PDF 解析版本中不存在。")
+        return {
+            "doc_id": doc_id, "anchors": list(positions),
+            "pdf_sha256": job["pdf_sha256"],
+            "parse_sha256": job["parse_sha256"],
+            "source_url": job["pdf_url"],
+            "verification_level": "parsed_text_anchor_only",
+            "full_text_verified": False,
+        }
+
+    def quote(self, doc_id: str, anchor: str, verbatim: str) -> dict[str, Any]:
+        """逐字查证已解析段落中的短引，不代替人类对原始 PDF 的审核。"""
+        evidence = self.validate_positions(doc_id, [anchor])
+        if (not isinstance(verbatim, str)
+                or not 3 <= len(verbatim) <= 1000
+                or not verbatim.strip()):
+            raise PatentWorkflowError("短引应为3至1000个实际原文字符。")
+        block_no = int(anchor.split(":b", 1)[1])
+        with self.memory.connect() as db:
+            row = db.execute(
+                "SELECT content,source_pdf_sha256 FROM fulltext_blocks "
+                "WHERE doc_id=? AND block_no=?",
+                (doc_id, block_no),
+            ).fetchone()
+            if row is None or row["source_pdf_sha256"] != evidence["pdf_sha256"]:
+                raise PatentWorkflowError("原文解析版本已更新，请重新定位引文。")
+        exact = verbatim in row["content"]
+        return {
+            **evidence, "anchor": anchor, "exact_match": exact,
+            "block_sha256": sha256(row["content"].encode("utf-8")).hexdigest(),
+            "quote_sha256": sha256(verbatim.encode("utf-8")).hexdigest() if exact else None,
+            "verification_level": "parsed_text_match_only",
+        }
+
     def search(self, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
         """按正文页码/段落检索，返回可验证的 PDF SHA 与明确的未核验状态。"""
         term = str(query or "").strip()[:160]
