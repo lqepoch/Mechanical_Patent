@@ -35,3 +35,31 @@ user-invocable: true
 ## 引证网络深挖
 
 当科研论文提出一个关键物理机制、控制策略或存在技术争议时，读取 patent-citation-discovery 技能。用真实 DOI 对参考文献和后续引用开展一跳扩展，将新 DOI 作为待验证线索，再通过 OpenAlex/Crossref/Crawl4AI 搜索真实原文和相反证据。不能根据引用次数判断专利创造性。
+
+
+
+## 项目论文深分页与持久文献记忆
+
+本技能与 patent-literature-memory/SKILL.md 联用。使用 OpenAlex/Crossref 官方 cursor 分批查询论文并在该项目 knowledge/documents/papers/ 下为每个 DOI/OpenAlex ID 生成单独 MD；去重后的全部元数据和批注索引归属于同项目 literature.sqlite3。OpenAlex 深分页需要免费 API Key；Crossref cursor 过期可按相同查询重新运行，通过 DOI 幂等去重恢复。遇配额、超时或缺失摘要时记录真实缺口。
+
+经授权获取论文全文后记录其结构、关键方程、参数边界、实验结果出处、局限和可迁移机理。使用 patent_literature_note 的 basis 字段区分 metadata、abstract、claims、full_text；声明全文依据时必须有页码/章节。每批次研究先恢复 RESEARCH_RESUME.md，后加载相关文献与未完成队列；定期保存下一轮创新想法与反证关键词。
+
+## 统一科研数据源与多渠道选择（2026-11-18）
+
+1. 调用 `paper-sources` / MCP `patent_capabilities` 获取平台能力。按问题选择：广域关键词 OpenAlex + Crossref；引文扩展 Semantic Scholar；预印本 arXiv；生医 Europe PMC + PubMed；有许可的机构库 CORE；专利与学术引用协同 Lens。缺少来源时解释覆盖盲区。
+2. 使用明确外发审批后的 `--paper-provider` 或 MCP `paper_sources`。默认 OpenAlex、Crossref、Semantic Scholar；`all` 跳过无商业授权或无凭证的 CORE/Lens；单独选择有价平台必须既提供 Key，又明确 `--allow-paid-paper-apis` / MCP `allow_paid_paper_apis`。
+3. 通过 DOI 合并不同源元数据，统一记录来源列表、作者、引用数、发表日、OA、许可、候选 PDF URL。Unpaywall 仅做 DOI 合法 OA 位置补全（需真实邮件），未获取/核验全文时 `full_text_verified=false`。
+4. 保存 03_papers.json、04_evidence.json、03_paper_memory/EV-*.md，每篇文献独立记忆元数据、可追溯链接、待核对全文的实验/公式和相反证据。优先在项目私有工作空间内持久化，通过 manifest 校验，不将内部技术与大文件提交到公共仓库。
+5. 供应商异常、缺摘要、失效 PDF/非开放许可、限额及 429 时记录缺口并保留可用来源；仅在许可和审批后再下载原文，通过 Docling/PDF 审核核查页码、方程、实验结论，再联动专利权利要求反证。
+
+接口及平台政策详见 docs/PAPER_SOURCES.md；不做各站未授权抓取，不擅自扩大用户明确的费用预算。
+
+## 论文原始全文与页码证据（2026-11-19）
+
+不同来源统一 DOI 后，只在纸面许可已确认、OA PDF 来源真实、企业外发审批通过时安排 `patent-fulltext-processing` 任务。Unpaywall 和 OpenAlex 的 PDF URL 先视为候选，未知许可/NC/ND 等不进入自动下载。通过受控 CLI 调用 `fulltext-plan`、`fulltext-process`，失败留存任务与 PDF SHA，利用 `patent_literature_fulltext_search` 获取页码证据。技术综述、创造性反证须以原始文献核验结果为据，切勿将 Docling 解析等同于论文结论核实。
+
+## 批量多平台检索、恢复与 DOI 授权发现（2026-11-19）
+
+当项目目标涉及数百上千篇论文，优先使用 literature harvest 选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC 或 PubMed 的官方分页通道，按实际源配额、费用、公开日期和许可分流，逐页保留当前案卷 SQLite 游标与单篇 MD。Semantic Scholar 普通检索 offset 上限每词1000篇，Bulk 使用 token，每页1000篇、max_documents 必须为1000整数倍；OpenAlex 第二页需要 API Key。出现网络失败时保留 partial/failed checkpoint，后续经审批恢复。
+
+用单独的 oa-enrich 在核准的同项目目录按 DOI 查询 Unpaywall 公开候选 PDF；不得自动下载。跨平台同 DOI 元数据应合并 authors/source_ids/sources，许可证或 OA 权属冲突按失效优先；保留原有分析笔记。PDF 获取、离线 Docling、页码块及版权审计采用已有 FulltextPipeline 的 fulltext-plan/fulltext-process，机器全文结果始终待核验。详细示例见 docs/PAPER_SOURCES.md。

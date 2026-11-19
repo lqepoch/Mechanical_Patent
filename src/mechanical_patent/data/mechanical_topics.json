@@ -1,0 +1,393 @@
+{
+  "version": 1,
+  "kind": "research_topic_hypotheses",
+  "scope": "universal_mechanical_engineering",
+  "topics": [
+    {
+      "id": "MECH-01",
+      "title": "重载齿轮箱瞬态冲击机械保护",
+      "problem": "载荷峰值使齿轮啮合冲击与疲劳累积",
+      "hypothesis": "机械扭矩缓冲及多路径限载机构",
+      "falsification": "相同载荷谱下冲击系数、效率和齿面损伤对比",
+      "domain": "heavy_equipment",
+      "industry_tags": [
+        "heavy_equipment",
+        "mining"
+      ],
+      "mechanism_tags": [
+        "powertrain",
+        "fatigue"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-02",
+      "title": "高速电驱轴承热变形自补偿",
+      "problem": "高速运转与温差引起预紧力变化",
+      "hypothesis": "可控弹性预载与热补偿配合机构",
+      "falsification": "转速-温度-预紧力矩阵及轴承寿命对照",
+      "domain": "energy",
+      "industry_tags": [
+        "energy",
+        "automotive",
+        "precision"
+      ],
+      "mechanism_tags": [
+        "tribology",
+        "thermodynamics"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-03",
+      "title": "宽工况离心泵含气介质连续输送",
+      "problem": "气液混输与偏工况导致性能波动",
+      "hypothesis": "诱导分流与被动气液分离复合入口",
+      "falsification": "含气率、NPSH与扬程恢复时间对照",
+      "domain": "environment",
+      "industry_tags": [
+        "environment",
+        "energy",
+        "marine"
+      ],
+      "mechanism_tags": [
+        "fluid",
+        "multiphysics"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-04",
+      "title": "深海往复密封抗磨损补偿",
+      "problem": "海水压力循环和颗粒磨损导致密封泄漏",
+      "hypothesis": "分级密封座与磨损自补偿机械预载",
+      "falsification": "压力循环后泄漏率、磨耗及功耗",
+      "domain": "marine",
+      "industry_tags": [
+        "marine",
+        "robotics"
+      ],
+      "mechanism_tags": [
+        "sealing",
+        "tribology"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-05",
+      "title": "机器人关节失电多级安全制动",
+      "problem": "重力与惯性载荷使失电关节意外运动",
+      "hypothesis": "分段机械锁止和受控释放机构",
+      "falsification": "失电偏载、热态、反复锁止的安全距离",
+      "domain": "robotics",
+      "industry_tags": [
+        "robotics",
+        "medical"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "reliability"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-06",
+      "title": "农业装备粉尘湿泥条件自清洁传动",
+      "problem": "粉尘缠绕和湿泥黏附引发传动卡滞",
+      "hypothesis": "联动式刮除与防堵排污传动护罩",
+      "falsification": "单位小时卡滞率、功耗与维护间隔",
+      "domain": "agriculture",
+      "industry_tags": [
+        "agriculture",
+        "mining"
+      ],
+      "mechanism_tags": [
+        "tribology",
+        "reliability"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-07",
+      "title": "金属-复材连接节点循环载荷防损伤",
+      "problem": "热膨胀差与频繁载荷致层间剥离",
+      "hypothesis": "柔顺层加分流受力的可检验连接节点",
+      "falsification": "热循环+疲劳的连接刚度衰减及NDT",
+      "domain": "aerospace",
+      "industry_tags": [
+        "aerospace",
+        "marine",
+        "materials"
+      ],
+      "mechanism_tags": [
+        "materials",
+        "fatigue"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-08",
+      "title": "轨道转向架宽频减振机构",
+      "problem": "轮轨不平顺引起低频和高频耦合振动",
+      "hypothesis": "频带可切换机械阻尼和被动隔振结构",
+      "falsification": "轮轨谱下加速度、稳定性与疲劳载荷",
+      "domain": "rail",
+      "industry_tags": [
+        "rail",
+        "heavy_equipment"
+      ],
+      "mechanism_tags": [
+        "dynamics",
+        "fatigue"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-09",
+      "title": "增材制造复杂承载件残余应力控制",
+      "problem": "复杂拓扑高应力区成形后变形和开裂",
+      "hypothesis": "支撑拓扑及后处理夹持自适应机构",
+      "falsification": "变形量、裂纹概率与加工时间对照",
+      "domain": "industrial_manufacturing",
+      "industry_tags": [
+        "industrial_manufacturing",
+        "materials",
+        "aerospace"
+      ],
+      "mechanism_tags": [
+        "manufacturing",
+        "fatigue"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-10",
+      "title": "隧道通风叶轮防冰与失衡保护",
+      "problem": "低温潮湿工况结冰致动不平衡",
+      "hypothesis": "分区导流融冰和机械失衡保护结构",
+      "falsification": "不同结冰质量下振动和恢复时间",
+      "domain": "construction",
+      "industry_tags": [
+        "construction",
+        "mining",
+        "environment"
+      ],
+      "mechanism_tags": [
+        "dynamics",
+        "thermodynamics"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-11",
+      "title": "协作机器人夹具自对中快速定位",
+      "problem": "柔性生产产品尺寸散差导致重复定位偏差",
+      "hypothesis": "被动浮动定位与刚度转换夹持机构",
+      "falsification": "重复夹取定位误差、节拍和损伤率",
+      "domain": "robotics",
+      "industry_tags": [
+        "robotics",
+        "industrial_manufacturing"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "actuation"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-12",
+      "title": "高压氢阀密封热循环补偿",
+      "problem": "氢脆环境下压力温度波动导致泄漏风险",
+      "hypothesis": "多级金属密封和可检验弹性补偿机构",
+      "falsification": "低高温循环及压力脉冲密封完整性",
+      "domain": "energy",
+      "industry_tags": [
+        "energy",
+        "automotive"
+      ],
+      "mechanism_tags": [
+        "sealing",
+        "materials"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-13",
+      "title": "工程液压缸抗偏载卡滞机械补偿",
+      "problem": "伸缩机构偏载导致活塞杆磨耗和密封异常",
+      "hypothesis": "多自由度导向加自校正连接机构",
+      "falsification": "偏载循环次数、摩擦力和泄漏量",
+      "domain": "heavy_equipment",
+      "industry_tags": [
+        "heavy_equipment",
+        "construction",
+        "mining"
+      ],
+      "mechanism_tags": [
+        "hydraulics",
+        "tribology"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-14",
+      "title": "风电主轴大轴承局部缺油保护",
+      "problem": "载荷波动和润滑分配不均造成早期磨损",
+      "hypothesis": "被动流量均配与冗余润滑导流机构",
+      "falsification": "倾角载荷下供油覆盖率与轴承温升",
+      "domain": "energy",
+      "industry_tags": [
+        "energy"
+      ],
+      "mechanism_tags": [
+        "tribology",
+        "powertrain"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-15",
+      "title": "康复外骨骼可控柔顺机械限位",
+      "problem": "人体关节运动不确定引起过约束风险",
+      "hypothesis": "柔顺关节、机械可调限位与失电退回",
+      "falsification": "异常步态条件峰值关节力及保护动作",
+      "domain": "medical",
+      "industry_tags": [
+        "medical",
+        "robotics"
+      ],
+      "mechanism_tags": [
+        "kinematics",
+        "reliability"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-16",
+      "title": "海洋设备可更换抗腐蚀连接节点",
+      "problem": "盐雾与交变拉压造成连接寿命下降",
+      "hypothesis": "可拆换牺牲构件和腐蚀隔离连接",
+      "falsification": "加速腐蚀后的残余强度和维修工时",
+      "domain": "marine",
+      "industry_tags": [
+        "marine",
+        "energy"
+      ],
+      "mechanism_tags": [
+        "sealing",
+        "fatigue"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-17",
+      "title": "工程车辆副车架自适应扭转连接",
+      "problem": "复杂地形底盘扭转导致上装局部应力集中",
+      "hypothesis": "可调限位和滑移解耦支承节点",
+      "falsification": "扭转载荷谱下螺栓力与焊缝损伤",
+      "domain": "heavy_equipment",
+      "industry_tags": [
+        "heavy_equipment",
+        "automotive"
+      ],
+      "mechanism_tags": [
+        "fatigue",
+        "dynamics"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-18",
+      "title": "微重力相变流体热管理结构",
+      "problem": "微重力下气液分离与相界面不稳定",
+      "hypothesis": "毛细导流、多孔结构和热传递组合通道",
+      "falsification": "模拟重力等级下换热性能和干涸阈值",
+      "domain": "aerospace",
+      "industry_tags": [
+        "aerospace",
+        "precision"
+      ],
+      "mechanism_tags": [
+        "thermodynamics",
+        "fluid"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-19",
+      "title": "矿山机械磨料流冲蚀可替换结构",
+      "problem": "高含砂流体使阀弯头磨耗速率高",
+      "hypothesis": "可替换冲蚀衬块及受控回流结构",
+      "falsification": "颗粒浓度变化下磨损曲线与压降",
+      "domain": "mining",
+      "industry_tags": [
+        "mining",
+        "environment",
+        "heavy_equipment"
+      ],
+      "mechanism_tags": [
+        "tribology",
+        "fluid"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    },
+    {
+      "id": "MECH-20",
+      "title": "精密装配机构热漂移自定位",
+      "problem": "温度梯度导致高精度机械装配错位",
+      "hypothesis": "几何补偿连杆及热膨胀对称节点",
+      "falsification": "温度循环定位漂移与重复装配精度",
+      "domain": "precision",
+      "industry_tags": [
+        "precision",
+        "industrial_manufacturing"
+      ],
+      "mechanism_tags": [
+        "thermodynamics",
+        "kinematics"
+      ],
+      "status": "hypothesis_only",
+      "origin": "2026-11-19_cross_industry_mechanics_brainstorm",
+      "novelty_checked": false
+    }
+  ]
+}

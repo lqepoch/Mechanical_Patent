@@ -2,7 +2,7 @@
 
 ## 系统使命
 
-当用户给出机械、消防车辆、应急装备、液压或控制系统的技术难题时，当前 ChatGPT、Codex 或兼容 AI 会话应在能力范围内完成以下完整闭环：
+当用户给出任何机械结构、机械装备、机电液控制、传动、流体、热管理、材料成型或机械制造领域的技术难题时，当前 ChatGPT、Codex 或兼容 AI 会话应在能力范围内完成以下完整闭环：
 
 保密分级 → 全球专利检索与论文检索 → 技术路线/创意裂变/反证 → 工程理论验证 → **默认工程技术方案及双人评审** → 归档；仅明确申请且企业可信签名授权后转换中国专利申请文件。
 
@@ -14,6 +14,19 @@
 2. 为兼容 Agent Skills 规范，技能的 name 与目录名、文件路径和代码符号使用英文小写和连字符；description、章节标题和自然语言指令保持简体中文。
 3. 专利公开号、DOI、IPC/CPC、物理符号、标准原文、法律术语及 API 字段保留准确原始格式。
 4. 原始第三方许可证和上游代码文档保留其语言；自有适配说明及业务操作指南使用简体中文。
+
+
+## 全机械工程通用检索原则（2026-11-19）
+
+任何机械行业和未来新型机械平台均可纳入课题发现。消防车只是 fire_rescue 专题示例，AI 无权把消防行业作为默认优先级或检索上限。每次研究应先通过 patent_mechanical_taxonomy 获取行业与物理机理双轴分类，再检索已有来源/课题/观察结果。按故障物理（振动、汽蚀、摩擦磨损、疲劳、热、密封等）调用 patent_mechanical_analogies，从其他行业寻找可迁移的机构和制造原理。行业清单可扩展，暂未分类的设备保存为 unclassified 并经审核补充；全局公共来源 all 始终参加具体行业检索。任何相似方案都需重新执行原始专利权利要求、可制造性与实验反证，AI 研究假说不得标记为已获专利或已通过工程认证。
+
+## 所有机械行业研究任务先复用公开课题来源平台库（2026-11-19）
+
+**每次 AI 用户要求提出机械研发课题、主动挖掘问题、检索技术突破口或扩大研究方向时，第一步必须检索本仓库已持久化的来源目录、已有课题和未处理的新观察；不得未经查询直接重新发散。** 依次调用 patent_source_catalog、patent_topic_catalog、patent_discovery_inbox（或 CLI source-catalog sources/topics/inbox），建立来源和历史研究记录的背景，再继续现有的专利/论文、TRIZ、想法裂变及独立反证。
+
+来源目录按平台、权属/许可、地域、官方/挑战/标准/科研类型、巡检状态、更新周期分类；发现新的大型问题源只能通过 patent_source_propose 记录为 pending，由管理员核对真实性、版权及网页规则后 CLI 批准。AI 不得自行审批新数据源。公开资料观察记录用 patent_public_observe，机械问题和可证伪实验用 patent_topic_derive，后续通过 patent_topic_plan、patent_public_research_note 追溯；选择研究的课题用 patent_topic_adopt 在当前项目独立 SQLite 新建案卷，真实保密审核先于项目检索词外发。
+
+**人类与真实实验审批不可省略**：标题、摘要、行业猜想、AI 自评分不能成为“原创/法律可申请/工程已认证”的证据。临时不可访问的数据源记录错误与覆盖缺口，不用虚构内容代替。来源库公共数据库不得含内部故障、未公开方案、CAD/BOM 等机密；具体见 docs/PROBLEM_DISCOVERY.md 与 skills/patent-autonomous/SKILL.md。
 
 ## 核心职责与任务分派
 
@@ -144,6 +157,39 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 
 论文元数据、专利权要摘录、完整原文阅读及专业技术核查分别登记；一千篇著录信息不等于一千篇经过细读。补搜必须遵守供应方官方速率与配额。EPO OPS/论文文献分页运行失败保留已存 MD 和检查点；重新运行需追加检索并保留批注。用户仍决定何时由白话发明交底转入正式代理申请格式，默认交付简洁可理解的机械结构、控制逻辑、创新差异和验证计划。
 
+
+## 容器部署和发行规范（2026-11-18）
+
+容器化、磁盘、GHCR 和灾备任务必须读取 skills/patent-deployment/SKILL.md 与 docs/DEPLOYMENT_UBUNTU26.md。Ubuntu 26.04 使用宿主机独立磁盘挂载 /data，并配置 PATENT_MCP_PROJECT_ID；每项目 SQLite 位于 projects/<project-id>/patents.sqlite3。服务仅允许本机 127.0.0.1:8765 访问；公开镜像不包含私有案卷和密钥。PR 完成测试后由 main / 版本标签发布，远程接入须先落实 OIDC 和项目 ABAC。
+
+## 论文平台选择及长期文献记忆（2026-11-18）
+
+论文检索读取 skills/patent-paper-search/SKILL.md 与 docs/PAPER_SOURCES.md，优先组合 OpenAlex、Crossref、Semantic Scholar；需要预印本、医学研究、开放存储库和论文-专利交叉引用时可分别启用 arXiv、Europe PMC、PubMed、CORE、Lens。每一来源必须按平台授权、费用及速率实际约束执行，不得将 HTTP 200 等同于全文核验。外发前取得本轮案卷审批；CORE/Lens 另经商业许可批准。每篇论文逐篇生成 03_paper_memory Markdown，并记录 DOI、作者、PDF 候选、许可、数据原始来源以及下一步技术分析任务；以本地 SHA256 与项目 SQLite 索引追溯。无完整全文或无法联网时保留能力缺口。代码统一入口为 paper_sources.py、CLI 和 MCP。
+
+## 多代构思裂变补充协议（2026-11-19）
+
+一条技术任务需经过全球专利与论文检索、至少三条独立物理机理路径、反证与工程边界验证，再进入工程技术方案。若存在不同技术轴的已评价候选，优先调用 `patent_idea_crossovers`，构建可实施的多亲本组合创新；必须描述构件接口、控制时序和协同效果假说。对无法自洽、被在先技术挑战或试验否定的方案调用 `patent_idea_reject`，保留失败条件给下一代使用。任何评分、文本近似、构思交叉均不代替来源逐项核验或法律创造性判断。工作流见 `docs/IDEA_FISSION.md` 和 `skills/patent-idea-fission/SKILL.md`。
+
+## 学术 PDF 合法获取与可恢复证据（2026-11-19）
+
+在已完成的论文元数据检索与长期记忆基础上，按 `skills/patent-pdf-evidence/SKILL.md`、`skills/patent-literature-memory/SKILL.md`、`docs/FULLTEXT_PIPELINE.md` 执行：每篇开放许可证核查、当前案卷外发审批、真实授权人及许可依据记录、正式远端 PDF URL 精确域名白名单与固定 IP/TLS 安全下载、内容哈希、离线 Docling、页码原文索引、机器未核验状态、人工技术事实复核。禁止推定 PDF 链接有效、忽略法律许可、把摘要或解析输出标记已校验全文。下载/解析只通过受控 CLI 执行；MCP 提供状态、队列和页码级只读检索。迁移不得删除原有文献与人工批注，失败后保存状态等待人工判断，正式生产执行前仍需要可信企业身份及签名审批。
+
+
+## 按需可编辑图示流水线（2026-11-19）
+工程阶段默认先保存明确的部件连接 diagram_relations、顺序工作步骤 process_steps 和主体交互 sequence_messages；根据实际内容挑选 draw.io 原理关系、Mermaid 流程或时序图。读取 skills/patent-figure-cad/SKILL.md 与 docs/TECHNICAL_BRIEF_STANDARD.md 第10节，调用 patent_figure_prepare 创建内容哈希图源，交给独立无网络、非特权的图示渲染 worker 生成 PDF，再调用 patent_figure_sync 校核产物并更新 LaTeX。MCP 不得直接执行浏览器/Electron/TeX；图源和 PDF 均须记录 SHA256。技术方案修改导致签核哈希失效；任何图不能冒充真实 CAD 尺寸/结构。
+
+## 必须核对全文引用位置（2026-11-19）
+
+对于已经合法归档并解析的论文/专利来源，使用 patent_literature_fulltext_search 定位当前案卷的页码/块，再由 patent_literature_fulltext_quote 检查原文短引真实出现在当前 PDF 解析版本内。只有具体的 p2:b1 等引用通过校验后，才提交 basis=full_text 的 patent_literature_note。批注永久记录源 PDF SHA256、解析版本 SHA256 和未独立核验等级；PDF 更版、未解析、错误文献、缺失页码须拒绝高可信全文分析。应用既有 FulltextPipeline，不创建重复的 PDF 索引表，继续遵守保密/版权/人工法律审查门禁。
+
+## 论文分页与长期记忆工作流（2026-11-19）
+
+按 skills/patent-paper-search 和 skills/patent-literature-memory，选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 等来源及官方分页；Semantic Scholar Bulk 要求每页1000条并保留 token。案卷审批、来源许可、费用预算和覆盖缺口逐项核查。跨来源 DOI 归并保留证据、用户批注和最新版权变化，失效优先。Unpaywall OA 发现必须使用经过外发审批的 oa-enrich；PDF 正式下载、Docling 解析与页码证据继续通过 canonical FulltextPipeline 和已有人工门禁。具体见 docs/PAPER_SOURCES.md、docs/FULLTEXT_PIPELINE.md。
+
+
+## 新增研究编排协议：长周期科研循环（2026-11-19）
+
+当用户需要完整多 Agent 课题/专利/论文研究时，读取 skills/patent-research-cycle/SKILL.md 和 docs/RESEARCH_CYCLE.md。新案卷应先创建保密审批，不允许通过科研循环假装获得外发权限。当前项目的专利与论文检索可以并行，但后续证据必须先在项目案卷里经真实来源核验。构思必须包含可证伪实验，反证须覆盖全部候选；独立裁决 Agent 必须与构思和反证执行者不同，且生产环境要靠真实身份认证约束其独立性。计算/仿真/实验级别的验证需实际项目附件和 SHA256；模型自报级别不能替代人工认证。研究循环产出可以转为技术交底、论文初稿、待审专利候选或新研究任务，不能直接视为已发表、已授权或已完成正式递交。每一轮独立数据保存在项目专属 SQLite；出错后保留审计链及历史记录。MCP 工具见 patent_cycle_*，CLI 见 mechanical-patent cycle。现阶段运行仍依赖宿主 AI，定时巡检及分布式队列是后续独立建设事项。
 
 ## 所有专利项目必执行知识星图
 

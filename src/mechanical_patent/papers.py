@@ -10,32 +10,48 @@ from html import unescape
 import json
 import os
 import re
+import time
 from typing import Any, Callable
 from urllib import error, parse, request
 
 from .core import Evidence, PatentWorkflowError, deduplicate, utc_now
 
-MAX_RESPONSE = 3_000_000
+MAX_RESPONSE = 8_000_000
 MAX_QUERY = 240
 USER_AGENT = "MechanicalPatentResearch/0.2 (research tool; see https://github.com/lqepoch/Mechanical_Patent)"
 
 
 def _fetch_json(url: str, *, headers: dict[str, str] | None = None) -> dict[str, Any]:
-    req = request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json", **(headers or {})})
-    try:
-        with request.urlopen(req, timeout=25) as response:
-            raw = response.read(MAX_RESPONSE + 1)
-        if len(raw) > MAX_RESPONSE:
-            raise PatentWorkflowError("Scholarly response exceeded safe size limit")
-        result = json.loads(raw)
-        if not isinstance(result, dict):
-            raise PatentWorkflowError("Scholarly service returned a non-object payload")
-        return result
-    except error.HTTPError as exc:
-        raise PatentWorkflowError(f"Scholarly provider HTTP {exc.code}; inspect quota or query") from exc
-    except (error.URLError, OSError, ValueError, json.JSONDecodeError) as exc:
-        raise PatentWorkflowError("Scholarly provider unavailable or returned invalid JSON") from exc
-
+    req = request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json", **(headers or {})}
+    )
+    for attempt in range(4):
+        try:
+            with request.urlopen(req, timeout=25) as response:
+                raw = response.read(MAX_RESPONSE + 1)
+            if len(raw) > MAX_RESPONSE:
+                raise PatentWorkflowError("Scholarly response exceeded safe size limit")
+            result = json.loads(raw)
+            if not isinstance(result, dict):
+                raise PatentWorkflowError("Scholarly service returned a non-object payload")
+            return result
+        except error.HTTPError as exc:
+            if exc.code in {429, 500, 502, 503, 504} and attempt < 3:
+                retry_after = exc.headers.get("Retry-After", "") if exc.headers else ""
+                try:
+                    delay = min(30.0, max(0.25, float(retry_after)))
+                except (TypeError, ValueError):
+                    delay = min(12.0, 2.0 ** attempt)
+                time.sleep(delay)
+                continue
+            raise PatentWorkflowError(
+                f"Scholarly provider HTTP {exc.code}; inspect quota or query"
+            ) from exc
+        except (error.URLError, OSError, ValueError, json.JSONDecodeError) as exc:
+            raise PatentWorkflowError(
+                "Scholarly provider unavailable or returned invalid JSON"
+            ) from exc
+    raise PatentWorkflowError("Scholarly retry budget exhausted")
 
 def _doi(value: Any) -> str:
     text = str(value or "").strip()
@@ -88,36 +104,54 @@ class OpenAlexProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(
+        self, query: str, *, cursor: str | None = None, limit: int = 100,
+    ) -> dict[str, Any]:
+        """分页官方 OpenAlex works；下一页游标保留供断点续检。"""
         term = query.strip()[:MAX_QUERY]
         if not term:
-            return []
-        params = {"search": term, "per_page": max(1, min(limit, 25))}
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = "Bearer " + self.api_key
-        url = "https://api.openalex.org/works?" + parse.urlencode(params)
-        payload = self.fetch_json(url, headers=headers)
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        params = {"search": term, "per_page": max(1, min(limit, 100))}
+        if cursor not in (None, "", "*") and not self.api_key:
+            raise PatentWorkflowError("OpenAlex 深分页从第二页开始需要 OPENALEX_API_KEY。")
+        if cursor is not None:
+            params["cursor"] = cursor or "*"
+        headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}
+        payload = self.fetch_json(
+            "https://api.openalex.org/works?" + parse.urlencode(params), headers=headers
+        )
         items = payload.get("results", [])
         if not isinstance(items, list):
             raise PatentWorkflowError("OpenAlex results must be a list")
+        from .paper_sources import _mk, merge_paper_records
         out: list[Evidence] = []
         for item in items:
             if not isinstance(item, dict):
                 continue
-            doi = _doi(item.get("doi"))
             oa_url = str(item.get("id") or "")
-            publication = doi or oa_url.rsplit("/", 1)[-1]
-            title = str(item.get("display_name") or item.get("title") or "").strip()
-            canonical = _canonical_url(doi, oa_url)
-            if not publication or not title or not canonical.startswith("https://"):
-                continue
-            out.append(Evidence(
-                publication=publication, title=title, url=canonical, source=self.name,
-                retrieved_at=utc_now(), abstract=_abstract_from_inverted_index(item.get("abstract_inverted_index")),
-                publication_date=str(item.get("publication_date") or ""),
-                jurisdiction="", kind="paper", verified=True,
-            ))
-        return deduplicate(out)
+            location = item.get("best_oa_location") or {}
+            access = item.get("open_access") or {}
+            authorships = item.get("authorships") or []
+            e = _mk(self.name, title=item.get("display_name") or item.get("title"),
+                    identifier=oa_url.rsplit("/", 1)[-1], url=oa_url, doi=item.get("doi"),
+                    abstract=_abstract_from_inverted_index(item.get("abstract_inverted_index")),
+                    date=item.get("publication_date"), pdf=location.get("pdf_url"),
+                    authors=[a["author"]["display_name"] for a in authorships
+                             if isinstance(a, dict) and isinstance(a.get("author"), dict)
+                             and a["author"].get("display_name")],
+                    cited=item.get("cited_by_count"), is_oa=access.get("is_oa"),
+                    oa_status=access.get("oa_status"), license=location.get("license"))
+            if e:
+                out.append(e)
+        meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+        next_cursor = meta.get("next_cursor") if len(items) >= int(params["per_page"]) else None
+        next_cursor = next_cursor[:4096] if isinstance(next_cursor, str) else None
+        return {
+            "records": merge_paper_records(out), "next_cursor": next_cursor,
+            "total_results": meta.get("count"),
+        }
 
 
 class CrossrefProvider:
@@ -128,32 +162,51 @@ class CrossrefProvider:
         self.fetch_json = fetch_json or _fetch_json
 
     def search(self, query: str, *, limit: int = 10) -> list[Evidence]:
+        return self.search_page(query, limit=min(limit, 25))["records"]
+
+    def search_page(
+        self, query: str, *, cursor: str | None = None, limit: int = 100,
+    ) -> dict[str, Any]:
+        """Crossref cursor 深分页；游标失效需由上层从第一页幂等重检。"""
         term = query.strip()[:MAX_QUERY]
         if not term:
-            return []
-        params = {"query.bibliographic": term, "rows": max(1, min(limit, 25))}
+            return {"records": [], "next_cursor": None, "total_results": 0}
+        size = max(1, min(limit, 100))
+        params = {"query.bibliographic": term, "rows": size}
+        if cursor is not None:
+            params["cursor"] = cursor or "*"
         if self.contact_email:
             params["mailto"] = self.contact_email
-        url = "https://api.crossref.org/works?" + parse.urlencode(params)
-        payload = self.fetch_json(url)
-        items = payload.get("message", {}).get("items", [])
+        payload = self.fetch_json("https://api.crossref.org/works?" + parse.urlencode(params))
+        message = payload.get("message")
+        if not isinstance(message, dict):
+            raise PatentWorkflowError("Crossref message must be a JSON object")
+        items = message.get("items", [])
         if not isinstance(items, list):
             raise PatentWorkflowError("Crossref items must be a list")
+        from .paper_sources import _mk, merge_paper_records
         out: list[Evidence] = []
         for item in items:
             if not isinstance(item, dict):
                 continue
             doi = _doi(item.get("DOI"))
-            title_list = item.get("title")
-            title = str(title_list[0] if isinstance(title_list, list) and title_list else "").strip()
+            titles = item.get("title")
+            title = str(titles[0] if isinstance(titles, list) and titles else "").strip()
             if not doi or not title:
                 continue
-            out.append(Evidence(
-                publication=doi, title=title,
-                url=_canonical_url(doi, str(item.get("URL") or "")),
-                source=self.name, retrieved_at=utc_now(),
-                abstract=_crossref_abstract(item.get("abstract")),
-                publication_date=_crossref_date(item),
-                jurisdiction="", kind="paper", verified=True,
-            ))
-        return deduplicate(out)
+            authors = item.get("author") or []
+            e = _mk(self.name, title=title, identifier=doi, doi=doi,
+                    url=item.get("URL") or _canonical_url(doi, ""),
+                    abstract=_crossref_abstract(item.get("abstract")),
+                    date=_crossref_date(item),
+                    authors=[" ".join(str(a.get(x) or "") for x in ("given", "family")).strip()
+                             for a in authors if isinstance(a, dict)])
+            if e:
+                out.append(e)
+        next_cursor = message.get("next-cursor") if len(items) >= size else None
+        next_cursor = next_cursor[:4096] if isinstance(next_cursor, str) else None
+        return {
+            "records": merge_paper_records(out), "next_cursor": next_cursor,
+            "total_results": message.get("total-results"),
+        }
+

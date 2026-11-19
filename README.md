@@ -290,6 +290,73 @@ MCP 支持 patent_literature_search/read/note/stats/pending/resume/resume_save/h
 详细实现、来源权限与企业升级路径参见 docs/ARCHITECTURE.md、docs/DUAL_LITERATURE.md 和 docs/MCP_INTERFACE.md。
 
 
+## Ubuntu 26.04 Docker / GHCR 部署
+
+提供 `ghcr.io/lqepoch/mechanical_patent:main` 多架构镜像与 Linux Docker Compose。`PATENT_DATA_DIR` 将宿主机独立磁盘挂载到容器 `/data`；`PATENT_MCP_PROJECT_ID` 绑定单独专利项目。独立 SQLite 位于 `/data/projects/<project-id>/patents.sqlite3`；服务只监听宿主机回环 `127.0.0.1:8765`。
+
+~~~bash
+cp .env.example .env
+chmod 600 .env
+# 配置 PATENT_MCP_PROJECT_ID、PATENT_DATA_DIR、PATENT_IMAGE
+bash scripts/deploy_ubuntu26.sh init
+bash scripts/deploy_ubuntu26.sh up
+bash scripts/deploy_ubuntu26.sh status
+~~~
+
+完整安装、GHCR 包公开配置、备份/回滚与权限边界见 docs/DEPLOYMENT_UBUNTU26.md。
+
+## 学术检索平台组合与统一元数据（2026-11-18）
+
+先运行 `python -m mechanical_patent paper-sources` 查看可用渠道，再在已有工作流保密审批后使用：
+
+```bash
+python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-query "high altitude centrifugal pump cavitation" \
+  --paper-provider openalex --paper-provider semantic-scholar --paper-provider arxiv \
+  --enrich-unpaywall --allow-search-exposure --case-dir cases/example-paper-search
+```
+
+参数 `--paper-provider all` 会选择全部已授权来源；`--paper-provider core` 或 `lens` 需要对应凭证和 `--allow-paid-paper-apis`。无合法 PDF 时仍可保留 DOI、摘要和相关信息但标记全文未核验。每篇论文生成独立 Markdown 记忆，保存多渠道来源，并索引到案卷 SQLite。详细字段、密钥、配额与安全边界参见 [docs/PAPER_SOURCES.md](docs/PAPER_SOURCES.md)。
+
+### 2026-11-19：跨技术轴的真实双亲构思与负面记忆
+
+在已有四代构思裂变上增添 `patent_idea_crossovers` 与 `patent_idea_reject`。两位已评价的不同技术轴父构思可以组合生成新方案，必须提供可制造的接口定义和机理耦合说明；技术上被否定的方向仍保存在 JSON 谱系中，其失败条件成为下一轮明确的设计约束。近似文字重复只预警，来源、反证、工程和人工批准的独立门禁继续生效。详见 `docs/IDEA_FISSION.md`。
+
+## 论文合法 PDF 全文流水线（2026-11-19）
+
+针对每个项目独立的 `knowledge/literature.sqlite3`，新增逐篇开放许可确认、受控 HTTPS/TLS 固定公网 IP 下载、Docling 离线全文解析、页码证据 FTS5 索引、SHA256 哈希、任务租约与错误恢复。可通过 `mechanical-patent literature --project-dir ... fulltext-plan/fulltext-process/fulltext-status/fulltext-search/fulltext-pending` 操作。MCP 提供 `patent_literature_fulltext_status`、`patent_literature_fulltext_search`、`patent_literature_fulltext_pending` 三个只读工具。相关论文的机器解析产物始终标记待原文核验，开放许可与保密审批必须先行；受控 CLI 执行下载/解析。运行参数、安全要求、模型准备和容灾见 [docs/FULLTEXT_PIPELINE.md](docs/FULLTEXT_PIPELINE.md)。
+
+
+## 工程方案自动配图流水线（2026-11-19）
+
+研发案卷已保存 `08a_technical_brief.json` 后，调用 MCP `patent_figure_prepare` 生成可编辑 draw.io/Mermaid 原理图、流程图和时序图源；结构关系需明确的部件连线，避免用 AI 猜测机械几何。隔离工作器把图源转换为 PDF，`patent_figure_sync` 核对完整输出哈希并更新 LaTeX；可再用同一隔离工作器编译 PDF 方案书。真实 CAD 仍须通过 STEP/SolidWorks 专用模块取得。参见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节及 skills/patent-figure-cad/SKILL.md。
+
+## 全文证据逐字核验与长期记忆（2026-11-19）
+
+在原有合法论文 PDF 下载、Docling 解析、项目 SQLite/Markdown 文献库基础上，增加 CLI fulltext-quote 和 MCP patent_literature_fulltext_quote，可按 p2:b1 真实页码段落核对短引，返回 PDF/解析版本 SHA256。AI 以 full_text 依据保存技术机理时程序会拒绝错误页码或过期 PDF，单篇 Markdown 保存对应解析版本。引用检查仅验证机器提取文本，真实论文和专利中的公式/技术效果仍需独立人员核对原始 PDF。详见 docs/FULLTEXT_PIPELINE.md。
+
+## 自我发现课题来源平台库（2026-11-19）
+
+系统新增 **可增量复用的公开工程问题来源目录**。已登记37个公开平台来源和40项跨行业机械研究假说（消防专题保留），包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+
+每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
+
+公共目录存于工作区 public_source_catalog/sources.sqlite3；37个平台及40个机械课题随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；也提供 Compose 的 discovery 可选后台服务自动轮询已审批公共 RSS。AI 深度研究仍需已授权的 Agent 运行器，保密外发须审批。
+
+完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
+
+## 论文深分页与 OA 合法地址补全（2026-11-19）
+
+现有项目文献库可通过 literature harvest 从六个开放论文平台按原生分页机制积累元数据，也可使用 Semantic Scholar Bulk token 深分页。受审批的 literature oa-enrich 用于按 DOI 查询 Unpaywall 的 OA URL；PDF 下载与 Docling 解析继续交由 FulltextPipeline 全文权限工作流处理。详情见 docs/PAPER_SOURCES.md。
+
+## 全机械工程领域与跨行业类比（2026-11-19）
+
+全机械领域均可检索和提出研发课题。初始定义18个行业维度、19个物理机理，支持未知领域 unclassified 的扩充。已登记37个来源平台和40项机械研究假说，原有20项消防车课题完整保留。新增 NSF/CMMI、国家重点研发计划、NSFC、ARPA-E、NIST、CORDIS/EIC、EPSRC、Innovate UK、ASME 等官方入口。通过 source-catalog taxonomy 查询分类、sources --industry robotics 按行业筛选、analogies --industry fire_rescue --mechanism fluid 查找跨行业机械机理类比；每轮 AI 研究需优先复用已有来源、课题、证据和失败记录。详见 docs/PROBLEM_DISCOVERY.md。
+
+
+### 多 Agent 科研循环（2026-11-19）
+
+已有项目案卷可通过 python -m mechanical_patent cycle --project-id PM80 --storage-root /data create --case-id CASE-001 启动科研任务图；用 cycle status 查看当前可领取的角色，通过 cycle claim/finish 写入可检查的阶段 JSON；通过 MCP 的 patent_cycle_* 工具可由 ChatGPT/Codex 等宿主执行多 Agent 协作。支持并行专利/论文检索、分支假设反证、独立裁决、理论/实际附件分级、失败重试和历史迭代。保密审批、数据源授权、实际实验和成果递交仍需要真实授权。完整命令与字段示例见 docs/RESEARCH_CYCLE.md。
+
 ## 🔭 三级知识星图与文献记忆
 
 新增可审计的文献知识星图，覆盖单份专利/论文、单个研发案卷、仅获批准公开的跨项目研究网络。单研究运行独立保存 knowledge.sqlite3，自动记录文献关键词、引用、TF-IDF 候选相似关系、已有技术谱系与逐字校验后仍待人工复核的技术三元组；每个文档创建 document_memory/generated/EV-*.md，人工维护的 manual/ 文件不被覆盖。

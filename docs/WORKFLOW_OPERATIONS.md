@@ -111,3 +111,14 @@ SQLite 支持单机并发事务和离线索引，但没有真正的组织权限�
 可重试任务在次数未超过预算时回到待领取；人为终止或超过预算进入已阻断。正式系统必须绑定经过认证的执行人、审签身份、任务超时监控和业务审计，避免代理人随意代签。
 
 标准输出经过最小字段筛选：任务状态可见，未公开发明全文与内部审阅理由仅在受控案卷保存。研究系统不再将整个案卷 JSON 直接打印到不受控的 CI/终端日志。
+
+
+## 跨会话文献恢复与大批量逐篇记忆
+
+每个项目保存 knowledge/RESEARCH_RESUME.md、INDEX.md、literature.sqlite3 和 documents/{patents,papers}/EV-*.md。专利/论文首次检索以及外部合规 MCP 导入生成每文献一篇 Markdown；再次检索只刷新机器元数据并保留原有 AI/人工分析。
+
+操作步骤：通过 literature stats/search 读取已存在文献→保密许可之后调用分页 harvest 补漏→通过 patent_literature_pending 分批取10–30篇→查阅合法公开原始来源，通过 patent_literature_note 写作用、效果、机械机构、控制策略、关键参数、技术缺点、反证、可迁移原理及新创新方向→读取当前 resume SHA256 并用 resume_save 更新项目研发快照→新会话恢复后继续下一批。
+
+    python -m mechanical_patent literature --project-dir private/cases/X01 harvest --provider openalex --provider crossref --query "centrifugal pump cavitation" --workflow-case-id X01 --workspace-db private/index.sqlite3 --max-documents 1000 --allow-search-exposure
+
+完整文本核验与大批量 Markdown 自动创建有不同评价标准；千篇已入库不能报告为千篇已完成全文分析。凡涉及未申请结构/BOM/实验材料，禁止公开发布。SQLite 和 MD 都需在独立私有目录存储，企业部署增加快照备份、增量备份及恢复演练。

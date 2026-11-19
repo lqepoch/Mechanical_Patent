@@ -67,3 +67,29 @@ AI 再把论文的流动机理、汽蚀阈值、传感控制和材料知识转�
 - OpenAlex API Reference: https://help.openalex.org/api/
 - Crossref Public API: https://www.crossref.org/documentation/retrieve-metadata/rest-api
 - Crossref authentication & rate limits: https://www.crossref.org/documentation/retrieve-metadata/rest-api/access-and-authentication/
+
+
+## 千篇双源文献的增量检索、落盘与研读
+
+新增 literature CLI 和 patent_literature_* MCP 工具。单词默认预算最多1000条、每页100、最多30页或600秒；预算是上限，不等于一定发现1000篇，也不意味着查全所有专利。官方 OpenAlex Cursor 超过第一页需要免费 API Key；Crossref cursor 约五分钟会过期，可从头幂等重检；EPO OPS 免费额度与频率受官方公平使用政策控制。论文来源合法元数据、摘要、权利要求与全文必须分别记载可用性。
+
+    python -m mechanical_patent literature --project-dir private/cases/X01 stats
+    python -m mechanical_patent literature --project-dir private/cases/X01 search --query "消防泵汽蚀"
+    python -m mechanical_patent literature --project-dir private/cases/X01 pending --limit 20
+    python -m mechanical_patent literature --project-dir private/cases/X01 harvest --provider openalex --provider crossref --query "centrifugal pump cavitation" --workflow-case-id X01 --workspace-db private/index.sqlite3 --max-documents 1000 --allow-search-exposure
+
+每发现一篇资料，立即生成带证据编号和可打开链接的 Markdown。AI 按每批10–30篇进行白话技术解读，记录原理、结构、控制、参数、作用效果、缺点、反证、创新点和跨文献连接；basis 标记 metadata/abstract/claims/full_text，声称读过完整原文必须记录页码/章节。研究快照 RESEARCH_RESUME.md 保存当前事实、发明候选、未解决问题、下次任务。元数据自动成文不等于实质读完。
+
+开源复用：官方 OpenAlex、Crossref 元数据 API；已有引证扩展 OpenCitations；合法全文可接已有 Docling PDF 解析、PaperQA2 证据检索方式及 GROBID TEI，但要核查模型权重、版权和使用许可。大规模批量离线可评估 OpenAlex Snapshot，降低反复 API 查询成本。专业检索覆盖用已授权的召回金标准持续验证。
+
+## 论文检索多来源标准接口（2026-11-18）
+
+统一论文记录扩展 `Evidence.pdf_url` 和 `Evidence.paper_metadata`（包含 `doi`、`authors`、`citation_count`、`is_open_access`、`oa_status`、`license`、`source_ids`、`sources`、`pdf_link_status`、`full_text_verified`）。统一 DOI 合并各渠道摘要及来源 ID，保留 URL 来源和真实性区分，原生无 DOI 编号保留，不猜测跨来源同一性。
+
+平台：OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 为默认可选来源；CORE、Lens 加显式凭证和付费/许可证门禁。Unpaywall 为 DOI→OA PDF 位置增补，不能关键词检索。入库文档仅表示来源元数据，`full_text_verified=false`，真实 PDF 解析和版权审核另由批准流程处理。每次研究运行会生成逐篇 `03_paper_memory/EV-*.md` 和 SHA256 清单，作为长上下文研究的持久记忆。
+
+CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --paper-provider openalex --enrich-unpaywall` 可组合使用；MCP `patent_research(paper_sources=[...],enrich_unpaywall=true)` 保持同一行为。外发保密审批、按案例 SQLite 隔离、授权 API 配额和提供方错误报告保留。技术细节见 [docs/PAPER_SOURCES.md](PAPER_SOURCES.md)。
+
+## 论文原文获取与反证的可信边界（2026-11-19）
+
+开放来源的真实 PDF URL 若经许可和项目保密审批，可在项目中排队安全下载、离线解析，记录 PDF SHA256、块编号与页码；其机理、试验及技术效果仍须与原始 PDF 逐页核验。MCP 的全文检索结果一律提示机器提取待核查。科研正文和专利的证据关系更新前应审查引用位置；目录和实现见 [FULLTEXT_PIPELINE.md](FULLTEXT_PIPELINE.md)。

@@ -41,3 +41,19 @@ user-invocable: true
 8. **复核与周期性更新**：事件更新、来源变更与检索失效必须留时间戳、版本和错误原因；支持重新打开以往放弃的课题，保存被反证的方案与失败原因，避免上下文压缩后重复研究。
 
 详见 docs/PROBLEM_DISCOVERY.md；本节定义 AI/Skill 研究规范，公开问题源的自动采集和调度仍属于后续代码开发任务。
+
+
+## 长期课题来源发现优先级（2026-11-19执行协议）
+
+用户要求“自己找题目/研究方向”、跟踪最新行业问题或开始任何消防机械方向查新时，必须先执行：
+1. 使用 MCP patent_source_catalog（approved）、patent_topic_catalog、patent_discovery_inbox 读取已有20个来源种子、20个机械课题和增量公告。CLI 可用 mechanical-patent source-catalog sources/topics/inbox。
+2. 优先核实来源官网发布日期和更新频率；过期项目保留历史研究价值但不能视为开放申报。平台新增时通过 patent_source_propose 入 pending，AI 不具备 source approve 权限。
+3. 对来源观察执行 patent_public_observe，再以专利/论文/跨行业机制、FMEA、TRIZ 导出具体零部件/可测技术效果。通过 patent_topic_derive 形成可回溯的研究假说，并关联可证伪实验。保密研发信息禁止写入公共目录。
+4. 对候选先复用 project 文献记忆，然后调用 patent_topic_plan 与既有多源检索、想法裂变、独立反证、工程审查工具；研究笔记必须标明原始 URL、证据缺口、发生时间和可信度，保存为未独立核验状态。
+5. 用户选择课题后使用 patent_topic_adopt 转为单项目 SQLite 案卷，保密审批通过后方可对外发送新检索词。未真实执行工程试验时禁止宣称工程已验证或具备专利授权条件。
+6. 只批准和处理有明确版权/访问权的公共数据。独立管理员通过本地 CLI 审批新源；AI 可提议但不能自我认证。
+详细工作流参见 docs/PROBLEM_DISCOVERY.md，源码 src/mechanical_patent/problem_sources.py，平台和课题种子存于 src/mechanical_patent/data/。
+
+## 全机械行业通用范围（2026-11-19）
+
+本技能适用于任何机械平台、结构、机构、机电液系统和制造工艺。消防装备仅是一种应用场景，新增来源应覆盖制造/机床、机器人、工程机械、航空航天、海工、轨道、能源、矿山、农机、医疗、精密仪器等。每轮最先调用 patent_mechanical_taxonomy、patent_source_catalog、patent_topic_catalog、patent_discovery_inbox，依据行业×失效物理机理进行检索。使用 patent_mechanical_analogies(target_industry,mechanism) 从其他行业提出真正有连接关系和可证伪指标的迁移构想。任何未列行业可标 unclassified，再登记扩充；不得以消防行业为默认检索范围。已有37个来源与40项假说是初始数据，全部支持持久化与后续扩展。结果需独立权利要求反证与工程验证，禁止 AI 自行标记专利新颖性或实验通过。详见 docs/PROBLEM_DISCOVERY.md。

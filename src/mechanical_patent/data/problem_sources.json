@@ -1,0 +1,754 @@
+{
+  "version": 2,
+  "kind": "public_problem_sources",
+  "reviewed_date": "2026-11-19",
+  "sources": [
+    {
+      "id": "CN-NFRA-NOTICE",
+      "name": "国家消防救援局—通知公告",
+      "url": "https://www.119.gov.cn/zfxxgk/fdzdgknr/tzgg/index.shtml",
+      "category": "official_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 96,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-NFRA-2026",
+      "name": "国家消防救援局—2026年度科技指南",
+      "url": "https://www.119.gov.cn/zfxxgk/fdzdgknr/tzgg/2026/53398.shtml",
+      "category": "historical_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 720,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-NFRA-PROVINCIAL",
+      "name": "消防救援总队—科技计划/揭榜挂帅",
+      "url": "https://js.119.gov.cn/jsxfww-menu-XXGK-tzgg_l_1.html",
+      "category": "official_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 96,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-MEM",
+      "name": "中华人民共和国应急管理部—政策与科技",
+      "url": "https://www.mem.gov.cn/",
+      "category": "official_policy",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue",
+        "heavy_equipment",
+        "mining"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-STANDARDS",
+      "name": "国家标准全文公开系统",
+      "url": "https://openstd.samr.gov.cn/bzgk/gb/",
+      "category": "standards",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-PROCUREMENT",
+      "name": "中国政府采购网—采购与验收需求",
+      "url": "https://www.ccgp.gov.cn/",
+      "category": "procurement",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 96,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-FAA-ARFF",
+      "name": "美国FAA—机场消防救援指南",
+      "url": "https://www.faa.gov/airports/airport_safety/aircraft_rescue_fire_fighting",
+      "category": "technical_guidance",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue",
+        "aerospace"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-FAA-FOAM",
+      "name": "美国FAA—机场灭火泡沫研究",
+      "url": "https://www.airporttech.tc.faa.gov/Airport-Safety/Aircraft-Rescue-Fire-Fighting/Fire-Extinguishing-Foam-Research",
+      "category": "research_report",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue",
+        "aerospace"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "EU-EASA-ARFF",
+      "name": "欧洲EASA—机场救援及灭火技术问答",
+      "url": "https://www.easa.europa.eu/en/the-agency/faqs/rescue-and-firefighting",
+      "category": "technical_guidance",
+      "region": "EU",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue",
+        "aerospace"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-NFPA",
+      "name": "美国NFPA—消防规范与标准",
+      "url": "https://www.nfpa.org/codes-and-standards",
+      "category": "standards",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 336,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "fire_rescue",
+        "construction"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-NASA-CHALLENGE",
+      "name": "NASA—技术挑战与众包",
+      "url": "https://www.nasa.gov/prizes-challenges-and-crowdsourcing/",
+      "category": "open_challenge",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-NASA-TECH",
+      "name": "NASA—技术新闻RSS",
+      "url": "https://www.nasa.gov/technology/",
+      "category": "cross_industry_research",
+      "region": "US",
+      "mode": "rss",
+      "feed_url": "https://www.nasa.gov/technology/feed/",
+      "cadence_hours": 48,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "aerospace",
+        "materials",
+        "robotics"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-NASA-AERO",
+      "name": "NASA—航空技术RSS",
+      "url": "https://www.nasa.gov/aeronautics/",
+      "category": "cross_industry_research",
+      "region": "US",
+      "mode": "rss",
+      "feed_url": "https://www.nasa.gov/aeronautics/feed/",
+      "cadence_hours": 48,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "aerospace"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-HEROX",
+      "name": "HeroX—全球技术挑战",
+      "url": "https://www.herox.com/",
+      "category": "open_challenge",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 96,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-MIT-SOLVE",
+      "name": "MIT Solve—开放创新挑战",
+      "url": "https://solve.mit.edu/challenges",
+      "category": "open_challenge",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-OPENALEX",
+      "name": "OpenAlex—学术技术问题",
+      "url": "https://openalex.org/",
+      "category": "academic_index",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-CROSSREF",
+      "name": "Crossref—科研出版元数据",
+      "url": "https://www.crossref.org/",
+      "category": "academic_index",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "EU-EPO",
+      "name": "欧洲专利局—公开专利",
+      "url": "https://www.epo.org/",
+      "category": "patent_index",
+      "region": "EU",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-USPTO",
+      "name": "美国专利商标局—公开专利",
+      "url": "https://www.uspto.gov/",
+      "category": "patent_index",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-WIPO",
+      "name": "世界知识产权组织—专利资料",
+      "url": "https://www.wipo.int/",
+      "category": "patent_index",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "publisher_landing_verified",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-MOST-PLAN",
+      "name": "国家科技管理信息系统—国家重点研发计划",
+      "url": "https://service.most.gov.cn/kjjh_tztg/",
+      "category": "official_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "manufacturing",
+        "materials",
+        "powertrain"
+      ]
+    },
+    {
+      "id": "CN-MOST-2026-MECH",
+      "name": "国家重点研发计划—关键基础件及制造工艺2026公告",
+      "url": "https://service2.most.gov.cn/kjjh_tztg_all/20261114/5936.html",
+      "category": "historical_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "industrial_manufacturing",
+        "precision",
+        "heavy_equipment"
+      ],
+      "mechanism_tags": [
+        "powertrain",
+        "manufacturing",
+        "tribology"
+      ]
+    },
+    {
+      "id": "CN-NSFC-GUIDES",
+      "name": "国家自然科学基金委员会—资助指南",
+      "url": "https://www.nsfc.gov.cn/p1/4201/sqzz.html",
+      "category": "research_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "CN-NSFC-NEWS",
+      "name": "国家自然科学基金委员会—项目指南",
+      "url": "https://www.nsfc.gov.cn/p1/3381/2824/zntg.html",
+      "category": "research_program",
+      "region": "CN",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-NSF-ENG",
+      "name": "美国 NSF 工程局项目总览",
+      "url": "https://www.nsf.gov/eng/programs",
+      "category": "research_program",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "manufacturing",
+        "materials",
+        "dynamics",
+        "fluid"
+      ]
+    },
+    {
+      "id": "US-NSF-CMMI",
+      "name": "NSF 机械土木与制造创新 CMMI",
+      "url": "https://www.nsf.gov/funding/opportunities/engineering-eng-civil-mechanical-manufacturing-innovation",
+      "category": "research_program",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "industrial_manufacturing",
+        "robotics",
+        "materials",
+        "construction"
+      ],
+      "mechanism_tags": [
+        "manufacturing",
+        "dynamics",
+        "fatigue",
+        "materials"
+      ]
+    },
+    {
+      "id": "US-ARPAE-PROGRAMS",
+      "name": "ARPA-E 能源颠覆性研发课题",
+      "url": "https://arpa-e.energy.gov/programs-and-initiatives/view-all-programs",
+      "category": "research_program",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "energy",
+        "industrial_manufacturing",
+        "automotive"
+      ],
+      "mechanism_tags": [
+        "thermodynamics",
+        "energy",
+        "materials"
+      ]
+    },
+    {
+      "id": "US-ARPAE-OPEN",
+      "name": "ARPA-E OPEN 跨领域能源创新征集",
+      "url": "https://arpa-e.energy.gov/programs-and-initiatives/OPEN-program",
+      "category": "research_program",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "energy",
+        "all"
+      ],
+      "mechanism_tags": [
+        "energy"
+      ]
+    },
+    {
+      "id": "US-NIST-SMART",
+      "name": "NIST 智能制造测量与技术研究",
+      "url": "https://www.nist.gov/smart-manufacturing",
+      "category": "technical_guidance",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "industrial_manufacturing",
+        "robotics",
+        "precision"
+      ],
+      "mechanism_tags": [
+        "inspection",
+        "manufacturing",
+        "control"
+      ]
+    },
+    {
+      "id": "US-DARPA-OPPORTUNITIES",
+      "name": "DARPA 前沿技术研发与挑战项目",
+      "url": "https://www.darpa.mil/work-with-us/opportunities",
+      "category": "research_program",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "aerospace",
+        "robotics",
+        "materials",
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "US-GOV-CHALLENGES",
+      "name": "USA.gov 现行联邦技术挑战入口",
+      "url": "https://www.usa.gov/find-active-challenge",
+      "category": "open_challenge",
+      "region": "US",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "EU-CORDIS",
+      "name": "欧盟 CORDIS 项目成果和研究数据库",
+      "url": "https://cordis.europa.eu/projects",
+      "category": "research_outputs",
+      "region": "EU",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "EU-EIC",
+      "name": "欧盟创新委员会 EIC 突破性技术机会",
+      "url": "https://eic.ec.europa.eu/eic-funding-opportunities_en",
+      "category": "research_program",
+      "region": "EU",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "EU-FUNDING",
+      "name": "欧盟 Funding & Tenders 研究与项目",
+      "url": "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home",
+      "category": "research_program",
+      "region": "EU",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "UK-EPSRC",
+      "name": "英国工程与物理科学 EPSRC 研究资助",
+      "url": "https://www.ukri.org/councils/epsrc/",
+      "category": "research_program",
+      "region": "UK",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "materials",
+        "manufacturing",
+        "fluid"
+      ]
+    },
+    {
+      "id": "UK-INNOVATE",
+      "name": "英国 Innovate UK 工程创新竞赛",
+      "url": "https://apply-for-innovation-funding.service.gov.uk/competition/search",
+      "category": "open_challenge",
+      "region": "UK",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "all"
+      ],
+      "mechanism_tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "GLOBAL-ASME-COMP",
+      "name": "美国机械工程师学会 ASME 设计制造竞赛",
+      "url": "https://www.asme.org/conferences-events/competitions",
+      "category": "open_challenge",
+      "region": "GLOBAL",
+      "mode": "manual",
+      "feed_url": "",
+      "cadence_hours": 168,
+      "rights": "metadata_and_links_only",
+      "seeded_on": "2026-11-19",
+      "trust": "official_landing_verified_metadata_only",
+      "industry_tags": [
+        "industrial_manufacturing",
+        "robotics",
+        "automotive",
+        "precision"
+      ],
+      "mechanism_tags": [
+        "manufacturing",
+        "kinematics",
+        "dynamics"
+      ]
+    }
+  ],
+  "scope": "universal_mechanical_engineering",
+  "note": "已登记来源默认只提供元数据/链接，网站监控和文献全文使用分别按原站许可；所有新增平台纳入审批。Challenge.gov 2026-03-30 关停，使用 USA.gov 当前入口。"
+}
