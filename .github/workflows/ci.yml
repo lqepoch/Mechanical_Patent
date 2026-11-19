@@ -41,6 +41,7 @@ jobs:
           - test_technical_brief.py
           - test_conversion_gate.py
           - test_technical_review.py
+          - test_problem_source_registry.py
           - test_figure_pipeline.py
     steps:
       - uses: actions/checkout@v4

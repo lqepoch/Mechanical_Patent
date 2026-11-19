@@ -195,6 +195,28 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 
 patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF 段落锚点真实性校验，记录分析使用的 PDF/解析版本 SHA256 以供历史审计。旧版 metadata/abstract 记忆可以保留，不自动升级证据可信等级。
 
+
+## 公共课题来源和自循环发现 MCP（2026-11-19）
+
+下列工具在每个 MCP 项目实例中复用同一个公共来源目录，保密案卷仍只限当前独立项目：
+
+| 工具 | 用途 |
+| --- | --- |
+| patent_source_catalog(status,limit) | 先读取已批准/待审来源目录与更新状态 |
+| patent_topic_catalog(limit) | 读取历次工程课题与技术假说 |
+| patent_discovery_inbox(limit) | 读取公开来源新增观察与待审批的大平台 |
+| patent_source_propose(name,url,reason,discovered_from) | AI 自动发现新大平台后进入 pending；绝不自动授权 |
+| patent_public_observe(source_id,url,title,summary,published_at) | 保存公开问题来源及原始链接元数据，内容未自动核验 |
+| patent_topic_derive(observation_id,problem,hypothesis,falsification,domain) | 提出与真实公开观察绑定的待验证机械研究课题 |
+| patent_topic_plan(topic_id) | 获取阶段化研究、反证及可证伪实验计划 |
+| patent_public_research_note(topic_id,agent,findings,evidence_urls,public_only) | 留下 AI 研究笔记，状态 unverified_ai_assessment |
+| patent_source_cycle(allow_public_network,max_sources) | 显式授权时执行已批准公开 RSS 的一次有限巡检 |
+| patent_topic_adopt(case_id,topic_id) | 在当前项目 SQLite 新建保密案卷，不能直接外发检索 |
+
+**数据治理**：共享公开目录保存在 `/data/public_source_catalog/sources.sqlite3`；各项目 SQLite 仍在 `/data/projects/<project-id>/patents.sqlite3`。20个来源和20个假说种子随 Python wheel/GHCR 镜像打包。新来源需管理员在 CLI `source-catalog approve` 批准：MCP 不提供 approve，不允许 AI 自行提高来源信任等级。管理员字符串尚未绑定身份认证，正式企业部署需要可信 OIDC、权限、可回滚审批和独立审计。
+
+**调度**：Docker Compose 可选 `COMPOSE_PROFILES=discovery` 启动 `source-radar`，只对批准公开 RSS 执行增量巡检，支持版本、去重、失败重试、持久化和停机恢复。尚不具备自动唤起 LLM 研究、第三方网站全文采集或实验认证，自动研究需要后续具备身份/预算与审签的独立 Agent 运行平台。详细边界见 `docs/PROBLEM_DISCOVERY.md` 与 Issues #58–#62。
+
 ## 论文批量接口（2026-11-19）
 
 patent_literature_harvest 扩充了可选 provider 和 page_size。普通 Semantic Scholar 使用 offset，Bulk 使用 token 每页1000条，arXiv、Europe PMC 和 PubMed 按各自官方 API 分页；仍强制执行项目保密外发门禁。无网、来源限流或许可缺失应保留错误而不伪造全局查全。原有 patent_literature_fulltext_status/search/pending 保持只读，下载与解析继续由本地批准的 FulltextPipeline 执行。
