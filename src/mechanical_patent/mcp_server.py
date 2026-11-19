@@ -156,13 +156,14 @@ class PatentMCPService:
 
     def literature_fulltext_batch_status(
         self, case_id: str, batch_id: str, limit: int = 100,
+        cursor: int | None = None, state: str | None = None,
     ) -> dict[str, Any]:
         """只读查看获许可的本项目全文批次检查点，不会启动网络访问。"""
         from .literature_fulltext import FulltextPipeline
         from .literature_fulltext_batch import FullTextBatchRunner
         return FullTextBatchRunner(
             FulltextPipeline(self._memory(case_id))
-        ).status(batch_id, limit=limit)
+        ).status(batch_id, limit=limit, cursor=cursor, state=state)
 
     def literature_fulltext_pending(self, case_id: str, limit: int = 30) -> dict[str, Any]:
         """列出当前项目尚未完成的 PDF 任务，供授权 CLI 执行。"""
@@ -629,9 +630,12 @@ def create_server(service: PatentMCPService):
     @server.tool()
     def patent_literature_fulltext_batch_status(
         case_id: str, batch_id: str, limit: int = 100,
+        cursor: int | None = None, state: str | None = None,
     ) -> dict[str, Any]:
-        """查看项目级 PDF 批量处理的完成、失败与待恢复状态。"""
-        return service.literature_fulltext_batch_status(case_id, batch_id, limit)
+        """查看项目级 PDF 批次状态；可按 pending/done/failed 筛选，使用 next_cursor 翻页。"""
+        return service.literature_fulltext_batch_status(
+            case_id, batch_id, limit, cursor=cursor, state=state,
+        )
 
     @server.tool()
     def patent_literature_fulltext_pending(case_id: str, limit: int = 30) -> dict[str, Any]:
