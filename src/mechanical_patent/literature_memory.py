@@ -383,8 +383,10 @@ class LiteratureMemoryStore:
         if basis not in ALLOWED_BASIS:
             raise PatentWorkflowError("未知的文献分析依据。")
         positions = source_positions or []
-        if basis == "full_text" and not positions:
-            raise PatentWorkflowError("声称阅读原文全文时必须提供页码/章节引用。")
+        verification = None
+        if basis == "full_text":
+            from .literature_fulltext import FulltextPipeline
+            verification = FulltextPipeline(self).validate_positions(doc_id, positions)
         if not isinstance(analysis, dict) or not analysis:
             raise PatentWorkflowError("分析必须为非空结构化对象。")
         allowed = {"plain_summary", "technical_mechanism", "structures_and_parameters",
@@ -401,7 +403,12 @@ class LiteratureMemoryStore:
         entries = "\n\n### 研究批注 " + utc_now() + "\n\n"
         entries += "- 分析者：" + _safe_markdown(actor) + "\n"
         entries += "- 依据：" + basis + "（不代表完成独立核验）\n"
-        entries += "- 原文位置：" + ", ".join(_safe_markdown(x, 200) for x in positions[:30]) + "\n\n"
+        entries += "- 原文位置：" + ", ".join(_safe_markdown(x, 200) for x in positions[:30]) + "\n"
+        if verification is not None:
+            entries += "- PDF SHA256：" + verification["pdf_sha256"] + "\n"
+            entries += "- 解析版本 SHA256：" + verification["parse_sha256"] + "\n"
+            entries += "- 证据等级：parsed_text_anchor_only（需人工核查原始 PDF）\n"
+        entries += "\n"
         for field, value in analysis.items():
             entries += "#### " + field + "\n\n" + _safe_markdown(value, 30000) + "\n\n"
         old = current["markdown"]

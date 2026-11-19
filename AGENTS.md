@@ -164,3 +164,7 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 
 ## 按需可编辑图示流水线（2026-11-19）
 工程阶段默认先保存明确的部件连接 diagram_relations、顺序工作步骤 process_steps 和主体交互 sequence_messages；根据实际内容挑选 draw.io 原理关系、Mermaid 流程或时序图。读取 skills/patent-figure-cad/SKILL.md 与 docs/TECHNICAL_BRIEF_STANDARD.md 第10节，调用 patent_figure_prepare 创建内容哈希图源，交给独立无网络、非特权的图示渲染 worker 生成 PDF，再调用 patent_figure_sync 校核产物并更新 LaTeX。MCP 不得直接执行浏览器/Electron/TeX；图源和 PDF 均须记录 SHA256。技术方案修改导致签核哈希失效；任何图不能冒充真实 CAD 尺寸/结构。
+
+## 必须核对全文引用位置（2026-11-19）
+
+对于已经合法归档并解析的论文/专利来源，使用 patent_literature_fulltext_search 定位当前案卷的页码/块，再由 patent_literature_fulltext_quote 检查原文短引真实出现在当前 PDF 解析版本内。只有具体的 p2:b1 等引用通过校验后，才提交 basis=full_text 的 patent_literature_note。批注永久记录源 PDF SHA256、解析版本 SHA256 和未独立核验等级；PDF 更版、未解析、错误文献、缺失页码须拒绝高可信全文分析。应用既有 FulltextPipeline，不创建重复的 PDF 索引表，继续遵守保密/版权/人工法律审查门禁。
