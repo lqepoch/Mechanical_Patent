@@ -33,3 +33,7 @@ patent_library
 **/.pytest_cache
 **/*.egg-info
 .venv
+
+# Ship only curated PUBLIC research source seeds from the package.
+!src/mechanical_patent/data/
+!src/mechanical_patent/data/*.json

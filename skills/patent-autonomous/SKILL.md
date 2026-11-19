@@ -49,3 +49,14 @@ user-invocable: true
 ## 自动研究的可核查短引（2026-11-19）
 
 先使用 patent_literature_fulltext_search 查询与机械问题对应的真实页码，再用 patent_literature_fulltext_quote 检查原文短引是否逐字匹配。仅当引用属于当前案卷、当前 PDF SHA256 且来源已解析，才通过 patent_literature_note(basis=full_text) 持久化工程事实。模型推断与专业复核分层保存，文本匹配不等同法律和工程结论已核验。未解析、缺页码及已变更 PDF 的证据要写入待补清单。
+
+## 长期课题来源发现优先级（2026-11-19执行协议）
+
+用户要求“自己找题目/研究方向”、跟踪最新行业问题或开始任何消防机械方向查新时，必须先执行：
+1. 使用 MCP patent_source_catalog（approved）、patent_topic_catalog、patent_discovery_inbox 读取已有20个来源种子、20个机械课题和增量公告。CLI 可用 mechanical-patent source-catalog sources/topics/inbox。
+2. 优先核实来源官网发布日期和更新频率；过期项目保留历史研究价值但不能视为开放申报。平台新增时通过 patent_source_propose 入 pending，AI 不具备 source approve 权限。
+3. 对来源观察执行 patent_public_observe，再以专利/论文/跨行业机制、FMEA、TRIZ 导出具体零部件/可测技术效果。通过 patent_topic_derive 形成可回溯的研究假说，并关联可证伪实验。保密研发信息禁止写入公共目录。
+4. 对候选先复用 project 文献记忆，然后调用 patent_topic_plan 与既有多源检索、想法裂变、独立反证、工程审查工具；研究笔记必须标明原始 URL、证据缺口、发生时间和可信度，保存为未独立核验状态。
+5. 用户选择课题后使用 patent_topic_adopt 转为单项目 SQLite 案卷，保密审批通过后方可对外发送新检索词。未真实执行工程试验时禁止宣称工程已验证或具备专利授权条件。
+6. 只批准和处理有明确版权/访问权的公共数据。独立管理员通过本地 CLI 审批新源；AI 可提议但不能自我认证。
+详细工作流参见 docs/PROBLEM_DISCOVERY.md，源码 src/mechanical_patent/problem_sources.py，平台和课题种子存于 src/mechanical_patent/data/。

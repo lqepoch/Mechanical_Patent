@@ -37,3 +37,37 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+
+  # Explicit opt-in with COMPOSE_PROFILES=discovery. No public port is exposed.
+  source-radar:
+    profiles: ["discovery"]
+    image: ${PATENT_IMAGE:?Set PATENT_IMAGE in .env}
+    init: true
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+    volumes:
+      - type: bind
+        source: ${PATENT_DATA_DIR:?Set PATENT_DATA_DIR in .env}
+        target: /data
+        bind:
+          create_host_path: false
+    entrypoint: ["python", "-m", "mechanical_patent.source_catalog_worker"]
+    command: ["--storage-root", "/data", "--interval-minutes", "180",
+              "--max-sources", "4", "--allow-public-network"]
+    healthcheck:
+      disable: true  # Dockerfile TCP healthcheck belongs to the MCP API only.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

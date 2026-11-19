@@ -15,6 +15,7 @@ from .providers import EPOOPSProvider, ImportedPatentProvider
 from .workflow import PatentResearch, validate_case
 from .workspace_cli import add_workspace_parser, handle_workspace
 from .literature_cli import add_literature_parser, handle_literature
+from .source_catalog_cli import add_source_catalog_parser, handle_source_catalog
 
 
 def _add_research_arguments(command: argparse.ArgumentParser) -> None:
@@ -57,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("--case-dir", required=True, type=Path)
     add_workspace_parser(sub)
     add_literature_parser(sub)
+    add_source_catalog_parser(sub)
     benchmark = sub.add_parser("benchmark", help="按授权标注集评测专利检索排序、同族召回率")
     benchmark.add_argument("--gold", required=True, type=Path)
     benchmark.add_argument("--results", required=True, type=Path)
@@ -83,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "source-catalog":
+            return handle_source_catalog(args)
         if args.command == "paper-sources":
             import json
             print(json.dumps(paper_source_catalog(), ensure_ascii=False, indent=2))
