@@ -27,9 +27,39 @@ from .core import PatentWorkflowError
 _ROOT = Path(__file__).resolve().parent / "data"
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{2,79}\Z")
 _HTML = re.compile(r"<[^>]+>")
-_KEYWORDS = ("消防", "救援", "应急", "灭火", "泡沫", "水泵", "fluid", "pump",
-             "robot", "rescue", "aeronautic", "mechanical", "firefighting",
-             "fluid", "hydraulic", "thermal", "safety", "emergency", "materials")
+_KEYWORDS = (
+    "消防", "救援", "机械", "机构", "设备", "轴承", "齿轮", "传动", "振动", "摩擦", "磨损",
+    "润滑", "疲劳", "结构", "强度", "制造", "装配", "机床", "电机", "机器人", "机械臂",
+    "矿山", "海工", "船舶", "工程机械", "农业机械", "轨道", "航空", "航天", "复合材料",
+    "密封", "腐蚀", "汽蚀", "流体", "液压", "气液", "泵", "阀", "风电", "热变形", "增材",
+    "gear", "bearing", "robot", "actuator", "machin", "manufactur", "fluid", "pump",
+    "hydraulic", "thermal", "fatigue", "vibration", "structure", "mechanical",
+    "tribology", "sealing", "friction", "wear", "aerospace", "marine", "rail", "turbine",
+    "kinematic", "gearbox", "powertrain", "materials", "additive",
+)
+_TAG_ID = re.compile(r"[a-z][a-z0-9_]{1,63}\Z")
+
+
+def _tags(values: list[str] | None, default: str) -> list[str]:
+    if values is None:
+        return [default]
+    if not isinstance(values, list) or len(values) > 20:
+        raise PatentWorkflowError("机械领域标签需为不超过20项的数组。")
+    chosen = []
+    for item in values:
+        if not isinstance(item, str) or not _TAG_ID.fullmatch(item):
+            raise PatentWorkflowError("机械领域标签须为安全的英文小写标识。")
+        if item not in chosen:
+            chosen.append(item)
+    return chosen or [default]
+
+
+def _decoded(row: sqlite3.Row) -> dict:
+    result = dict(row)
+    result["industry_tags"] = json.loads(result.pop("industry_tags_json", "[]"))
+    result["mechanism_tags"] = json.loads(result.pop("mechanism_tags_json", "[]"))
+    return result
+
 _ALLOWED_STAGES = {"hypothesis_only", "triage_pending", "research_pending", "human_reviewed"}
 _MAX_RESPONSE = 1_000_000
 
@@ -258,6 +288,13 @@ class ProblemSourceRegistry:
                 prev_hash TEXT NOT NULL, entry_hash TEXT NOT NULL
               );
             """)
+            # Additive, idempotent schema migration for existing persisted /data volumes.
+            # Existing review approvals, URLs, hashes and historical observations remain intact.
+            for table in ("sources", "topics"):
+                columns = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
+                for field in ("industry_tags_json", "mechanism_tags_json"):
+                    if field not in columns:
+                        db.execute(f"ALTER TABLE {table} ADD COLUMN {field} TEXT NOT NULL DEFAULT '[]'")
 
     @staticmethod
     def _event(db: sqlite3.Connection, action: str, identifier: str, detail: dict) -> None:
@@ -283,9 +320,16 @@ class ProblemSourceRegistry:
         return {"valid": True, "events": len(rows), "tip_hash": prev,
                 "limitation": "哈希链可检测普通篡改；生产级防管理员篡改需独立不可变存储与签名。"}
 
+    def taxonomy(self) -> dict:
+        """Industry and physical-mechanism dimensions are independently extensible."""
+        return json.loads((self.seed_dir / "mechanical_taxonomy.json").read_text(encoding="utf-8"))
+
     def seed(self) -> dict:
         source_data = json.loads((self.seed_dir / "problem_sources.json").read_text(encoding="utf-8"))
-        topic_data = json.loads((self.seed_dir / "fire_apparatus_topics.json").read_text(encoding="utf-8"))
+        topic_data = []
+        for filename in ("fire_apparatus_topics.json", "mechanical_topics.json"):
+            payload = json.loads((self.seed_dir / filename).read_text(encoding="utf-8"))
+            topic_data.extend(payload["topics"])
         count_s = count_t = 0
         with self.connect(write=True) as db:
             for x in source_data["sources"]:
@@ -305,7 +349,13 @@ class ProblemSourceRegistry:
                      x["rights"], "curated_repository_seed", "repository_maintainer",
                      x["seeded_on"], _now(), _now()))
                 count_s += result.rowcount
-            for x in topic_data["topics"]:
+                # Fill labels only for untouched legacy records; never reset human governance.
+                db.execute("""UPDATE sources SET industry_tags_json=?,mechanism_tags_json=?
+                    WHERE id=? AND provenance='curated_repository_seed'
+                    AND industry_tags_json='[]' AND mechanism_tags_json='[]'""",
+                    (_json(_tags(x.get("industry_tags"), "unclassified")),
+                     _json(_tags(x.get("mechanism_tags"), "general")), x["id"]))
+            for x in topic_data:
                 if not _ID.fullmatch(x["id"]):
                     raise PatentWorkflowError("种子课题编号无效。")
                 result = db.execute("""INSERT OR IGNORE INTO topics
@@ -314,32 +364,87 @@ class ProblemSourceRegistry:
                     (x["id"], x["title"], x["domain"], x["problem"], x["hypothesis"],
                      x["falsification"], x["origin"], "hypothesis_only", _now()))
                 count_t += result.rowcount
+                db.execute("""UPDATE topics SET industry_tags_json=?,mechanism_tags_json=?
+                    WHERE id=? AND industry_tags_json='[]' AND mechanism_tags_json='[]'""",
+                    (_json(_tags(x.get("industry_tags"), "unclassified")),
+                     _json(_tags(x.get("mechanism_tags"), "general")), x["id"]))
             if count_s or count_t:
                 self._event(db, "catalog_seed", "repository", {"sources_added": count_s,
                                                               "topics_added": count_t})
         return {"sources_added": count_s, "topics_added": count_t}
 
-    def sources(self, status: str = "approved", limit: int = 100) -> list[dict]:
+    def sources(self, status: str = "approved", limit: int = 100,
+                industry: str = "", mechanism: str = "") -> list[dict]:
+        """Search registered domains; all/general sources remain eligible."""
         if status not in ("approved", "pending", "disabled", "rejected", "all"):
             raise PatentWorkflowError("平台状态无效。")
-        query = "SELECT * FROM sources"
-        params: tuple = ()
+        industry, mechanism = self._filters(industry, mechanism)
+        checks: list[str] = []
+        params: list[Any] = []
         if status != "all":
-            query += " WHERE status=?"
-            params = (status,)
+            checks.append("status=?")
+            params.append(status)
+        if industry and industry != "all":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(sources.industry_tags_json) t
+                            WHERE t.value=? OR t.value='all')""")
+            params.append(industry)
+        if mechanism and mechanism != "general":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(sources.mechanism_tags_json) t
+                            WHERE t.value=? OR t.value='general')""")
+            params.append(mechanism)
+        query = "SELECT * FROM sources"
+        if checks:
+            query += " WHERE " + " AND ".join(checks)
         query += " ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END,name LIMIT ?"
         with self.connect() as db:
             rows = db.execute(query, (*params, max(1, min(int(limit), 200)))).fetchall()
-        return [dict(row) for row in rows]
+        return [_decoded(row) for row in rows]
 
-    def topics(self, limit: int = 100) -> list[dict]:
+    @staticmethod
+    def _filters(industry: str, mechanism: str) -> tuple[str, str]:
+        for label,value in (("行业",industry),("机理",mechanism)):
+            if value and (not isinstance(value,str) or not _TAG_ID.fullmatch(value)):
+                raise PatentWorkflowError(f"{label}筛选参数须为安全的小写技术标签。")
+        return industry or "", mechanism or ""
+
+    def topics(self, limit: int = 100, industry: str = "",
+               mechanism: str = "") -> list[dict]:
+        industry, mechanism = self._filters(industry, mechanism)
+        checks: list[str] = []
+        params: list[Any] = []
+        if industry and industry != "all":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(topics.industry_tags_json) t
+                            WHERE t.value=? OR t.value='all')""")
+            params.append(industry)
+        if mechanism and mechanism != "general":
+            checks.append("""EXISTS(SELECT 1 FROM json_each(topics.mechanism_tags_json) t
+                            WHERE t.value=? OR t.value='general')""")
+            params.append(mechanism)
+        query="SELECT * FROM topics"
+        if checks:
+            query+=" WHERE "+" AND ".join(checks)
+        query+=" ORDER BY id LIMIT ?"
         with self.connect() as db:
-            rows = db.execute("SELECT * FROM topics ORDER BY id LIMIT ?",
-                              (max(1, min(int(limit), 200)),)).fetchall()
-        return [dict(row) for row in rows]
+            rows=db.execute(query,(*params,max(1,min(int(limit),200)))).fetchall()
+        return [_decoded(row) for row in rows]
+
+    def analogies(self, target_industry: str, mechanism: str, limit: int = 20) -> dict:
+        """Other-industry hypotheses on the same physical principle, not proof."""
+        target_industry, mechanism = self._filters(target_industry, mechanism)
+        if not target_industry or not mechanism or mechanism == "general":
+            raise PatentWorkflowError("类比必须指定目标行业及具体物理机理。")
+        ideas=self.topics(limit=200,mechanism=mechanism)
+        external=[item for item in ideas if target_industry not in item["industry_tags"]
+                  and "all" not in item["industry_tags"]]
+        take=max(1,min(int(limit),50))
+        return {"target_industry":target_industry, "mechanism":mechanism,
+                "analogies":external[:take], "count":min(len(external),take),
+                "interpretation":"仅为跨行业研究假说，需重新验证工况、尺寸、物理约束和专利权利要求。",
+                "patent_novelty_certified":False}
 
     def propose(self, name: str, url: str, reason: str, *,
-                discovered_from: str = "manual") -> dict:
+                discovered_from: str = "manual", industry_tags: list[str] | None = None,
+                mechanism_tags: list[str] | None = None) -> dict:
         if not isinstance(name, str) or not 3 <= len(name.strip()) <= 160:
             raise PatentWorkflowError("请提供新平台的明确名称。")
         if not isinstance(reason, str) or not 8 <= len(reason.strip()) <= 1200:
@@ -358,6 +463,9 @@ class ProblemSourceRegistry:
                   'pending','unknown',?,?,?)""",
                 (ident, name.strip(), norm, _json({"why": reason.strip(),
                  "discovered_from": provenance}), "", _now()))
+            db.execute("UPDATE sources SET industry_tags_json=?,mechanism_tags_json=? WHERE id=?",
+                       (_json(_tags(industry_tags,"unclassified")),
+                        _json(_tags(mechanism_tags,"general")),ident))
             self._event(db, "source_proposed", ident, {"url": norm, "discovered_from": provenance})
         return {"source_id": ident, "status": "pending", "created": True,
                 "requires_human_source_approval": True}
@@ -463,11 +571,16 @@ class ProblemSourceRegistry:
                              "patent_brief_audit"],
                 "patent_novelty_certified":False,
                 "experimental_validation_done":False,
+                "industry_tags":(json.loads(topic["industry_tags_json"]) if topic else []),
+                "mechanism_tags":(json.loads(topic["mechanism_tags_json"]) if topic else []),
+                "cross_industry_analysis_required":True,
                 "outbound_search_requires_project_approval":True}
 
 
     def derive_topic(self, observation_id: str, problem: str, hypothesis: str,
-                     falsification: str, domain: str = "mechanical") -> dict:
+                     falsification: str, domain: str = "mechanical",
+                     industry_tags: list[str] | None = None,
+                     mechanism_tags: list[str] | None = None) -> dict:
         """AI may register a research hypothesis; it cannot attest patent novelty."""
         for field, value in (("problem",problem),("hypothesis",hypothesis),
                              ("falsification",falsification),("domain",domain)):
@@ -478,6 +591,14 @@ class ProblemSourceRegistry:
                                    (observation_id,)).fetchone()
             if not observation:
                 raise PatentWorkflowError("新的课题须关联真实且已入库的来源观察记录。")
+            src=db.execute("SELECT industry_tags_json,mechanism_tags_json FROM sources WHERE id=?",
+                           (observation["source_id"],)).fetchone()
+            inherited=json.loads(src["industry_tags_json"]) if src else []
+            if inherited==["all"] or not inherited:
+                inherited=["unclassified"]
+            chosen_industries=_tags(industry_tags,"unclassified") if industry_tags is not None else inherited
+            chosen_mechanisms=(_tags(mechanism_tags,"general") if mechanism_tags is not None
+                               else (json.loads(src["mechanism_tags_json"]) if src else ["general"]))
             topic_id="IDEA-"+sha256((observation_id+"|"+hypothesis.strip().casefold())
                                    .encode()).hexdigest()[:20].upper()
             result=db.execute("""INSERT OR IGNORE INTO topics
@@ -487,6 +608,8 @@ class ProblemSourceRegistry:
                  hypothesis.strip(),falsification.strip(),
                  "public_observation:"+observation_id,_now()))
             if result.rowcount:
+                db.execute("UPDATE topics SET industry_tags_json=?,mechanism_tags_json=? WHERE id=?",
+                           (_json(chosen_industries),_json(chosen_mechanisms),topic_id))
                 db.execute("UPDATE observations SET status='research_pending' WHERE id=?",
                            (observation_id,))
                 self._event(db,"topic_derived",topic_id,{"observation_id":observation_id,

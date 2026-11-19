@@ -84,16 +84,30 @@ def register_project_research_tools(server: Any, service: Any) -> None:
 
 
     @server.tool()
-    def patent_source_catalog(status: str = "approved", limit: int = 60) -> dict:
+    def patent_source_catalog(status: str = "approved", limit: int = 60,
+                              industry: str = "", mechanism: str = "") -> dict:
         """默认先查长期共享的公开课题平台库，包括来源等级、监测方式与更新时间。"""
-        return {"sources": public_catalog.sources(status,limit),
+        return {"sources": public_catalog.sources(status,limit,industry,mechanism),
                 "project_id": service.project.project_id,
                 "contains_confidential_project_data": False}
 
     @server.tool()
-    def patent_topic_catalog(limit: int = 60) -> dict:
+    def patent_topic_catalog(limit: int = 60, industry: str = "",
+                             mechanism: str = "") -> dict:
         """检索沉淀的消防车机械研究题目，包括历史 AI 假说；未证明新颖性。"""
-        return {"topics": public_catalog.topics(limit),"novelty_certified":False}
+        return {"topics": public_catalog.topics(limit,industry,mechanism),"novelty_certified":False}
+
+
+    @server.tool()
+    def patent_mechanical_taxonomy() -> dict:
+        """获取所有机械行业和跨行业物理机理分类；未来新领域可继续补充。"""
+        return public_catalog.taxonomy()
+
+    @server.tool()
+    def patent_mechanical_analogies(target_industry: str,
+                                    mechanism: str, limit: int = 20) -> dict:
+        """发现其他机械行业同一物理机理的研究假说，供技术迁移和独立反证。"""
+        return public_catalog.analogies(target_industry,mechanism,limit)
 
     @server.tool()
     def patent_discovery_inbox(limit: int = 30) -> dict:
@@ -102,9 +116,12 @@ def register_project_research_tools(server: Any, service: Any) -> None:
 
     @server.tool()
     def patent_source_propose(name: str, url: str, reason: str,
-                              discovered_from: str = "manual") -> dict:
+                              discovered_from: str = "manual",
+                              industry_tags: list[str] | None = None,
+                              mechanism_tags: list[str] | None = None) -> dict:
         """AI 发现新大平台后只能登记候选；禁止自动批准外网监测。"""
-        return public_catalog.propose(name,url,reason,discovered_from=discovered_from)
+        return public_catalog.propose(name,url,reason,discovered_from=discovered_from,
+                                      industry_tags=industry_tags,mechanism_tags=mechanism_tags)
 
     @server.tool()
     def patent_public_observe(source_id: str, url: str, title: str,
@@ -115,10 +132,12 @@ def register_project_research_tools(server: Any, service: Any) -> None:
 
     @server.tool()
     def patent_topic_derive(observation_id: str, problem: str, hypothesis: str,
-                            falsification: str, domain: str = "mechanical") -> dict:
+                            falsification: str, domain: str = "mechanical",
+                            industry_tags: list[str] | None = None,
+                            mechanism_tags: list[str] | None = None) -> dict:
         """根据真实公开来源观察提出新机械课题和可证伪实验，持久化但不认证专利性。"""
         return public_catalog.derive_topic(observation_id,problem,hypothesis,
-                                          falsification,domain)
+                                          falsification,domain,industry_tags,mechanism_tags)
 
     @server.tool()
     def patent_topic_plan(topic_id: str) -> dict:

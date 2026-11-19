@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "scope": "all_mechanical_engineering",
+  "industry_dimensions": [
+    {
+      "id": "all",
+      "label": "全领域跨行业公共平台"
+    },
+    {
+      "id": "fire_rescue",
+      "label": "消防与应急救援装备"
+    },
+    {
+      "id": "heavy_equipment",
+      "label": "工程机械与起重运输"
+    },
+    {
+      "id": "industrial_manufacturing",
+      "label": "机床、自动化与工业制造"
+    },
+    {
+      "id": "robotics",
+      "label": "机器人与智能执行机构"
+    },
+    {
+      "id": "aerospace",
+      "label": "航空航天与地面支持"
+    },
+    {
+      "id": "marine",
+      "label": "船舶、海工与海洋装备"
+    },
+    {
+      "id": "rail",
+      "label": "铁路轨道与运输装备"
+    },
+    {
+      "id": "automotive",
+      "label": "汽车、特种车辆与底盘"
+    },
+    {
+      "id": "energy",
+      "label": "能源、风电、氢能与发电装备"
+    },
+    {
+      "id": "mining",
+      "label": "矿山、地下及隧道机械"
+    },
+    {
+      "id": "agriculture",
+      "label": "农业及林业机械"
+    },
+    {
+      "id": "medical",
+      "label": "医疗与康复机械"
+    },
+    {
+      "id": "construction",
+      "label": "建筑与基础设施机械"
+    },
+    {
+      "id": "precision",
+      "label": "精密仪器与微机电"
+    },
+    {
+      "id": "environment",
+      "label": "环保、水务及过程装备"
+    },
+    {
+      "id": "materials",
+      "label": "材料加工、复合与增材制造"
+    },
+    {
+      "id": "unclassified",
+      "label": "新型机械领域待分配"
+    }
+  ],
+  "physical_mechanisms": [
+    {
+      "id": "fluid",
+      "label": "流体、两相流与汽蚀"
+    },
+    {
+      "id": "hydraulics",
+      "label": "液压及压力控制"
+    },
+    {
+      "id": "thermodynamics",
+      "label": "传热、热应力与相变"
+    },
+    {
+      "id": "dynamics",
+      "label": "振动、运动与动力学"
+    },
+    {
+      "id": "fatigue",
+      "label": "结构疲劳、强度与断裂"
+    },
+    {
+      "id": "tribology",
+      "label": "摩擦、磨损与润滑"
+    },
+    {
+      "id": "sealing",
+      "label": "密封、泄漏与腐蚀"
+    },
+    {
+      "id": "powertrain",
+      "label": "传动、轴承、齿轮与动力分配"
+    },
+    {
+      "id": "kinematics",
+      "label": "机构学、关节、连杆与锁止"
+    },
+    {
+      "id": "actuation",
+      "label": "机电液执行与致动"
+    },
+    {
+      "id": "manufacturing",
+      "label": "增材、成型、机加与焊接"
+    },
+    {
+      "id": "materials",
+      "label": "材料与轻量化连接"
+    },
+    {
+      "id": "control",
+      "label": "结构—控制协同"
+    },
+    {
+      "id": "reliability",
+      "label": "可靠性、失效与安全"
+    },
+    {
+      "id": "inspection",
+      "label": "测量、试验与无损检测"
+    },
+    {
+      "id": "interaction",
+      "label": "机器人接驳与人机交互"
+    },
+    {
+      "id": "energy",
+      "label": "能量管理与高效转换"
+    },
+    {
+      "id": "multiphysics",
+      "label": "流固热多物理场耦合"
+    },
+    {
+      "id": "general",
+      "label": "跨物理机理开放课题"
+    }
+  ],
+  "policy": "行业标签和物理机理均支持将来增补。可按行业或跨行业检索；理论上所有机械装备均可纳入，未知领域标记 unclassified。标签仅用于发现与分组，不构成已验证技术事实。"
+}
