@@ -92,7 +92,10 @@ class LiteratureHarvester:
             and local_pages < limits.max_pages
             and time.monotonic() - started < limits.max_seconds
         ):
-            requested = min(limits.page_size, limits.max_documents - records)
+            requested = (
+                1000 if name == "semantic-scholar-bulk" else
+                min(limits.page_size, limits.max_documents - records)
+            )
             # EPO OPS 官方对检索请求有更严格的公平使用限制：单页≤20。
             if name == "epo-ops":
                 requested = min(requested, 20)
@@ -108,7 +111,9 @@ class LiteratureHarvester:
                 consumed = page.get("consumed_records", len(incoming))
                 if (type(consumed) is not int or consumed < len(incoming)
                         or consumed > requested):
-                    raise PatentWorkflowError("供应商返回的原始分页数量超过预算或与已解析记录不符。")
+                    raise PatentWorkflowError("供应商返回的原始分页数量与请求不一致。")
+                if records + consumed > limits.max_documents:
+                    raise PatentWorkflowError("整页实际文献数量超过预算：保留原游标，调整预算后再继续。")
                 counts = self.memory.ingest_many(incoming)
                 new += counts["new"]
                 updated += counts["updated"]

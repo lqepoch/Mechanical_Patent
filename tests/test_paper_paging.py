@@ -86,7 +86,7 @@ class PagingTests(unittest.TestCase):
             return (f"""<PubmedArticleSet><PubmedArticle>
              <MedlineCitation><PMID>{number}</PMID><Article>
              <ArticleTitle>Experimental rescue medicine</ArticleTitle>
-             <Abstract><AbstractText>Fluid dynamics</AbstractText></Abstract></MedlineCitation>
+             <Abstract><AbstractText>Fluid dynamics</AbstractText></Abstract></Article></MedlineCitation>
              </PubmedArticle></PubmedArticleSet>""").encode()
         provider = PubMedProvider(api_key="", fetch_json=get, fetch_xml=get_xml)
         a = provider.search_page("rescue", cursor="*", limit=1)
