@@ -64,3 +64,8 @@ user-invocable: true
 ## 全机械行业通用范围（2026-11-19）
 
 本技能适用于任何机械平台、结构、机构、机电液系统和制造工艺。消防装备仅是一种应用场景，新增来源应覆盖制造/机床、机器人、工程机械、航空航天、海工、轨道、能源、矿山、农机、医疗、精密仪器等。每轮最先调用 patent_mechanical_taxonomy、patent_source_catalog、patent_topic_catalog、patent_discovery_inbox，依据行业×失效物理机理进行检索。使用 patent_mechanical_analogies(target_industry,mechanism) 从其他行业提出真正有连接关系和可证伪指标的迁移构想。任何未列行业可标 unclassified，再登记扩充；不得以消防行业为默认检索范围。已有37个来源与40项假说是初始数据，全部支持持久化与后续扩展。结果需独立权利要求反证与工程验证，禁止 AI 自行标记专利新颖性或实验通过。详见 docs/PROBLEM_DISCOVERY.md。
+
+
+## 跨课题科研循环编排（2026-11-19）
+
+在用户需要长周期研究、并行 Agent、独立科学验证、专利和论文成果分流时，读取 patent-research-cycle/SKILL.md 及 docs/RESEARCH_CYCLE.md。先建立项目隔离案卷，再用 patent_cycle_create / patent_cycle_status / patent_cycle_claim / patent_cycle_finish 实施有依赖的任务分工；双源检索完成后才进入证据整合和构思，独立评委与构思/反证执行人须不同。若裁决为 iterate，调用 patent_cycle_iterate 开启下一轮，旧记录不可覆写；真实计算与仿真证据须使用项目内附件的 SHA256 校验。科研循环仅保留模型无关的调度记录，当前宿主 AI 执行专业工作；专利申请审批、科学发表和真人实验核验始终走原有独立授权。

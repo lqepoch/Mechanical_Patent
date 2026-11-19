@@ -351,3 +351,8 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 ## 全机械工程领域与跨行业类比（2026-11-19）
 
 全机械领域均可检索和提出研发课题。初始定义18个行业维度、19个物理机理，支持未知领域 unclassified 的扩充。已登记37个来源平台和40项机械研究假说，原有20项消防车课题完整保留。新增 NSF/CMMI、国家重点研发计划、NSFC、ARPA-E、NIST、CORDIS/EIC、EPSRC、Innovate UK、ASME 等官方入口。通过 source-catalog taxonomy 查询分类、sources --industry robotics 按行业筛选、analogies --industry fire_rescue --mechanism fluid 查找跨行业机械机理类比；每轮 AI 研究需优先复用已有来源、课题、证据和失败记录。详见 docs/PROBLEM_DISCOVERY.md。
+
+
+### 多 Agent 科研循环（2026-11-19）
+
+已有项目案卷可通过 python -m mechanical_patent cycle --project-id PM80 --storage-root /data create --case-id CASE-001 启动科研任务图；用 cycle status 查看当前可领取的角色，通过 cycle claim/finish 写入可检查的阶段 JSON；通过 MCP 的 patent_cycle_* 工具可由 ChatGPT/Codex 等宿主执行多 Agent 协作。支持并行专利/论文检索、分支假设反证、独立裁决、理论/实际附件分级、失败重试和历史迭代。保密审批、数据源授权、实际实验和成果递交仍需要真实授权。完整命令与字段示例见 docs/RESEARCH_CYCLE.md。

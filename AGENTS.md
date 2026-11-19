@@ -185,3 +185,8 @@ Codex 自动扫描仓库级 .agents/skills；本项目 canonical skills/ 和 .ag
 ## 论文分页与长期记忆工作流（2026-11-19）
 
 按 skills/patent-paper-search 和 skills/patent-literature-memory，选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC、PubMed 等来源及官方分页；Semantic Scholar Bulk 要求每页1000条并保留 token。案卷审批、来源许可、费用预算和覆盖缺口逐项核查。跨来源 DOI 归并保留证据、用户批注和最新版权变化，失效优先。Unpaywall OA 发现必须使用经过外发审批的 oa-enrich；PDF 正式下载、Docling 解析与页码证据继续通过 canonical FulltextPipeline 和已有人工门禁。具体见 docs/PAPER_SOURCES.md、docs/FULLTEXT_PIPELINE.md。
+
+
+## 新增研究编排协议：长周期科研循环（2026-11-19）
+
+当用户需要完整多 Agent 课题/专利/论文研究时，读取 skills/patent-research-cycle/SKILL.md 和 docs/RESEARCH_CYCLE.md。新案卷应先创建保密审批，不允许通过科研循环假装获得外发权限。当前项目的专利与论文检索可以并行，但后续证据必须先在项目案卷里经真实来源核验。构思必须包含可证伪实验，反证须覆盖全部候选；独立裁决 Agent 必须与构思和反证执行者不同，且生产环境要靠真实身份认证约束其独立性。计算/仿真/实验级别的验证需实际项目附件和 SHA256；模型自报级别不能替代人工认证。研究循环产出可以转为技术交底、论文初稿、待审专利候选或新研究任务，不能直接视为已发表、已授权或已完成正式递交。每一轮独立数据保存在项目专属 SQLite；出错后保留审计链及历史记录。MCP 工具见 patent_cycle_*，CLI 见 mechanical-patent cycle。现阶段运行仍依赖宿主 AI，定时巡检及分布式队列是后续独立建设事项。
