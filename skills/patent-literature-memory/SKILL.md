@@ -48,3 +48,8 @@ user-invocable: true
 ## 论文 DOI 来源谱系与合规全文记忆（2026-11-19）
 
 不同 API 分批返回相同 DOI 时，合并 DOI、作者、原生 ID、来源列表及合法 PDF 候选，保留原始提供方和每次检索日期；不以标题猜测无 DOI 文献同一性。文学研究批注/逐页解析的持久区与机器元数据分开，避免刷新覆盖。最新版权状态冲突时失效优先，等待人工许可复核。每次 AI 复用 RESEARCH_RESUME.md 与来源 MD，先检查过去已阅读内容。OA 地址查询用 oa-enrich，真正下载与解析参照 patent-fulltext-processing Skill，技术结论需独立原文核验。
+
+## 项目级全文批次与断点恢复（2026-11-19）
+对于上百篇需要 PDF 解析的研究，优先使用唯一的 FulltextPipeline 与 FullTextBatchRunner，避免建立第二套版权审批或原文索引。先经可信工作流完成当前 case_id 的外发审批，为 manifest.items 每篇提供稳定 doc_id、真实 rights_actor/rights_reference、已审查的 allowed_hosts、parse；审批人字符串仅作审计，不能替代外部身份验证。
+仅由授权本地 CLI 运行 literature fulltext-batch，要求 --workflow-case-id、--workspace-db、--rights-approved、--allow-download、--allow-search-exposure，严格限定 max_documents/max_seconds/max_total_bytes/max_attempts 和离线 Docling 资源。相同清单生成确定性 FTB 批次号，单项目 SQLite 保存每篇完成/失败/重试检查点。超限、付费墙、许可不明、非 PDF 或下载失败必须隔离；达到重试上限需重新授权后 --refresh。
+使用 fulltext-batch-status 或只读 MCP patent_literature_fulltext_batch_status 查询进度，不触发网络或下载。任何机器解析结果仍为未审核证据，全文技术结论必须校验原始 PDF、页码及 SHA256。结构和故障恢复详见 docs/FULLTEXT_PIPELINE.md。

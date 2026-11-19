@@ -32,3 +32,6 @@ PDF 文件哈希、原始在线链接、解析器版本、页码、原文段落�
 ## 文献 PDF 自动化证据流水线（2026-11-19）
 
 优先读取 `docs/FULLTEXT_PIPELINE.md` 与 `patent-fulltext-processing` Skill。通过项目出站审批和真实 OA 许可核查后，使用已有 pinned TLS 下载器与离线 Docling；保留 SHA256、供应商 URL、PDF 文件内容哈希、机器解析结果、页码/文本块，记录失败/重试/可恢复状态。来自 MCP 的页码检索均标为 awaiting_original_pdf_review。未知许可、私人 IP、重定向、非 PDF、重复超过次数、超额度需阻断并人工复核。
+
+## 批量论文 PDF 的核验与失败恢复（2026-11-19）
+多篇 PDF 统一经 FulltextPipeline 的已批准来源、URL 白名单、安全 HTTPS 下载和离线 Docling；FullTextBatchRunner 仅增加 manifest 逐篇 rights_actor/rights_reference、处理预算、状态检查点、重试与 SHA256 复核，不形成第二套全文索引。授权 CLI 运行 literature fulltext-batch，查询由 fulltext-batch-status 或 MCP patent_literature_fulltext_batch_status 完成。批次完成仅证明处理阶段完成，自动页码与内容抽取依然需要原件逐项复核，技术证据级别维持 parsed_unreviewed。详见 docs/FULLTEXT_PIPELINE.md。

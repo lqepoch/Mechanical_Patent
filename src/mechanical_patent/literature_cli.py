@@ -98,6 +98,22 @@ def add_literature_parser(subparsers: Any) -> None:
 
     pending_files = subs.add_parser("fulltext-pending", help="查看需要重试或继续解析的论文任务")
     pending_files.add_argument("--limit", type=int, default=30)
+    batch = subs.add_parser("fulltext-batch", help="逐篇审批的全文批量处理，具备检查点和限额")
+    batch.add_argument("--manifest", required=True, type=Path)
+    batch.add_argument("--workflow-case-id", required=True)
+    batch.add_argument("--workspace-db", required=True, type=Path)
+    batch.add_argument("--rights-approved", action="store_true")
+    batch.add_argument("--allow-download", action="store_true")
+    batch.add_argument("--allow-search-exposure", action="store_true")
+    batch.add_argument("--docling-artifacts", type=Path)
+    batch.add_argument("--max-documents", type=int, default=100)
+    batch.add_argument("--max-seconds", type=int, default=900)
+    batch.add_argument("--max-total-bytes", type=int, default=2 * 1024 * 1024 * 1024)
+    batch.add_argument("--max-attempts", type=int, default=3)
+    batch.add_argument("--refresh", action="store_true")
+    batch_status = subs.add_parser("fulltext-batch-status", help="查询项目全文批次检查点")
+    batch_status.add_argument("--batch-id", required=True)
+    batch_status.add_argument("--limit", type=int, default=100)
 
 
 def _assert_fulltext_approval(args: argparse.Namespace) -> None:
@@ -157,7 +173,8 @@ def handle_literature(args: argparse.Namespace) -> int:
             raise PatentWorkflowError("DOI 外部查询需要案卷保密审批和明确用户授权。")
         result = enrich_unpaywall(memory, args.doc_id, authorized=True)
     elif command in {"fulltext-plan", "fulltext-process", "fulltext-status",
-                     "fulltext-search", "fulltext-pending", "fulltext-quote"}:
+                     "fulltext-search", "fulltext-pending", "fulltext-quote",
+                     "fulltext-batch", "fulltext-batch-status"}:
         from .literature_fulltext import FulltextPipeline
         pipeline = FulltextPipeline(memory)
         if command == "fulltext-quote":
@@ -169,6 +186,21 @@ def handle_literature(args: argparse.Namespace) -> int:
                       "review_status": "awaiting_original_pdf_review"}
         elif command == "fulltext-pending":
             result = {"jobs": pipeline.pending(limit=args.limit)}
+        elif command == "fulltext-batch-status":
+            from .literature_fulltext_batch import FullTextBatchRunner
+            result = FullTextBatchRunner(pipeline).status(args.batch_id, limit=args.limit)
+        elif command == "fulltext-batch":
+            from .literature_fulltext_batch import FullTextBatchRunner
+            _assert_fulltext_approval(args)
+            if not (args.rights_approved and args.allow_download and args.allow_search_exposure):
+                raise PatentWorkflowError("全文批次缺少明确的版权许可与外发执行批准。")
+            manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+            result = FullTextBatchRunner(pipeline).run(
+                manifest, authorized=True, outbound_approved=True,
+                artifacts=args.docling_artifacts, max_documents=args.max_documents,
+                max_seconds=args.max_seconds, max_total_bytes=args.max_total_bytes,
+                max_attempts=args.max_attempts, refresh=args.refresh,
+            )
         else:
             _assert_fulltext_approval(args)
             if command == "fulltext-plan":
@@ -223,6 +255,8 @@ def handle_literature(args: argparse.Namespace) -> int:
     else:
         raise PatentWorkflowError("未知文献操作。")
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if not (
-        command == "harvest" and any(x["status"] == "failed" for x in result["jobs"])
-    ) else 2
+    if command == "harvest" and any(x["status"] == "failed" for x in result["jobs"]):
+        return 2
+    if command == "fulltext-batch" and result["status"] != "complete":
+        return 2
+    return 0

@@ -98,3 +98,22 @@ AI 通过 patent_literature_note 以 basis=full_text 写入研究批注时，sou
 ## DOI 开放获取线索（2026-11-19）
 
 资料库里的 DOI 可以经项目出站审批使用 literature oa-enrich 查找 Unpaywall 公共 OA URL/许可线索，保留跨平台提供方谱系。它仅更新机器元数据；仍须通过此文的 fulltext-plan 完成版权/人工授权核验，再经 fulltext-process 下载、解析和存档。来源许可冲突将阻断旧授权继续使用。
+
+## 项目级 PDF 批次、预算与断点恢复（2026-11-19）
+
+复用唯一的 `FulltextPipeline` 下载/版权状态机及 Docling 页码证据索引；`FullTextBatchRunner` 只提供多篇调度、项目独立 SQLite 检查点、失败隔离和重复执行恢复。新增 `fulltext_batches`、`fulltext_batch_items` 记录按清单哈希生成的 FTB 批次、文献序号、状态、次数、PDF SHA256 和截断错误信息，不修改已有机器解析及真人复核结论。
+
+受控清单是 JSON 对象 `{"items":[{"doc_id":"实际EV编号","rights_actor":"许可审核人","rights_reference":"真实授权记录号","allowed_hosts":["publisher.example.org"],"parse":true}]}`。每篇必须核对公开许可、实际 PDF 候选 URL、下载主机和来源授权；`rights_actor` 仅作为审计信息，不能代替真实鉴权/人工审批。需要经项目审批的 CLI：
+
+```bash
+python -m mechanical_patent literature --project-dir /secure/projects/P1/cases/CASE01 fulltext-batch \
+  --manifest /secure/approved-batch.json --workflow-case-id CASE01 \
+  --workspace-db /secure/projects/P1/patents.sqlite3 \
+  --rights-approved --allow-download --allow-search-exposure \
+  --docling-artifacts /secure/docling-models --max-documents 100 \
+  --max-seconds 900 --max-total-bytes 2147483648 --max-attempts 3
+python -m mechanical_patent literature --project-dir /secure/projects/P1/cases/CASE01 fulltext-batch-status \
+  --batch-id FTB-实际20位十六进制
+```
+
+同一份规范化清单返回确定性的 FTB 标识；重试会复用已核验的原始 PDF 与检查点，完成条目通常跳过。达到重试上限须重新审批后显式 `--refresh`。每轮通过文献数、运行秒数、总字节数和逐篇尝试次数限制工作，单篇 HTTPS 仍遵守公网 IP、固定 TLS/域名白名单、禁止重定向和 PDF magic 校验。批次状态为 complete/partial，不能据此宣称真实全文技术结论已被人工核实。MCP 仅提供 `patent_literature_fulltext_batch_status(case_id,batch_id,limit)` 查询进度，不开放批量远程下载。

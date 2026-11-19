@@ -240,3 +240,7 @@ MCP 的 patent_source_catalog(status,limit) 和 patent_topic_catalog(limit) 现�
 | patent_knowledge_global_public | max_nodes | 仅查询原工作流中已批准公开项目的最小著录关系，其他密级不可见 |
 
 跨项目私有查询没有绕过权限的 MCP 参数。完整 CLI、图谱本体、构建前端、性能与安全边界见 docs/KNOWLEDGE_ATLAS.md。
+
+## 合规 PDF 全文批次只读状态（2026-11-19）
+
+`patent_literature_fulltext_batch_status(case_id,batch_id,limit=100)` 在当前 project_id/case_id 下读取 `FullTextBatchRunner` 的批次总量、已完成、待处理、失败重试和截断的单篇检查点。MCP 不启动网络请求、PDF 下载或用户授权流程；批次创建与执行仅允许完成真实版权许可及项目外发审批的本地 CLI `literature fulltext-batch`。已有 `FulltextPipeline` 是唯一原文下载/解析状态机，解释见 docs/FULLTEXT_PIPELINE.md。

@@ -40,3 +40,8 @@ PDF 候选 URL、许可证/审查来源、SHA256、解析器版本、解析 JSON
 ## 统一全文管线与 DOI OA 候选补全（2026-11-19）
 
 目前唯一的原文获取、审核和解析执行器是 FulltextPipeline；禁止引入第二套并行下载状态机。外部论文 DOI 通过经批准的 literature oa-enrich 查询 Unpaywall，只更新 OA 候选 URL 与许可线索。随后核查最新公开许可，人工登记 fulltext-plan 并通过受限 fulltext-process 获取 PDF，保存 SHA256/页码/许可审计，所有机器解析保持待核验状态。不同供应商许可证冲突时封锁旧授权；旧研究 MD 必须保持可恢复。详见 docs/FULLTEXT_PIPELINE.md。
+
+## 项目级全文批次与断点恢复（2026-11-19）
+对于上百篇需要 PDF 解析的研究，优先使用唯一的 FulltextPipeline 与 FullTextBatchRunner，避免建立第二套版权审批或原文索引。先经可信工作流完成当前 case_id 的外发审批，为 manifest.items 每篇提供稳定 doc_id、真实 rights_actor/rights_reference、已审查的 allowed_hosts、parse；审批人字符串仅作审计，不能替代外部身份验证。
+仅由授权本地 CLI 运行 literature fulltext-batch，要求 --workflow-case-id、--workspace-db、--rights-approved、--allow-download、--allow-search-exposure，严格限定 max_documents/max_seconds/max_total_bytes/max_attempts 和离线 Docling 资源。相同清单生成确定性 FTB 批次号，单项目 SQLite 保存每篇完成/失败/重试检查点。超限、付费墙、许可不明、非 PDF 或下载失败必须隔离；达到重试上限需重新授权后 --refresh。
+使用 fulltext-batch-status 或只读 MCP patent_literature_fulltext_batch_status 查询进度，不触发网络或下载。任何机器解析结果仍为未审核证据，全文技术结论必须校验原始 PDF、页码及 SHA256。结构和故障恢复详见 docs/FULLTEXT_PIPELINE.md。

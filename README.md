@@ -366,3 +366,7 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
     python -m mechanical_patent atlas-global --workspace ./private_patent_workspace --output ./global-public.json
 
 本地打包的 atlas-web 使用 Cytoscape.js 浏览生成的 JSON：cd atlas-web && npm install && npm run dev。MCP 新增 patent_knowledge_index、patent_knowledge_graph、patent_knowledge_record_fact 与 patent_knowledge_global_public；内网/未申请项目绝不进入公开全局投影。相似度及待复核技术关系不能代替真实权要核查、人工审查和法律判断。详情：docs/KNOWLEDGE_ATLAS.md、skills/patent-knowledge-atlas/SKILL.md。
+
+## 批量论文 PDF 断点恢复（2026-11-19）
+
+在已有 `FulltextPipeline` 上提供 `literature fulltext-batch` 和 `fulltext-batch-status`，支持逐篇版权许可、批次 SHA256 检查点、重试上限、时间/文献数/下载字节预算和项目隔离。只读 MCP `patent_literature_fulltext_batch_status` 查询进度。批量获取和 Docling 解析不会自动将科研结论升级为人工核验；完整使用方式见 docs/FULLTEXT_PIPELINE.md。
