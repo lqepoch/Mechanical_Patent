@@ -189,6 +189,12 @@ MCP Host 当前 AI 负责真实研究和白话解读，服务端本身无 LLM �
 
 独立工作器必须运行在已配置的企业安全隔离容器中，真实渲染版本需验收；本仓库 CI 对生成、源数据约束、失败关闭、伪造输出和 MCP 合同做离线验证。具体合同见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节。
 
+## 文献短引核验增量 MCP（2026-11-19）
+
+新增 patent_literature_fulltext_quote(case_id, doc_id, anchor, verbatim)：依托当前项目绑定的 FulltextPipeline，检查证据位置形如 p2:b1、文献当前已解析 PDF 的哈希和段落文本是否含指定原文短引。响应 exact_match 与 SHA256、来源 URL、verification_level=parsed_text_match_only 和 full_text_verified=false；错误页码、其他项目来源和旧版 PDF 返回确定性拒绝。此工具只读，依赖已有合法 OA 下载、离线 Docling 和单项目案卷授权机制；没有任意路径或远程文献读取权限。
+
+patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF 段落锚点真实性校验，记录分析使用的 PDF/解析版本 SHA256 以供历史审计。旧版 metadata/abstract 记忆可以保留，不自动升级证据可信等级。
+
 ## 论文批量接口（2026-11-19）
 
 patent_literature_harvest 扩充了可选 provider 和 page_size。普通 Semantic Scholar 使用 offset，Bulk 使用 token 每页1000条，arXiv、Europe PMC 和 PubMed 按各自官方 API 分页；仍强制执行项目保密外发门禁。无网、来源限流或许可缺失应保留错误而不伪造全局查全。原有 patent_literature_fulltext_status/search/pending 保持只读，下载与解析继续由本地批准的 FulltextPipeline 执行。

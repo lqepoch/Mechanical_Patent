@@ -132,7 +132,6 @@ CLI `paper-sources` 列举来源能力；`research --paper-provider arxiv --pape
 技术事实/创新候选 → figure_pipeline（显式连接/步骤/消息的可编辑 .drawio/.mmd；未提供关系禁止猜测） → 08d 图源计划 → **独立隔离 figure_worker**（drawio/mmdc → PDF；XeLaTeX → 工程说明书） → 08e/08f SHA 校验及案卷更新 → 阶段A工程质量与审签。MCP 仅开放 patent_figure_prepare/source/status/sync，不存在通用进程执行工具。项目数据仍经 ProjectStorage 的唯一项目路径和 SQLite 隔离。
 真实 SolidWorks/STEP 几何与尺寸精确图纸采用独立 CAD worker，图纸审阅与合法保密审批作为另一个工程阶段。企业级容器化和授权身份仍受 #25 约束；详细技术合同与第三方官方 CLI 见 docs/TECHNICAL_BRIEF_STANDARD.md。
 
-
 ## 批量论文分页与 DOI 公共全文候选（2026-11-19）
 
 此扩展为项目内现有的 OpenAlex/Crossref 深分页增加 Semantic Scholar 普通偏移分页（每检索词最多1000条）、Semantic Scholar Bulk token 深分页（每页1000条）、arXiv Atom start、Europe PMC cursorMark、PubMed retstart。现有 literature harvest 的 SQLite 游标、错误状态和单篇 Markdown 记忆继续复用。OpenAlex 第二页需要 API Key。Bulk 模式要求 page_size=1000 且 max_documents 是1000整数倍；更小的页要使用普通来源。

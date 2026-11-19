@@ -330,6 +330,10 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 
 研发案卷已保存 `08a_technical_brief.json` 后，调用 MCP `patent_figure_prepare` 生成可编辑 draw.io/Mermaid 原理图、流程图和时序图源；结构关系需明确的部件连线，避免用 AI 猜测机械几何。隔离工作器把图源转换为 PDF，`patent_figure_sync` 核对完整输出哈希并更新 LaTeX；可再用同一隔离工作器编译 PDF 方案书。真实 CAD 仍须通过 STEP/SolidWorks 专用模块取得。参见 docs/TECHNICAL_BRIEF_STANDARD.md 第10节及 skills/patent-figure-cad/SKILL.md。
 
+## 全文证据逐字核验与长期记忆（2026-11-19）
+
+在原有合法论文 PDF 下载、Docling 解析、项目 SQLite/Markdown 文献库基础上，增加 CLI fulltext-quote 和 MCP patent_literature_fulltext_quote，可按 p2:b1 真实页码段落核对短引，返回 PDF/解析版本 SHA256。AI 以 full_text 依据保存技术机理时程序会拒绝错误页码或过期 PDF，单篇 Markdown 保存对应解析版本。引用检查仅验证机器提取文本，真实论文和专利中的公式/技术效果仍需独立人员核对原始 PDF。详见 docs/FULLTEXT_PIPELINE.md。
+
 ## 论文深分页与 OA 合法地址补全（2026-11-19）
 
 现有项目文献库可通过 literature harvest 从六个开放论文平台按原生分页机制积累元数据，也可使用 Semantic Scholar Bulk token 深分页。受审批的 literature oa-enrich 用于按 DOI 查询 Unpaywall 的 OA URL；PDF 下载与 Docling 解析继续交由 FulltextPipeline 全文权限工作流处理。详情见 docs/PAPER_SOURCES.md。
