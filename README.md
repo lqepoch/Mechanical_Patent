@@ -336,14 +336,18 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 
 ## 自我发现课题来源平台库（2026-11-19）
 
-系统新增 **可增量复用的公开工程问题来源目录**。首批预置20个公开平台来源和20项消防车结构研究假说，包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
+系统新增 **可增量复用的公开工程问题来源目录**。已登记37个公开平台来源和40项跨行业机械研究假说（消防专题保留），包含科技指南/揭榜挂帅、标准、采购、NASA、FAA、EASA、NFPA、HeroX、MIT Solve及专利论文数据入口；所有课题种子均标记“待验证的创新构想”。
 
 每次 AI 接到“挖掘机械专利课题”任务时先调用 MCP：patent_source_catalog → patent_topic_catalog → patent_discovery_inbox。发现未登记平台，调用 patent_source_propose 进入人工审核候选池；来源证据可通过 patent_public_observe 入库，再调用 patent_topic_derive / patent_topic_plan 产生可证伪课题，最后结合已有专利论文技能继续检索、论证。公开研究笔记始终为待独立核验状态，采用的课题经 patent_topic_adopt 进入当前项目独立 SQLite。
 
-公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；也提供 Compose 的 discovery 可选后台服务自动轮询已审批公共 RSS。AI 深度研究仍需已授权的 Agent 运行器，保密外发须审批。
+公共目录存于工作区 public_source_catalog/sources.sqlite3；37个平台及40个机械课题随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；也提供 Compose 的 discovery 可选后台服务自动轮询已审批公共 RSS。AI 深度研究仍需已授权的 Agent 运行器，保密外发须审批。
 
 完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
 
 ## 论文深分页与 OA 合法地址补全（2026-11-19）
 
 现有项目文献库可通过 literature harvest 从六个开放论文平台按原生分页机制积累元数据，也可使用 Semantic Scholar Bulk token 深分页。受审批的 literature oa-enrich 用于按 DOI 查询 Unpaywall 的 OA URL；PDF 下载与 Docling 解析继续交由 FulltextPipeline 全文权限工作流处理。详情见 docs/PAPER_SOURCES.md。
+
+## 全机械工程领域与跨行业类比（2026-11-19）
+
+全机械领域均可检索和提出研发课题。初始定义18个行业维度、19个物理机理，支持未知领域 unclassified 的扩充。已登记37个来源平台和40项机械研究假说，原有20项消防车课题完整保留。新增 NSF/CMMI、国家重点研发计划、NSFC、ARPA-E、NIST、CORDIS/EIC、EPSRC、Innovate UK、ASME 等官方入口。通过 source-catalog taxonomy 查询分类、sources --industry robotics 按行业筛选、analogies --industry fire_rescue --mechanism fluid 查找跨行业机械机理类比；每轮 AI 研究需优先复用已有来源、课题、证据和失败记录。详见 docs/PROBLEM_DISCOVERY.md。

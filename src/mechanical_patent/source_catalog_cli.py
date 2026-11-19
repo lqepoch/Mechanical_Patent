@@ -13,9 +13,15 @@ def add_source_catalog_parser(subparsers: argparse._SubParsersAction) -> None:
     p = subparsers.add_parser("source-catalog",
         help="公共研发课题平台目录，候选来源隔离，增量监测与证据研究队列")
     p.add_argument("action", choices=("sources","topics","inbox","propose",
-        "approve","observe","derive","plan","note","cycle","audit"))
+        "approve","observe","derive","plan","note","cycle","audit","taxonomy","analogies"))
     p.add_argument("--storage-root", type=Path, default=Path("private_patent_workspace"))
     p.add_argument("--status", default="approved")
+    p.add_argument("--industry", default="", help="跨行业检索行业标签，例如 robotics、marine")
+    p.add_argument("--mechanism", default="", help="共享物理机理标签，例如 fluid、fatigue")
+    p.add_argument("--industry-tag", action="append", default=None,
+                   help="新增平台或研究假说的行业标签，可多次指定")
+    p.add_argument("--mechanism-tag", action="append", default=None,
+                   help="新增平台或研究假说的物理机理，可多次指定")
     p.add_argument("--source-id", default="")
     p.add_argument("--observation-id", default="")
     p.add_argument("--topic-id", default="")
@@ -49,14 +55,19 @@ def handle_source_catalog(args: argparse.Namespace) -> int:
     registry = ProblemSourceRegistry(args.storage_root)
     action = args.action
     if action == "sources":
-        data = {"sources":registry.sources(args.status,args.limit)}
+        data = {"sources":registry.sources(args.status,args.limit,args.industry,args.mechanism)}
     elif action == "topics":
-        data = {"topics":registry.topics(args.limit)}
+        data = {"topics":registry.topics(args.limit,args.industry,args.mechanism)}
+    elif action == "taxonomy":
+        data = registry.taxonomy()
+    elif action == "analogies":
+        data = registry.analogies(args.industry,args.mechanism,args.limit)
     elif action == "inbox":
         data = registry.inbox(args.limit)
     elif action == "propose":
         data = registry.propose(args.name,args.url,args.reason,
-                                discovered_from=args.discovered_from)
+                                discovered_from=args.discovered_from,
+                                industry_tags=args.industry_tag,mechanism_tags=args.mechanism_tag)
     elif action == "approve":
         data = registry.approve(args.source_id,reviewer=args.reviewer,
                rights_reviewed=args.rights_reviewed,mode=args.mode,
@@ -66,7 +77,8 @@ def handle_source_catalog(args: argparse.Namespace) -> int:
                     summary=args.summary,published_at=args.published_at)
     elif action == "derive":
         data = registry.derive_topic(args.observation_id,args.problem,
-                    args.hypothesis,args.falsification,args.domain)
+                    args.hypothesis,args.falsification,args.domain,
+                    args.industry_tag,args.mechanism_tag)
     elif action == "plan":
         data = registry.plan(args.topic_id)
     elif action == "note":

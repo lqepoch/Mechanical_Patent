@@ -53,3 +53,7 @@ user-invocable: true
 5. 用户选择课题后使用 patent_topic_adopt 转为单项目 SQLite 案卷，保密审批通过后方可对外发送新检索词。未真实执行工程试验时禁止宣称工程已验证或具备专利授权条件。
 6. 只批准和处理有明确版权/访问权的公共数据。独立管理员通过本地 CLI 审批新源；AI 可提议但不能自我认证。
 详细工作流参见 docs/PROBLEM_DISCOVERY.md，源码 src/mechanical_patent/problem_sources.py，平台和课题种子存于 src/mechanical_patent/data/。
+
+## 全机械行业通用范围（2026-11-19）
+
+本技能适用于任何机械平台、结构、机构、机电液系统和制造工艺。消防装备仅是一种应用场景，新增来源应覆盖制造/机床、机器人、工程机械、航空航天、海工、轨道、能源、矿山、农机、医疗、精密仪器等。每轮最先调用 patent_mechanical_taxonomy、patent_source_catalog、patent_topic_catalog、patent_discovery_inbox，依据行业×失效物理机理进行检索。使用 patent_mechanical_analogies(target_industry,mechanism) 从其他行业提出真正有连接关系和可证伪指标的迁移构想。任何未列行业可标 unclassified，再登记扩充；不得以消防行业为默认检索范围。已有37个来源与40项假说是初始数据，全部支持持久化与后续扩展。结果需独立权利要求反证与工程验证，禁止 AI 自行标记专利新颖性或实验通过。详见 docs/PROBLEM_DISCOVERY.md。
