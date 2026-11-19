@@ -18,6 +18,8 @@ jobs:
           - test_cli.py
           - test_papers.py
           - test_paper_sources.py
+          - test_paper_integration.py
+          - test_paper_paging.py
           - test_workflow.py
           - test_web_crawler.py
           - test_local_workspace.py

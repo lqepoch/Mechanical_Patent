@@ -216,3 +216,7 @@ patent_literature_note 的 full_text 分析层级现在必须通过当前 PDF �
 **数据治理**：共享公开目录保存在 `/data/public_source_catalog/sources.sqlite3`；各项目 SQLite 仍在 `/data/projects/<project-id>/patents.sqlite3`。20个来源和20个假说种子随 Python wheel/GHCR 镜像打包。新来源需管理员在 CLI `source-catalog approve` 批准：MCP 不提供 approve，不允许 AI 自行提高来源信任等级。管理员字符串尚未绑定身份认证，正式企业部署需要可信 OIDC、权限、可回滚审批和独立审计。
 
 **调度**：Docker Compose 可选 `COMPOSE_PROFILES=discovery` 启动 `source-radar`，只对批准公开 RSS 执行增量巡检，支持版本、去重、失败重试、持久化和停机恢复。尚不具备自动唤起 LLM 研究、第三方网站全文采集或实验认证，自动研究需要后续具备身份/预算与审签的独立 Agent 运行平台。详细边界见 `docs/PROBLEM_DISCOVERY.md` 与 Issues #58–#62。
+
+## 论文批量接口（2026-11-19）
+
+patent_literature_harvest 扩充了可选 provider 和 page_size。普通 Semantic Scholar 使用 offset，Bulk 使用 token 每页1000条，arXiv、Europe PMC 和 PubMed 按各自官方 API 分页；仍强制执行项目保密外发门禁。无网、来源限流或许可缺失应保留错误而不伪造全局查全。原有 patent_literature_fulltext_status/search/pending 保持只读，下载与解析继续由本地批准的 FulltextPipeline 执行。

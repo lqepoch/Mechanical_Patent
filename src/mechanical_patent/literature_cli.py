@@ -47,7 +47,9 @@ def add_literature_parser(subparsers: Any) -> None:
 
     harvest = subs.add_parser("harvest", help="保密授权后按源分页检索并持续写入记忆")
     harvest.add_argument("--provider", action="append", required=True,
-                         choices=["openalex", "crossref", "epo-ops"])
+                         choices=["openalex", "crossref", "semantic-scholar",
+                                  "semantic-scholar-bulk", "arxiv", "europe-pmc",
+                                  "pubmed", "epo-ops"])
     harvest.add_argument("--query", action="append", required=True)
     harvest.add_argument("--workflow-case-id", required=True)
     harvest.add_argument("--workspace-db", required=True, type=Path)
@@ -57,6 +59,13 @@ def add_literature_parser(subparsers: Any) -> None:
     harvest.add_argument("--max-pages", type=int, default=30)
     harvest.add_argument("--max-seconds", type=int, default=600)
     harvest.add_argument("--refresh", action="store_true")
+
+    oa = subs.add_parser("oa-enrich", help="按 DOI 查询 Unpaywall 并持久化开放获取候选位置")
+    oa.add_argument("--doc-id", required=True)
+    oa.add_argument("--workflow-case-id", required=True)
+    oa.add_argument("--workspace-db", required=True, type=Path)
+    oa.add_argument("--allow-search-exposure", action="store_true")
+    oa.add_argument("--authorized", action="store_true")
 
     rights = subs.add_parser("fulltext-plan", help="经案卷权限与开放许可证审核登记 PDF 任务")
     rights.add_argument("--doc-id", required=True)
@@ -141,6 +150,12 @@ def handle_literature(args: argparse.Namespace) -> int:
             args.doc_id, analyst=args.analyst, basis=args.basis,
             analysis=payload, source_positions=args.source_position,
         )
+    elif command == "oa-enrich":
+        from .literature_oa import enrich_unpaywall
+        _assert_fulltext_approval(args)
+        if not args.authorized or not args.allow_search_exposure:
+            raise PatentWorkflowError("DOI 外部查询需要案卷保密审批和明确用户授权。")
+        result = enrich_unpaywall(memory, args.doc_id, authorized=True)
     elif command in {"fulltext-plan", "fulltext-process", "fulltext-status",
                      "fulltext-search", "fulltext-pending", "fulltext-quote"}:
         from .literature_fulltext import FulltextPipeline
@@ -170,8 +185,8 @@ def handle_literature(args: argparse.Namespace) -> int:
     elif command == "harvest":
         if not args.allow_search_exposure:
             raise PatentWorkflowError("联网批量检索须明确允许外发检索词。")
-        if len(args.query) > 8 or len(args.provider) > 3:
-            raise PatentWorkflowError("单次最多8条查询词和3个数据源。")
+        if len(args.query) > 8 or len(args.provider) > 6:
+            raise PatentWorkflowError("单次最多8条查询词和6个数据源。")
         if args.project_dir.name != args.workflow_case_id:
             raise PatentWorkflowError("项目目录名称必须与工作流案卷编号一致。")
         from .local_workspace import LocalPatentWorkspace
@@ -179,6 +194,10 @@ def handle_literature(args: argparse.Namespace) -> int:
         if not workspace.can_egress(args.workflow_case_id):
             raise PatentWorkflowError("工作流未批准当前案卷外部查询。")
         from .papers import CrossrefProvider, OpenAlexProvider
+        from .paper_sources import (
+            SemanticScholarProvider, SemanticScholarBulkProvider,
+            ArxivProvider, EuropePMCProvider, PubMedProvider,
+        )
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         budgets = HarvestBudget(
@@ -187,7 +206,10 @@ def handle_literature(args: argparse.Namespace) -> int:
         )
         types = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
-            "epo-ops": EPOOPSProvider,
+            "semantic-scholar": SemanticScholarProvider,
+            "semantic-scholar-bulk": SemanticScholarBulkProvider,
+            "arxiv": ArxivProvider, "europe-pmc": EuropePMCProvider,
+            "pubmed": PubMedProvider, "epo-ops": EPOOPSProvider,
         }
         harvester = LiteratureHarvester(memory)
         jobs = []

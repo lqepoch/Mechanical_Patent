@@ -45,3 +45,6 @@ user-invocable: true
 
 合法取得当前案卷已解析全文后，AI 写 full_text 层级的摘要、工程机理和创新启发时，必须附 source_positions（例如 p2:b1）；精确引文先由 patent_literature_fulltext_quote 核对。数据库验证当前案卷的页码、段落、PDF SHA256 和解析版本，失效时拒绝写入。单篇 MD 持久记录引用版本及证据等级。metadata、abstract 可不提供全文锚点，但必须注明结论依据与局限。
 
+## 论文 DOI 来源谱系与合规全文记忆（2026-11-19）
+
+不同 API 分批返回相同 DOI 时，合并 DOI、作者、原生 ID、来源列表及合法 PDF 候选，保留原始提供方和每次检索日期；不以标题猜测无 DOI 文献同一性。文学研究批注/逐页解析的持久区与机器元数据分开，避免刷新覆盖。最新版权状态冲突时失效优先，等待人工许可复核。每次 AI 复用 RESEARCH_RESUME.md 与来源 MD，先检查过去已阅读内容。OA 地址查询用 oa-enrich，真正下载与解析参照 patent-fulltext-processing Skill，技术结论需独立原文核验。

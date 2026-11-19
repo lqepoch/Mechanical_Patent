@@ -343,3 +343,7 @@ python -m mechanical_patent research --direction "高海拔泵汽蚀" --paper-qu
 公共目录存于工作区 public_source_catalog/sources.sqlite3；20个数据种子随安装包分发，见 src/mechanical_patent/data。批次巡检通过 mechanical-patent source-catalog cycle --allow-public-network 执行，批准的 RSS 来源增量更新并保留旧版本，失败会退避重试。生产可通过 Docker 持久卷和受控 cron/作业调度启动单次巡检；也提供 Compose 的 discovery 可选后台服务自动轮询已审批公共 RSS。AI 深度研究仍需已授权的 Agent 运行器，保密外发须审批。
 
 完整文档：docs/PROBLEM_DISCOVERY.md。开源网页监测备选：changedetection.io、Huginn 和 RSSHub，尚未自动安装集成。
+
+## 论文深分页与 OA 合法地址补全（2026-11-19）
+
+现有项目文献库可通过 literature harvest 从六个开放论文平台按原生分页机制积累元数据，也可使用 Semantic Scholar Bulk token 深分页。受审批的 literature oa-enrich 用于按 DOI 查询 Unpaywall 的 OA URL；PDF 下载与 Docling 解析继续交由 FulltextPipeline 全文权限工作流处理。详情见 docs/PAPER_SOURCES.md。

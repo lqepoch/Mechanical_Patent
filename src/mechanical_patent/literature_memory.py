@@ -78,6 +78,7 @@ class LiteratureMemoryStore:
     def connect(self, *, write: bool = False) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.db_path, timeout=30.0, isolation_level=None)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=30000")
         try:
             if write:
@@ -241,9 +242,50 @@ class LiteratureMemoryStore:
                     if key != "retrieved_at"
                 })
                 old = db.execute(
-                    "SELECT content_hash,note_path FROM documents WHERE doc_id=?",
+                    "SELECT * FROM documents WHERE doc_id=?",
                     (doc_id,),
                 ).fetchone()
+                if old is not None and record.kind == "paper":
+                    old_meta = json.loads(old["metadata_json"] or "{}")
+                    fresh_meta = dict(record.paper_metadata)
+                    if old_meta or fresh_meta or old["pdf_url"] or record.pdf_url:
+                        from dataclasses import replace
+                        from .paper_sources import merge_paper_records
+                        previous = Evidence(
+                            publication=old["publication"], title=old["title"],
+                            url=old["source_url"], source=old["source"],
+                            retrieved_at=record.retrieved_at, kind="paper",
+                            abstract=old["abstract"], publication_date=old["published_at"],
+                            verified=bool(old["metadata_verified"]),
+                            pdf_url=old["pdf_url"], paper_metadata=old_meta,
+                        )
+                        combined = merge_paper_records([previous, record])[0]
+                        merged_meta = dict(combined.paper_metadata)
+                        # License/OA disagreement fails closed. Stale provider rights
+                        # cannot make a previously withdrawn PDF safe to download.
+                        old_license = str(old_meta.get("license") or "")
+                        new_license = str(fresh_meta.get("license") or "")
+                        if old_license and new_license and old_license != new_license:
+                            merged_meta["license"] = ""
+                            merged_meta["is_open_access"] = False
+                        if old_meta.get("is_open_access") is False or fresh_meta.get("is_open_access") is False:
+                            merged_meta["is_open_access"] = False
+                        if record.source == old["source"]:
+                            for attr in ("license", "is_open_access", "oa_status"):
+                                if attr in fresh_meta:
+                                    merged_meta[attr] = fresh_meta[attr]
+                        if old_license and new_license and old_license != new_license:
+                            merged_meta["license"] = ""
+                            merged_meta["is_open_access"] = False
+                        pdf = record.pdf_url if record.source == old["source"] else combined.pdf_url
+                        record = replace(
+                            combined, pdf_url=pdf,
+                            paper_metadata=merged_meta,
+                        )
+                        fingerprint = _digest({
+                            key: value for key, value in record.to_dict().items()
+                            if key != "retrieved_at"
+                        })
                 file = self._note_path(doc_id, record.kind)
                 if file.is_symlink():
                     raise PatentWorkflowError("检测到文献文件符号链接，拒绝写入。")

@@ -37,3 +37,6 @@ PDF 候选 URL、许可证/审查来源、SHA256、解析器版本、解析 JSON
 - patent_literature_note(basis=full_text) 必须携带1–30个实际存在的 source_positions；程序拒绝错误页码、缺失段落、其他案卷或已更换 PDF 的失效引用。每个 Markdown 研究批注自动记录 PDF 与解析版本 SHA256。
 - 沿用现有 FulltextPipeline、fulltext_jobs、fulltext_blocks 和 FTS5，禁止创建重复的同名全文索引表。接口详见 docs/FULLTEXT_PIPELINE.md。
 
+## 统一全文管线与 DOI OA 候选补全（2026-11-19）
+
+目前唯一的原文获取、审核和解析执行器是 FulltextPipeline；禁止引入第二套并行下载状态机。外部论文 DOI 通过经批准的 literature oa-enrich 查询 Unpaywall，只更新 OA 候选 URL 与许可线索。随后核查最新公开许可，人工登记 fulltext-plan 并通过受限 fulltext-process 获取 PDF，保存 SHA256/页码/许可审计，所有机器解析保持待核验状态。不同供应商许可证冲突时封锁旧授权；旧研究 MD 必须保持可恢复。详见 docs/FULLTEXT_PIPELINE.md。

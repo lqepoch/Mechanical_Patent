@@ -173,24 +173,31 @@ class PatentMCPService:
     def literature_harvest(
         self, case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
-        allow_search_exposure: bool = False,
+        allow_search_exposure: bool = False, page_size: int = 100,
     ) -> dict[str, Any]:
         """同步受控批量检索；更大规模由带预算的 CLI 持续分批调用。"""
         self._case(case_id)
         if not allow_search_exposure or not self.workspace.can_egress(case_id):
             raise PatentWorkflowError("未同时取得显式外发授权和案卷保密批准。")
         from .papers import CrossrefProvider, OpenAlexProvider
+        from .paper_sources import (
+            SemanticScholarProvider, SemanticScholarBulkProvider,
+            ArxivProvider, EuropePMCProvider, PubMedProvider,
+        )
         from .providers import EPOOPSProvider
         from .literature_harvest import HarvestBudget, LiteratureHarvester
         options = {
             "openalex": OpenAlexProvider, "crossref": CrossrefProvider,
-            "epo-ops": EPOOPSProvider,
+            "semantic-scholar": SemanticScholarProvider,
+            "semantic-scholar-bulk": SemanticScholarBulkProvider,
+            "arxiv": ArxivProvider, "europe-pmc": EuropePMCProvider,
+            "pubmed": PubMedProvider, "epo-ops": EPOOPSProvider,
         }
         if provider not in options:
             raise PatentWorkflowError("不支持的文献数据源。")
         budget = HarvestBudget(
-            max_documents=max(1, min(int(max_documents), 1000)),
-            page_size=20 if provider == "epo-ops" else 100,
+            max_documents=max(1, min(int(max_documents), 10000)),
+            page_size=20 if provider == "epo-ops" else int(page_size),
             max_pages=max(1, min(int(max_pages), 20)),
             max_seconds=120,
         )
@@ -600,12 +607,12 @@ def create_server(service: PatentMCPService):
     def patent_literature_harvest(
         case_id: str, provider: str, query: str,
         max_documents: int = 200, max_pages: int = 4,
-        allow_search_exposure: bool = False,
+        allow_search_exposure: bool = False, page_size: int = 100,
     ) -> dict[str, Any]:
         """已获保密许可才按官方 API 分页查询，增量生成每篇 MD。"""
         return service.literature_harvest(
             case_id, provider, query, max_documents, max_pages,
-            allow_search_exposure,
+            allow_search_exposure, page_size,
         )
 
     @server.tool()

@@ -57,3 +57,9 @@ user-invocable: true
 ## 论文原始全文与页码证据（2026-11-19）
 
 不同来源统一 DOI 后，只在纸面许可已确认、OA PDF 来源真实、企业外发审批通过时安排 `patent-fulltext-processing` 任务。Unpaywall 和 OpenAlex 的 PDF URL 先视为候选，未知许可/NC/ND 等不进入自动下载。通过受控 CLI 调用 `fulltext-plan`、`fulltext-process`，失败留存任务与 PDF SHA，利用 `patent_literature_fulltext_search` 获取页码证据。技术综述、创造性反证须以原始文献核验结果为据，切勿将 Docling 解析等同于论文结论核实。
+
+## 批量多平台检索、恢复与 DOI 授权发现（2026-11-19）
+
+当项目目标涉及数百上千篇论文，优先使用 literature harvest 选择 OpenAlex、Crossref、Semantic Scholar、arXiv、Europe PMC 或 PubMed 的官方分页通道，按实际源配额、费用、公开日期和许可分流，逐页保留当前案卷 SQLite 游标与单篇 MD。Semantic Scholar 普通检索 offset 上限每词1000篇，Bulk 使用 token，每页1000篇、max_documents 必须为1000整数倍；OpenAlex 第二页需要 API Key。出现网络失败时保留 partial/failed checkpoint，后续经审批恢复。
+
+用单独的 oa-enrich 在核准的同项目目录按 DOI 查询 Unpaywall 公开候选 PDF；不得自动下载。跨平台同 DOI 元数据应合并 authors/source_ids/sources，许可证或 OA 权属冲突按失效优先；保留原有分析笔记。PDF 获取、离线 Docling、页码块及版权审计采用已有 FulltextPipeline 的 fulltext-plan/fulltext-process，机器全文结果始终待核验。详细示例见 docs/PAPER_SOURCES.md。

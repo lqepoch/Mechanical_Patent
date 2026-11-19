@@ -94,3 +94,7 @@ CI 增加 test_literature_fulltext.py 统一测试：许可拦截、OA 来源、
 AI 通过 patent_literature_note 以 basis=full_text 写入研究批注时，source_positions 需要1至30个真实的页码/段落锚点，文献数据库会独立验证引用并向 Markdown 追加源 PDF 与解析版本 SHA256。较低层级的摘要级笔记不强求 PDF；不合格的全文证据需要补读实际原文。需留意 PDF 更新后旧笔记的适用性，未来 #52 继续实现引用失效后的自动复核队列。
 
 此功能复用全文流水线现有的 fulltext_jobs、fulltext_blocks、fulltext_blocks_fts，无第二套数据表，避免与其他项目分支重叠。离线回归 test_fulltext_quote.py 覆盖未解析拒绝、真实匹配、错误页码、跨案卷、跨项目和 PDF 哈希变化。
+
+## DOI 开放获取线索（2026-11-19）
+
+资料库里的 DOI 可以经项目出站审批使用 literature oa-enrich 查找 Unpaywall 公共 OA URL/许可线索，保留跨平台提供方谱系。它仅更新机器元数据；仍须通过此文的 fulltext-plan 完成版权/人工授权核验，再经 fulltext-process 下载、解析和存档。来源许可冲突将阻断旧授权继续使用。
