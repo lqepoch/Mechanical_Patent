@@ -15,6 +15,15 @@
 3. 专利公开号、DOI、IPC/CPC、物理符号、标准原文、法律术语及 API 字段保留准确原始格式。
 4. 原始第三方许可证和上游代码文档保留其语言；自有适配说明及业务操作指南使用简体中文。
 
+
+## 所有研究任务先复用公开课题来源平台库（2026-11-19）
+
+**每次 AI 用户要求提出机械研发课题、主动挖掘问题、检索技术突破口或扩大研究方向时，第一步必须检索本仓库已持久化的来源目录、已有课题和未处理的新观察；不得未经查询直接重新发散。** 依次调用 patent_source_catalog、patent_topic_catalog、patent_discovery_inbox（或 CLI source-catalog sources/topics/inbox），建立来源和历史研究记录的背景，再继续现有的专利/论文、TRIZ、想法裂变及独立反证。
+
+来源目录按平台、权属/许可、地域、官方/挑战/标准/科研类型、巡检状态、更新周期分类；发现新的大型问题源只能通过 patent_source_propose 记录为 pending，由管理员核对真实性、版权及网页规则后 CLI 批准。AI 不得自行审批新数据源。公开资料观察记录用 patent_public_observe，机械问题和可证伪实验用 patent_topic_derive，后续通过 patent_topic_plan、patent_public_research_note 追溯；选择研究的课题用 patent_topic_adopt 在当前项目独立 SQLite 新建案卷，真实保密审核先于项目检索词外发。
+
+**人类与真实实验审批不可省略**：标题、摘要、行业猜想、AI 自评分不能成为“原创/法律可申请/工程已认证”的证据。临时不可访问的数据源记录错误与覆盖缺口，不用虚构内容代替。来源库公共数据库不得含内部故障、未公开方案、CAD/BOM 等机密；具体见 docs/PROBLEM_DISCOVERY.md 与 skills/patent-autonomous/SKILL.md。
+
 ## 核心职责与任务分派
 
 读取 agents/README.md 定位 13 个专业角色；优先按下面次序分派并保存独立结论：
