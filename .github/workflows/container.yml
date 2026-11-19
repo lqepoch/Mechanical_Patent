@@ -59,6 +59,9 @@ jobs:
             exit 1
           fi
           docker exec "$cid" pandoc --version | head -n 1
+          # Public topic/source seeds MUST be packaged inside GHCR, not only available in git.
+          docker exec "$cid" python -c 'from mechanical_patent.problem_sources import ProblemSourceRegistry; r=ProblemSourceRegistry("/data"); assert len(r.sources())==20, "source registry seeds missing from Docker"; assert len(r.topics())==20, "mechanical topic seeds missing from Docker"; print("public catalog bootstrapped:",len(r.sources()),"sources",len(r.topics()),"topics")'
+          sudo test -s "$PATENT_DATA_DIR/public_source_catalog/sources.sqlite3"
           echo "Persistent filesystem files:"
           sudo find "$PATENT_DATA_DIR" -maxdepth 5 -type f -printf '%p %s bytes\n' | head -n 40
           sudo test -s "$PATENT_DATA_DIR/projects/PM80/patents.sqlite3"
