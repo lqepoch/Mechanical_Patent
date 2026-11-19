@@ -1,11 +1,14 @@
 """基于 canonical FulltextPipeline 的可恢复多文献批次（无外网和模型权重）。"""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 from hashlib import sha256
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from mechanical_patent.core import Evidence, PatentWorkflowError, evidence_id
 from mechanical_patent.literature_memory import LiteratureMemoryStore
@@ -129,8 +132,12 @@ class FullTextBatchTests(unittest.TestCase):
         self.assertEqual(again["failed_this_run"], 1)
         blocked = self.run_batch(manifest, max_attempts=2)
         self.assertEqual(blocked["processed_this_run"], 0)
+        self.assertEqual(blocked["failed_total"], 1)
+        self.assertEqual(blocked["failed_pending_retry"], 0)
+        self.assertEqual(blocked["failed_retry_exhausted"], 1)
         recovered = self.run_batch(manifest, max_attempts=2, refresh=True)
         self.assertEqual(recovered["completed_total"], 2)
+        self.assertEqual(recovered["skipped_this_run"], 1)
         self.assertTrue(self.runner.status(first["batch_id"])["complete"])
 
     def test_download_only_and_parse_later(self):
@@ -144,6 +151,104 @@ class FullTextBatchTests(unittest.TestCase):
         self.assertEqual(self.pipeline.status(self.docs[0])["status"], "parsed")
         self.assertEqual(len(self.download_calls), 1)
         self.assertEqual(len(self.parse_calls), 1)
+
+    def test_thousand_record_pagination_and_failed_filter_via_cli_and_mcp(self):
+        from mechanical_patent.cli import main
+        from mechanical_patent.mcp_server import PatentMCPService
+        service = PatentMCPService(self.root / "mcp")
+        service.create_case("BATCH-1", "合成测试")
+        memory = service._memory("BATCH-1")
+        runner = FullTextBatchRunner(FulltextPipeline(memory))
+        batch_id = "FTB-" + "A" * 20
+
+        def doc_id(ordinal):
+            return f"EV-{ordinal:012X}"
+
+        with memory.connect(write=True) as db:
+            db.execute("INSERT INTO fulltext_batches VALUES(?,?,?,?,?)",
+                       (batch_id, "test", 1000, "test", "test"))
+            db.executemany(
+                "INSERT INTO fulltext_batch_items "
+                "(batch_id,doc_id,ordinal,state,attempts,last_error,updated_at) VALUES(?,?,?,?,?,?,?)",
+                [(batch_id, doc_id(i), i, "failed" if i in (200, 999) else "done",
+                  1, "测试解析失败" if i in (200, 999) else "", "test")
+                 for i in range(1000)],
+            )
+
+        first = runner.status(batch_id, limit=1000)
+        self.assertEqual(first["next_cursor"], 199)
+        self.assertTrue(first["truncated"])
+        seen = [row["doc_id"] for row in first["items"]]
+        page = first
+        while page["next_cursor"] is not None:
+            page = runner.status(batch_id, limit=200, cursor=page["next_cursor"])
+            seen.extend(row["doc_id"] for row in page["items"])
+        self.assertEqual(seen, [doc_id(i) for i in range(1000)])
+        self.assertFalse(page["truncated"])
+
+        out = StringIO()
+        with redirect_stdout(out):
+            rc = main(["literature", "--project-dir", str(service.root / "cases" / "BATCH-1"),
+                       "fulltext-batch-status", "--batch-id", batch_id, "--state", "failed",
+                       "--cursor", str(first["next_cursor"]), "--limit", "1"])
+        self.assertEqual(rc, 0)
+        result = json.loads(out.getvalue())
+        self.assertEqual(result["matched_total"], 2)
+        self.assertEqual(result["counts"], {"done": 998, "failed": 2})
+        self.assertEqual(result["items"][0]["doc_id"], doc_id(200))
+        self.assertEqual(result["items"][0]["last_error"], "测试解析失败")
+        rest = service.literature_fulltext_batch_status(
+            "BATCH-1", batch_id, limit=1, cursor=result["next_cursor"], state="failed",
+        )
+        self.assertEqual(rest["items"][0]["doc_id"], doc_id(999))
+        self.assertIsNone(rest["next_cursor"])
+        for args in ({"cursor": -1}, {"cursor": True}, {"cursor": 1000}, {"state": "unknown"}):
+            with self.assertRaises(PatentWorkflowError):
+                runner.status(batch_id, **args)
+
+    def test_failed_parse_charges_download_budget_and_retry_reuses_pdf(self):
+        manifest = {"items": [self.item(0), self.item(1)]}
+        with patch.object(self, "parser", side_effect=PatentWorkflowError("解析失败")):
+            first = self.run_batch(manifest, max_total_bytes=2500)
+        self.assertEqual(first["failed_this_run"], 1)
+        self.assertEqual(first["pending"], 1)
+        self.assertEqual(first["bytes_processed_this_run"], 1815)
+        self.assertEqual(len(self.download_calls), 1)
+        second = self.run_batch(manifest, max_total_bytes=2500)
+        self.assertEqual(second["status"], "complete")
+        self.assertEqual(second["bytes_processed_this_run"], 1815)
+        self.assertEqual(len(self.download_calls), 2)
+
+    def test_status_error_is_isolated_and_parse_completion_is_required(self):
+        status = self.pipeline.status
+
+        def sometimes_unavailable(doc_id):
+            if doc_id == self.docs[0]:
+                raise PatentWorkflowError("检查点不可用")
+            return status(doc_id)
+
+        manifest = {"items": [self.item(0), self.item(1)]}
+        with patch.object(self.pipeline, "status", side_effect=sometimes_unavailable):
+            first = self.run_batch(manifest)
+        self.assertEqual(first["processed_this_run"], 2)
+        self.assertEqual(first["failed_this_run"], 1)
+        self.assertEqual(first["completed_total"], 1)
+        with patch.object(self.pipeline, "process", return_value={"status": "downloaded"}):
+            second = self.run_batch(manifest)
+        self.assertEqual(second["status"], "partial")
+        self.assertEqual(second["failed_this_run"], 1)
+
+    def test_stale_done_does_not_consume_new_revision_attempt_budget(self):
+        manifest = {"items": [self.item(0)]}
+        self.assertEqual(self.run_batch(manifest, max_attempts=1)["status"], "complete")
+        with self.memory.connect(write=True) as db:
+            db.execute("UPDATE fulltext_jobs SET status='downloaded',attempts=0 WHERE doc_id=?",
+                       (self.docs[0],))
+        with patch.object(self, "parser", side_effect=PatentWorkflowError("新版本解析失败")):
+            result = self.run_batch(manifest, max_attempts=1)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["failed_retry_exhausted"], 1)
+        self.assertFalse(self.runner.status(result["batch_id"])["complete"])
 
     def test_project_isolation_and_malformed_batch_id(self):
         manifest = {"items": [self.item(0)]}

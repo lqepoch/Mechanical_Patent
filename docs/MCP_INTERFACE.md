@@ -243,4 +243,4 @@ MCP 的 patent_source_catalog(status,limit) 和 patent_topic_catalog(limit) 现�
 
 ## 合规 PDF 全文批次只读状态（2026-11-19）
 
-`patent_literature_fulltext_batch_status(case_id,batch_id,limit=100)` 在当前 project_id/case_id 下读取 `FullTextBatchRunner` 的批次总量、已完成、待处理、失败重试和截断的单篇检查点。MCP 不启动网络请求、PDF 下载或用户授权流程；批次创建与执行仅允许完成真实版权许可及项目外发审批的本地 CLI `literature fulltext-batch`。已有 `FulltextPipeline` 是唯一原文下载/解析状态机，解释见 docs/FULLTEXT_PIPELINE.md。
+`patent_literature_fulltext_batch_status(case_id,batch_id,limit=100,cursor=None,state=None)` 在当前 project_id/case_id 下读取 `FullTextBatchRunner` 的批次总量、已完成、待处理、失败重试和单篇检查点。可按 `pending`、`done`、`failed` 筛选；用 `next_cursor` 翻页，整批计数不受筛选影响。MCP 不启动网络请求、PDF 下载或用户授权流程；批次创建与执行仅允许完成真实版权许可及项目外发审批的本地 CLI `literature fulltext-batch`。已有 `FulltextPipeline` 是唯一原文下载/解析状态机，解释见 docs/FULLTEXT_PIPELINE.md。

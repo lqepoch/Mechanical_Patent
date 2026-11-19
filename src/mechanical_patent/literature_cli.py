@@ -114,6 +114,8 @@ def add_literature_parser(subparsers: Any) -> None:
     batch_status = subs.add_parser("fulltext-batch-status", help="查询项目全文批次检查点")
     batch_status.add_argument("--batch-id", required=True)
     batch_status.add_argument("--limit", type=int, default=100)
+    batch_status.add_argument("--cursor", type=int, help="上一页返回的 next_cursor")
+    batch_status.add_argument("--state", choices=("pending", "done", "failed"), help="按条目状态筛选")
 
 
 def _assert_fulltext_approval(args: argparse.Namespace) -> None:
@@ -188,7 +190,9 @@ def handle_literature(args: argparse.Namespace) -> int:
             result = {"jobs": pipeline.pending(limit=args.limit)}
         elif command == "fulltext-batch-status":
             from .literature_fulltext_batch import FullTextBatchRunner
-            result = FullTextBatchRunner(pipeline).status(args.batch_id, limit=args.limit)
+            result = FullTextBatchRunner(pipeline).status(
+                args.batch_id, limit=args.limit, cursor=args.cursor, state=args.state,
+            )
         elif command == "fulltext-batch":
             from .literature_fulltext_batch import FullTextBatchRunner
             _assert_fulltext_approval(args)
